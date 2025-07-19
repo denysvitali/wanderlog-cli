@@ -9,7 +9,10 @@
       "Bash(go build:*)",
       "Bash(grep:*)",
       "Bash(gojsonstruct:*)",
-      "Bash(./wanderlog trip:*)"
+      "Bash(./wanderlog trip:*)",
+      "Bash(./wanderlog places:*)",
+      "Bash(./wanderlog:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

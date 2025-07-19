@@ -4,14 +4,16 @@ A beautiful command-line interface for interacting with Wanderlog trip data. Bui
 
 ## Features
 
-- 🌍 Fetch trip details from Wanderlog API
-- 📅 Display trip dates, duration, and statistics
-- 📍 Show detailed itineraries with places and locations
-- ✈️ Flight information display
-- 🎨 Beautiful, colorized terminal output
-- 📊 JSON output support for scripting
-- 🔧 Configurable logging and output formats
-- 📦 Usable as both CLI tool and Go package
+- 🌍 **Fetch trip details** from Wanderlog API or local JSON files
+- 📅 **Trip overview** with dates, duration, and statistics  
+- ✈️ **Flight information** with departure/arrival details
+- 🗺️ **Day-by-day itinerary** showing destinations and notes
+- 🏠 **Places details** with ratings, addresses, and descriptions
+- 🎨 **Beautiful terminal output** with colors and emojis
+- 📊 **Multiple output formats** - pretty, JSON, and Markdown
+- 🤖 **LLM-friendly** Markdown output for AI analysis
+- 🔧 **Configurable** logging and output formats
+- 📦 **Go package** - usable as both CLI tool and library
 
 ## Installation
 
@@ -32,17 +34,32 @@ go build -o wanderlog
 ### Command Line
 
 ```bash
-# Get trip overview
+# Get trip overview from API
 wanderlog trip abc123xyz
 
-# Get detailed trip information
+# Get detailed itinerary with flights and destinations
 wanderlog trip abc123xyz --details
 
-# Output as JSON
+# Load trip from local JSON file
+wanderlog trip --file trips/trip1.json
+
+# Show places with details, ratings, and addresses
+wanderlog places abc123xyz
+wanderlog places --file trips/trip1.json
+
+# Output as JSON for scripting
 wanderlog trip abc123xyz --format json
+wanderlog places abc123xyz --format json
+
+# Output as Markdown for LLMs and documentation
+wanderlog trip abc123xyz --format markdown --details
+wanderlog places abc123xyz --format markdown
 
 # Enable verbose logging
 wanderlog trip abc123xyz --verbose
+
+# Combine options
+wanderlog trip --file trips/trip1.json --details --verbose
 ```
 
 ### Finding Trip IDs
@@ -92,14 +109,96 @@ verbose: true
 format: pretty
 ```
 
-## API Coverage
+## Example Output
 
-Currently supports:
-- ✅ Trip metadata (title, dates, statistics)
-- ✅ Daily itineraries with places
-- ✅ Flight information
-- ✅ Place details with Google Places data
-- ✅ Budget information (in data model)
+```bash
+$ wanderlog trip --file trips/trip1.json --details
+
+🌍 Trip to China
+
+📅 Oct 12, 2025 → Oct 25, 2025 (14 days)
+
+╭───────────────────────────────╮
+│                               │
+│  📍 8 places  •  👀 15 views  │
+│                               │
+╰───────────────────────────────╯
+
+✈️  Flights
+
+🛫 EgyptAir 706
+   Depart: Oct 12 17:50 from MXP (Milan)
+   Arrive: Oct 12 22:30 at CAI (Cairo)
+
+🛫 EgyptAir 955
+   Depart: Oct 13 00:50 from CAI (Cairo)
+   Arrive: Oct 13 15:20 at PEK (Beijing)
+
+🌍 Destinations
+
+📍 Beijing (Pechino)
+   Sunday, Oct 12, 2025
+   📝 Arriviamo al 13.10 pomeriggio
+
+📍 Pechino
+   Monday, Oct 13, 2025
+   📝 Opzioni hotel: Sunworld Hotel
+```
+
+## LLM Integration
+
+The `--format markdown` option produces clean, structured Markdown perfect for feeding to Large Language Models:
+
+```bash
+# Generate trip analysis for an LLM
+wanderlog trip abc123xyz --format markdown --details > trip.md
+
+# Get places data for AI processing
+wanderlog places abc123xyz --format markdown > places.md
+```
+
+**Example Markdown output:**
+```markdown
+# Trip to China
+
+## Trip Information
+- **Dates:** October 12, 2025 to October 25, 2025
+- **Duration:** 14 days
+- **Places:** 8
+
+## Flights
+### EgyptAir Flight 706
+- **Departure:** October 12, 2025 at 17:50
+- **From:** Milan Malpensa Airport (MXP) - Milan
+- **Arrival:** October 12, 2025 at 22:30
+- **To:** Cairo International Airport (CAI) - Cairo
+```
+
+This format allows you to easily:
+- 📊 **Analyze trip patterns** with AI
+- 💡 **Get travel recommendations** 
+- 📋 **Generate travel summaries**
+- 🗺️ **Plan optimized itineraries**
+
+## Current Features
+
+**Working:**
+- ✅ **Trip metadata** - title, dates, duration, statistics
+- ✅ **Flight details** - airline, flight numbers, departure/arrival times
+- ✅ **Daily itinerary** - destination breakdown with dates
+- ✅ **Places information** - ratings, addresses, descriptions, websites
+- ✅ **Notes and text** - travel notes and planning details
+- ✅ **Multiple output formats** - pretty terminal, JSON, Markdown
+- ✅ **LLM integration** - structured Markdown for AI analysis
+- ✅ **Local file loading** - test with offline JSON data
+- ✅ **Beautiful formatting** - colorized terminal output with emojis
+
+**Coming Soon:**
+- 🔄 **Photos and images** - trip and place photos
+- 🔄 **Budget tracking** - expenses and costs  
+- 🔄 **Interactive mode** - explore trips interactively
+- 🔄 **Export features** - PDF, HTML, other formats
+- 🔄 **Search and filtering** - find specific places or dates
 
 ## Development
 
