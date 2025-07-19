@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(jq:*)",
+      "Bash(go mod init:*)",
+      "Bash(mkdir:*)",
+      "Bash(go install:*)",
+      "Bash(go get:*)",
+      "Bash(go build:*)",
+      "Bash(grep:*)",
+      "Bash(gojsonstruct:*)",
+      "Bash(./wanderlog trip:*)"
+    ],
+    "deny": []
+  }
+}
