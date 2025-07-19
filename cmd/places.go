@@ -10,25 +10,17 @@ import (
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
-var (
-	outputFormat string
-	showDetails  bool
-	fromFile     string
-)
-
-var tripCmd = &cobra.Command{
-	Use:   "trip [trip-id]",
-	Short: "Get trip information",
-	Long: `Fetch and display trip information from Wanderlog.
-
-The trip ID can be found in the Wanderlog URL:
-https://wanderlog.com/view/TRIP_ID/trip-name
+var placesCmd = &cobra.Command{
+	Use:   "places [trip-id]",
+	Short: "Show places from a trip",
+	Long: `Display detailed information about places in a trip including
+names, addresses, ratings, and other metadata.
 
 Examples:
-  wanderlog trip abc123xyz
-  wanderlog trip abc123xyz --format json
-  wanderlog trip abc123xyz --format markdown --details
-  wanderlog trip --file trips/trip1.json`,
+  wanderlog places abc123xyz
+  wanderlog places --file trips/trip1.json
+  wanderlog places abc123xyz --format json
+  wanderlog places abc123xyz --format markdown`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if fromFile != "" && len(args) > 0 {
 			return fmt.Errorf("cannot specify both trip ID and --file flag")
@@ -64,19 +56,18 @@ Examples:
 
 		switch outputFormat {
 		case "json":
-			ui.PrintJSON(trip)
+			ui.PrintJSON(trip.Resources.PlaceMetadata)
 		case "markdown", "md":
-			ui.PrintTripMarkdown(trip, showDetails)
+			ui.PrintPlacesMarkdown(trip.Resources.PlaceMetadata)
 		default:
-			ui.PrintTrip(trip, showDetails)
+			ui.PrintPlaces(trip.Resources.PlaceMetadata)
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(tripCmd)
+	rootCmd.AddCommand(placesCmd)
 
-	tripCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
-	tripCmd.Flags().BoolVarP(&showDetails, "details", "d", false, "Show detailed information")
-	tripCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
+	placesCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	placesCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
 }
