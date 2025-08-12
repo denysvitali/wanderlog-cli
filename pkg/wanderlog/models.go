@@ -4,6 +4,26 @@ import (
 	"time"
 )
 
+// PlaceSearchResponse represents the response from the place search API
+type PlaceSearchResponse struct {
+	Success bool           `json:"success"`
+	Places  []SearchResult `json:"places"`
+}
+
+// SearchResult represents a single place result from search
+type SearchResult struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Address     string   `json:"address"`
+	PlaceID     string   `json:"place_id"`
+	Latitude    float64  `json:"latitude"`
+	Longitude   float64  `json:"longitude"`
+	Rating      float64  `json:"rating"`
+	Categories  []string `json:"categories"`
+	Description string   `json:"description"`
+	Website     string   `json:"website"`
+}
+
 type PlacesListsGeo struct {
 	Bounds      []float64 `json:"bounds"`
 	CountryName any       `json:"countryName"`
@@ -150,20 +170,20 @@ type CarouselItems struct {
 type Resources struct {
 	Ancestors                   []any `json:"ancestors"`
 	CurrencyRatesUsd            map[string]float64
-	DefaultPlacesListsGeo       PlacesListsGeo   `json:"defaultPlacesListsGeo"`
-	DistancesBetweenPlaces      struct{}         `json:"distancesBetweenPlaces"`
-	DistancesBetweenPlacesError any              `json:"distancesBetweenPlacesError"`
-	ExploreCarouselItems        []CarouselItems  `json:"exploreCarouselItems"`
-	FlightUpdates               struct{}         `json:"flightUpdates"`
-	Geo                         Geo              `json:"geo"`
-	Geos                        []Geo            `json:"geos"`
-	HotelDeals                  []any            `json:"hotelDeals"`
-	LiveFlightUpdates           struct{}         `json:"liveFlightUpdates"`
-	Nearby                      []POI            `json:"nearby"`
-	PlaceMetadata               []Metadata       `json:"placeMetadata"`
+	DefaultPlacesListsGeo       PlacesListsGeo     `json:"defaultPlacesListsGeo"`
+	DistancesBetweenPlaces      struct{}           `json:"distancesBetweenPlaces"`
+	DistancesBetweenPlacesError any                `json:"distancesBetweenPlacesError"`
+	ExploreCarouselItems        []CarouselItems    `json:"exploreCarouselItems"`
+	FlightUpdates               struct{}           `json:"flightUpdates"`
+	Geo                         Geo                `json:"geo"`
+	Geos                        []Geo              `json:"geos"`
+	HotelDeals                  []any              `json:"hotelDeals"`
+	LiveFlightUpdates           struct{}           `json:"liveFlightUpdates"`
+	Nearby                      []POI              `json:"nearby"`
+	PlaceMetadata               []Metadata         `json:"placeMetadata"`
 	SectionRecommendations      map[string][]Place `json:"sectionRecommendations"`
-	TipsOnLoadResources         []LoadResources  `json:"tipsOnLoadResources"`
-	TopPlace                    Place            `json:"topPlace"`
+	TipsOnLoadResources         []LoadResources    `json:"tipsOnLoadResources"`
+	TopPlace                    Place              `json:"topPlace"`
 }
 
 type GuidedResources struct {

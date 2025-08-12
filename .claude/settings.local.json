@@ -12,7 +12,9 @@
       "Bash(./wanderlog trip:*)",
       "Bash(./wanderlog places:*)",
       "Bash(./wanderlog:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(go mod:*)",
+      "Bash(go run:*)"
     ],
     "deny": []
   }
