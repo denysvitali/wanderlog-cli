@@ -1,2 +1,4 @@
 /wanderlog
 /trips/*.json
+/*.js
+/wanderlog-cli

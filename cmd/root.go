@@ -61,7 +61,7 @@ func initConfig() {
 
 func setupLogging() {
 	logger = logrus.New()
-	
+
 	if verbose {
 		logger.SetLevel(logrus.DebugLevel)
 	} else {

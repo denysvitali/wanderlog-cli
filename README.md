@@ -5,6 +5,11 @@ A beautiful command-line interface for interacting with Wanderlog trip data. Bui
 ## Features
 
 - 🌍 **Fetch trip details** from Wanderlog API or local JSON files
+- ✍️ **Create and edit trips** - full write functionality with the same API as the Android app
+- 📍 **Place management** - add/remove places, manage itineraries
+- 🔐 **Authentication** - secure login with session management
+- 📋 **Trip management** - list, create, copy, delete trips
+- 🖼️ **Images and media** - view trip images and attachments
 - 📅 **Trip overview** with dates, duration, and statistics  
 - ✈️ **Flight information** with departure/arrival details
 - 🗺️ **Day-by-day itinerary** showing destinations and notes
@@ -31,7 +36,7 @@ go build -o wanderlog
 
 ## Usage
 
-### Command Line
+### Reading Trip Data
 
 ```bash
 # Get trip overview from API
@@ -47,6 +52,9 @@ wanderlog trip --file trips/trip1.json
 wanderlog places abc123xyz
 wanderlog places --file trips/trip1.json
 
+# View trip images
+wanderlog images abc123xyz
+
 # Output as JSON for scripting
 wanderlog trip abc123xyz --format json
 wanderlog places abc123xyz --format json
@@ -54,13 +62,63 @@ wanderlog places abc123xyz --format json
 # Output as Markdown for LLMs and documentation
 wanderlog trip abc123xyz --format markdown --details
 wanderlog places abc123xyz --format markdown
-
-# Enable verbose logging
-wanderlog trip abc123xyz --verbose
-
-# Combine options
-wanderlog trip --file trips/trip1.json --details --verbose
 ```
+
+### Writing and Editing Trips
+
+```bash
+# Authenticate with Wanderlog
+wanderlog login
+
+# List your trips
+wanderlog list
+
+# Create a new trip
+wanderlog create --title "Trip to Japan" --start 2024-06-01 --end 2024-06-15
+
+# Copy an existing trip
+wanderlog copy abc123xyz
+
+# Add a place to a trip
+wanderlog edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
+
+# Add a place with coordinates
+wanderlog edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671
+
+# Remove a place from a trip  
+wanderlog edit remove-place abc123xyz 12345
+
+# Delete a trip (careful!)
+wanderlog delete abc123xyz
+```
+
+### Authentication
+
+For write operations (creating, editing, deleting trips), you need to authenticate:
+
+```bash
+# Interactive login (credentials are securely stored in system keychain)
+wanderlog login
+
+# Check authentication status
+wanderlog status
+
+# Logout (clear stored credentials)
+wanderlog logout
+
+# Or set credentials via environment variables (not recommended for security)
+export WANDERLOG_SESSION="your-session-cookie"
+export WANDERLOG_XSRF="your-xsrf-token"
+
+# Or pass as flags (not recommended for security)
+wanderlog create --title "New Trip" --session "cookie" --xsrf "token"
+```
+
+**Security Features:**
+- 🔐 **Secure Storage**: Credentials are stored in your system keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux)
+- 🔄 **Automatic Loading**: Once logged in, credentials are automatically used for all write operations
+- 🗑️ **Easy Logout**: Clear stored credentials with `wanderlog logout`
+- ✅ **Status Check**: Verify authentication status with `wanderlog status`
 
 ### Finding Trip IDs
 
@@ -83,6 +141,7 @@ import (
 func main() {
     client := wanderlog.NewClient()
     
+    // Read trip data
     trip, err := client.GetTrip("abc123xyz")
     if err != nil {
         log.Fatal(err)
@@ -93,6 +152,27 @@ func main() {
         trip.TripPlan.StartDate, 
         trip.TripPlan.EndDate)
     fmt.Printf("Places: %d\n", trip.TripPlan.PlaceCount)
+    
+    // Authenticate for write operations
+    creds, err := client.Login("user@example.com", "password")
+    if err != nil {
+        log.Fatal(err)
+    }
+    client.SetAuth(creds)
+    
+    // Create a new trip
+    newTrip, err := client.CreateTrip(wanderlog.CreateTripRequest{
+        Title: "My New Trip",
+        StartDate: "2024-06-01",
+        EndDate: "2024-06-07",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Printf("Created trip: %s (ID: %s)\n", 
+        newTrip.TripPlan.Title, 
+        newTrip.TripPlan.Key)
 }
 ```
 
@@ -183,10 +263,15 @@ This format allows you to easily:
 ## Current Features
 
 **Working:**
+- ✅ **Complete CRUD operations** - create, read, update, delete trips
+- ✅ **Authentication** - secure login with session management
+- ✅ **Trip management** - list, create, copy, delete your trips
+- ✅ **Place editing** - add/remove places from itineraries
 - ✅ **Trip metadata** - title, dates, duration, statistics
 - ✅ **Flight details** - airline, flight numbers, departure/arrival times
 - ✅ **Daily itinerary** - destination breakdown with dates
 - ✅ **Places information** - ratings, addresses, descriptions, websites
+- ✅ **Images and media** - view trip photos and attachments
 - ✅ **Notes and text** - travel notes and planning details
 - ✅ **Multiple output formats** - pretty terminal, JSON, Markdown
 - ✅ **LLM integration** - structured Markdown for AI analysis
@@ -194,11 +279,23 @@ This format allows you to easily:
 - ✅ **Beautiful formatting** - colorized terminal output with emojis
 
 **Coming Soon:**
-- 🔄 **Photos and images** - trip and place photos
-- 🔄 **Budget tracking** - expenses and costs  
-- 🔄 **Interactive mode** - explore trips interactively
-- 🔄 **Export features** - PDF, HTML, other formats
+- 🔄 **Collaboration** - share trips, invite collaborators
+- 🔄 **Budget tracking** - expenses and costs management 
+- 🔄 **Batch operations** - bulk editing with operational transforms
+- 🔄 **Interactive mode** - explore trips interactively with TUI
+- 🔄 **Export features** - PDF, HTML, calendar formats
 - 🔄 **Search and filtering** - find specific places or dates
+- 🔄 **Trip analytics** - distance, duration, cost analysis
+
+## Security
+
+The CLI implements secure credential storage using your system's native keychain:
+
+- **macOS**: Keychain Access
+- **Windows**: Windows Credential Manager  
+- **Linux**: Secret Service (GNOME Keyring, KDE Wallet, etc.)
+
+Your login credentials (email/password) are **never stored**. Only session tokens are securely stored for convenience. You can always run `wanderlog logout` to clear stored credentials.
 
 ## Development
 
