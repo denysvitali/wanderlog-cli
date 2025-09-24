@@ -22,20 +22,29 @@ var mcpCmd = &cobra.Command{
 This allows LLMs and other MCP clients to access Wanderlog trip data
 and functionality through a standardized protocol.
 
-The server will run on stdin/stdout and provide tools for:
-- Listing trips
-- Getting trip details
+The server runs in read-only mode by default for security. Use --enable-write
+to allow trip modifications.
+
+Read-only tools (always available):
+- Listing trips and getting trip details
 - Viewing places and itineraries
-- Managing trip data
+- Searching for places
+- Trip analysis and recommendations
+
+Write operations (only with --enable-write):
+- Adding places to trips
+- Removing places from trips
 
 Examples:
-  wanderlog mcp                    # Start MCP server on stdio
-  wanderlog mcp --http :8080       # Start HTTP MCP server on port 8080`,
+  wanderlog mcp                    # Start read-only MCP server on stdio
+  wanderlog mcp --enable-write     # Start read-write MCP server on stdio
+  wanderlog mcp --http :8080       # Start read-only HTTP MCP server on port 8080`,
 	Run: func(cmd *cobra.Command, args []string) {
+		enableWrite, _ := cmd.Flags().GetBool("enable-write")
 		if httpAddr, _ := cmd.Flags().GetString("http"); httpAddr != "" {
-			runMCPHTTPServer(httpAddr)
+			runMCPHTTPServer(httpAddr, enableWrite)
 		} else {
-			runMCPStdioServer()
+			runMCPStdioServer(enableWrite)
 		}
 	},
 }
@@ -43,9 +52,10 @@ Examples:
 func init() {
 	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.Flags().String("http", "", "HTTP address to serve MCP on (e.g., :8080)")
+	mcpCmd.Flags().Bool("enable-write", false, "Enable write operations (add/remove places, etc.)")
 }
 
-func createMCPServer() *server.MCPServer {
+func createMCPServer(readOnly bool) *server.MCPServer {
 	// Create MCP server with capabilities
 	s := server.NewMCPServer(
 		"Wanderlog CLI",
@@ -112,51 +122,54 @@ func createMCPServer() *server.MCPServer {
 	)
 	s.AddTool(listSectionsTool, handleListSections)
 
-	// Add place to trip tool
-	addPlaceTool := mcp.NewTool("add_place",
-		mcp.WithDescription("Add a place to a trip"),
-		mcp.WithString("trip_key",
-			mcp.Required(),
-			mcp.Description("The key/ID of the trip to add the place to"),
-		),
-		mcp.WithString("name",
-			mcp.Required(),
-			mcp.Description("Name of the place to add"),
-		),
-		mcp.WithString("place_id",
-			mcp.Description("Google Place ID (optional)"),
-		),
-		mcp.WithNumber("latitude",
-			mcp.Description("Latitude of the place (optional)"),
-		),
-		mcp.WithNumber("longitude",
-			mcp.Description("Longitude of the place (optional)"),
-		),
-		mcp.WithNumber("section_id",
-			mcp.Description("Section ID to add the place to (optional)"),
-		),
-		mcp.WithString("text",
-			mcp.Description("Additional text/notes for the place (optional)"),
-		),
-	)
-	s.AddTool(addPlaceTool, handleAddPlace)
+	// Add write operation tools only if not in read-only mode
+	if !readOnly {
+		// Add place to trip tool
+		addPlaceTool := mcp.NewTool("add_place",
+			mcp.WithDescription("Add a place to a trip"),
+			mcp.WithString("trip_key",
+				mcp.Required(),
+				mcp.Description("The key/ID of the trip to add the place to"),
+			),
+			mcp.WithString("name",
+				mcp.Required(),
+				mcp.Description("Name of the place to add"),
+			),
+			mcp.WithString("place_id",
+				mcp.Description("Google Place ID (optional)"),
+			),
+			mcp.WithNumber("latitude",
+				mcp.Description("Latitude of the place (optional)"),
+			),
+			mcp.WithNumber("longitude",
+				mcp.Description("Longitude of the place (optional)"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID to add the place to (optional)"),
+			),
+			mcp.WithString("text",
+				mcp.Description("Additional text/notes for the place (optional)"),
+			),
+		)
+		s.AddTool(addPlaceTool, handleAddPlace)
 
-	// Remove place from trip tool
-	removePlaceTool := mcp.NewTool("remove_place",
-		mcp.WithDescription("Remove a place from a trip"),
-		mcp.WithString("trip_key",
-			mcp.Required(),
-			mcp.Description("The key/ID of the trip to remove the place from"),
-		),
-		mcp.WithNumber("place_id",
-			mcp.Required(),
-			mcp.Description("The ID of the place to remove"),
-		),
-		mcp.WithNumber("section_id",
-			mcp.Description("Section ID to remove the place from (optional)"),
-		),
-	)
-	s.AddTool(removePlaceTool, handleRemovePlace)
+		// Remove place from trip tool
+		removePlaceTool := mcp.NewTool("remove_place",
+			mcp.WithDescription("Remove a place from a trip"),
+			mcp.WithString("trip_key",
+				mcp.Required(),
+				mcp.Description("The key/ID of the trip to remove the place from"),
+			),
+			mcp.WithNumber("place_id",
+				mcp.Required(),
+				mcp.Description("The ID of the place to remove"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID to remove the place from (optional)"),
+			),
+		)
+		s.AddTool(removePlaceTool, handleRemovePlace)
+	}
 
 	// Add search places tool
 	searchPlacesTool := mcp.NewTool("search_places",
@@ -239,19 +252,32 @@ func createMCPServer() *server.MCPServer {
 	return s
 }
 
-func runMCPStdioServer() {
-	s := createMCPServer()
+func runMCPStdioServer(enableWrite bool) {
+	readOnly := !enableWrite
+	s := createMCPServer(readOnly)
 
-	logger.Info("Starting Wanderlog MCP server on stdio")
+	mode := "read-only"
+	if enableWrite {
+		mode = "read-write"
+	}
+	logger.WithField("mode", mode).Info("Starting Wanderlog MCP server on stdio")
 	if err := server.ServeStdio(s); err != nil {
 		logger.WithError(err).Fatal("Failed to start MCP server")
 	}
 }
 
-func runMCPHTTPServer(addr string) {
-	s := createMCPServer()
+func runMCPHTTPServer(addr string, enableWrite bool) {
+	readOnly := !enableWrite
+	s := createMCPServer(readOnly)
 
-	logger.WithField("address", addr).Info("Starting Wanderlog MCP server on HTTP")
+	mode := "read-only"
+	if enableWrite {
+		mode = "read-write"
+	}
+	logger.WithFields(map[string]interface{}{
+		"address": addr,
+		"mode":    mode,
+	}).Info("Starting Wanderlog MCP server on HTTP")
 	httpServer := server.NewStreamableHTTPServer(s)
 	if err := httpServer.Start(addr); err != nil {
 		logger.WithError(err).Fatal("Failed to start HTTP MCP server")
@@ -501,8 +527,8 @@ func handleListSections(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 			result += "\n"
 		}
 
-		result += fmt.Sprintf("\n💡 Use section IDs with add_place tool to add places to specific days:\n")
-		result += fmt.Sprintf("   add_place --trip_key %s --section_id <ID> --name \"Place Name\"\n", tripKey)
+		result += fmt.Sprintf("\n💡 Section IDs can be used with add_place tool to add places to specific days\n")
+		result += fmt.Sprintf("   (Note: write operations require --enable-write flag)\n")
 	}
 
 	return mcp.NewToolResultText(result), nil
