@@ -14,7 +14,12 @@
       "Bash(./wanderlog:*)",
       "Bash(git add:*)",
       "Bash(go mod:*)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(timeout:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(go list:*)",
+      "Read(//home/dvitali/go/pkg/mod/github.com/mark3labs/mcp-go@v0.37.0/**)"
     ],
     "deny": []
   }
