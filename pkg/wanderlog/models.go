@@ -314,6 +314,7 @@ type ItSections struct {
 		Depart             Station  `json:"depart,omitempty,omitzero"`
 		FlightInfo         *Flight  `json:"flightInfo,omitempty,omitzero"`
 		ID                 int      `json:"id,omitzero"`
+		Place              *BlockPlace `json:"place,omitempty"`
 		Text               Text     `json:"text"`
 		TravelerNames      []any    `json:"travelerNames"`
 		Type               string   `json:"type,omitzero"`
@@ -380,6 +381,13 @@ type Plan struct {
 	ViewCount                 int           `json:"viewCount,omitzero"`
 	ViewKey                   string        `json:"viewKey,omitzero"`
 	WebPlacesListID           any           `json:"webPlacesListId"`
+}
+
+type BlockPlace struct {
+	Name          string  `json:"name,omitempty"`
+	PlaceID       string  `json:"place_id,omitempty"`
+	Rating        float64 `json:"rating,omitempty"`
+	FormattedAddress string `json:"formatted_address,omitempty"`
 }
 
 type TripResponse struct {

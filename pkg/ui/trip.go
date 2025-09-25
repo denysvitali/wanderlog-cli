@@ -88,7 +88,7 @@ func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
 	fmt.Println()
 
 	if showDetails {
-		printTripDetails(&plan)
+		printTripDetails(trip, &plan)
 	} else {
 		printTripSummary(&plan)
 	}
@@ -106,15 +106,15 @@ func printTripSummary(plan *wanderlog.Plan) {
 	fmt.Println(infoStyle.Render("💡 Use --details flag to see full itinerary"))
 }
 
-func printTripDetails(plan *wanderlog.Plan) {
+func printTripDetails(trip *wanderlog.TripResponse, plan *wanderlog.Plan) {
 	fmt.Println(headerStyle.Render("🗓️  Detailed Itinerary"))
 	fmt.Println()
 
 	// Show flights first
 	printFlights(plan.Itinerary.Sections)
-	
+
 	// Show sections (cities/destinations)
-	printDestinations(plan.Itinerary.Sections)
+	printDestinations(plan.Itinerary.Sections, trip.Resources.SectionRecommendations)
 }
 
 func printFlights(sections []wanderlog.ItSections) {
@@ -157,41 +157,49 @@ func printFlights(sections []wanderlog.ItSections) {
 	}
 }
 
-func printDestinations(sections []wanderlog.ItSections) {
+func printDestinations(sections []wanderlog.ItSections, sectionRecommendations map[string][]wanderlog.Place) {
 	fmt.Println(headerStyle.Render("🌍 Destinations"))
 	fmt.Println()
-	
+
 	for _, section := range sections {
 		// Skip empty sections and special sections
-		if section.Heading == "" || section.Heading == "Notes" || 
+		if section.Heading == "" || section.Heading == "Notes" ||
 		   section.Heading == "Flights" || section.Heading == "Places to visit" {
 			continue
 		}
-		
+
 		// Show destination header
 		fmt.Println(subHeaderStyle.Render("📍 " + section.Heading))
-		
+
 		if section.Date != nil && *section.Date != "" {
 			sectionDate, _ := time.Parse("2006-01-02", *section.Date)
 			fmt.Println(infoStyle.Render("   " + sectionDate.Format("Monday, Jan 2, 2006")))
 		}
-		
-		// Show blocks for this destination
+
+		// Show places and notes/blocks for this destination
+		hasContent := false
 		if len(section.Blocks) > 0 {
 			for _, block := range section.Blocks {
 				switch block.Type {
+				case "place":
+					if block.Place != nil && block.Place.Name != "" {
+						fmt.Println(infoStyle.Render("🏢 " + block.Place.Name))
+						hasContent = true
+					}
 				case "note":
 					if len(block.Text.Ops) > 0 && block.Text.Ops[0].Insert != "\n" {
 						noteText := strings.TrimSpace(block.Text.Ops[0].Insert)
 						if noteText != "" {
 							fmt.Println(infoStyle.Render("   📝 " + noteText))
+							hasContent = true
 						}
 					}
 				default:
 					// Handle other block types if needed
 				}
 			}
-		} else {
+		}
+		if !hasContent {
 			fmt.Println(infoStyle.Render("   No details available"))
 		}
 		fmt.Println()

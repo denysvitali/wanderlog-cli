@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +15,20 @@ import (
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
+
+// tripIDKey is a custom context key for storing the default trip ID.
+type tripIDKey struct{}
+
+// withTripID adds a trip ID to the context.
+func withTripID(ctx context.Context, tripID string) context.Context {
+	return context.WithValue(ctx, tripIDKey{}, tripID)
+}
+
+// tripIDFromContext extracts the default trip ID from the context.
+func tripIDFromContext(ctx context.Context) (string, bool) {
+	tripID, ok := ctx.Value(tripIDKey{}).(string)
+	return tripID, ok && tripID != ""
+}
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
@@ -36,15 +51,18 @@ Write operations (only with --enable-write):
 - Removing places from trips
 
 Examples:
-  wanderlog mcp                    # Start read-only MCP server on stdio
-  wanderlog mcp --enable-write     # Start read-write MCP server on stdio
-  wanderlog mcp --http :8080       # Start read-only HTTP MCP server on port 8080`,
+  wanderlog mcp                             # Start read-only MCP server on stdio
+  wanderlog mcp --enable-write              # Start read-write MCP server on stdio
+  wanderlog mcp --trip-id "abc123"          # Start with default trip ID (trip_id params become optional)
+  wanderlog mcp --trip-id "abc123" --enable-write  # Start with default trip ID and write operations
+  wanderlog mcp --http :8080                # Start read-only HTTP MCP server on port 8080`,
 	Run: func(cmd *cobra.Command, args []string) {
 		enableWrite, _ := cmd.Flags().GetBool("enable-write")
+		tripID, _ := cmd.Flags().GetString("trip-id")
 		if httpAddr, _ := cmd.Flags().GetString("http"); httpAddr != "" {
-			runMCPHTTPServer(httpAddr, enableWrite)
+			runMCPHTTPServer(httpAddr, enableWrite, tripID)
 		} else {
-			runMCPStdioServer(enableWrite)
+			runMCPStdioServer(enableWrite, tripID)
 		}
 	},
 }
@@ -53,6 +71,7 @@ func init() {
 	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.Flags().String("http", "", "HTTP address to serve MCP on (e.g., :8080)")
 	mcpCmd.Flags().Bool("enable-write", false, "Enable write operations (add/remove places, etc.)")
+	mcpCmd.Flags().String("trip-id", "", "Default trip ID to use for all operations (makes trip_id parameter optional in tools)")
 }
 
 func createMCPServer(readOnly bool) *server.MCPServer {
@@ -81,8 +100,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	getTripTool := mcp.NewTool("get_trip",
 		mcp.WithDescription("Get detailed information about a specific trip"),
 		mcp.WithString("trip_id",
-			mcp.Required(),
-			mcp.Description("The ID of the trip to retrieve"),
+			mcp.Description("The ID of the trip to retrieve (optional if default trip ID is set)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -96,8 +114,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	listPlacesTool := mcp.NewTool("list_places",
 		mcp.WithDescription("List all places for a specific trip"),
 		mcp.WithString("trip_id",
-			mcp.Required(),
-			mcp.Description("The ID of the trip to get places for"),
+			mcp.Description("The ID of the trip to get places for (optional if default trip ID is set)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -111,8 +128,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	listSectionsTool := mcp.NewTool("list_sections",
 		mcp.WithDescription("List all sections/days for a specific trip with their IDs and dates"),
 		mcp.WithString("trip_id",
-			mcp.Required(),
-			mcp.Description("The ID of the trip to get sections for"),
+			mcp.Description("The ID of the trip to get sections for (optional if default trip ID is set)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -128,8 +144,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		addPlaceTool := mcp.NewTool("add_place",
 			mcp.WithDescription("Add a place to a trip"),
 			mcp.WithString("trip_key",
-				mcp.Required(),
-				mcp.Description("The key/ID of the trip to add the place to"),
+				mcp.Description("The key/ID of the trip to add the place to (optional if default trip ID is set)"),
 			),
 			mcp.WithString("name",
 				mcp.Required(),
@@ -157,8 +172,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		removePlaceTool := mcp.NewTool("remove_place",
 			mcp.WithDescription("Remove a place from a trip"),
 			mcp.WithString("trip_key",
-				mcp.Required(),
-				mcp.Description("The key/ID of the trip to remove the place from"),
+				mcp.Description("The key/ID of the trip to remove the place from (optional if default trip ID is set)"),
 			),
 			mcp.WithNumber("place_id",
 				mcp.Required(),
@@ -252,7 +266,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	return s
 }
 
-func runMCPStdioServer(enableWrite bool) {
+func runMCPStdioServer(enableWrite bool, tripID string) {
 	readOnly := !enableWrite
 	s := createMCPServer(readOnly)
 
@@ -260,13 +274,29 @@ func runMCPStdioServer(enableWrite bool) {
 	if enableWrite {
 		mode = "read-write"
 	}
-	logger.WithField("mode", mode).Info("Starting Wanderlog MCP server on stdio")
-	if err := server.ServeStdio(s); err != nil {
+
+	logFields := map[string]interface{}{"mode": mode}
+	if tripID != "" {
+		logFields["default_trip_id"] = tripID
+	}
+	logger.WithFields(logFields).Info("Starting Wanderlog MCP server on stdio")
+
+	var err error
+	if tripID != "" {
+		// Use context function to inject trip ID
+		err = server.ServeStdio(s, server.WithStdioContextFunc(func(ctx context.Context) context.Context {
+			return withTripID(ctx, tripID)
+		}))
+	} else {
+		err = server.ServeStdio(s)
+	}
+
+	if err != nil {
 		logger.WithError(err).Fatal("Failed to start MCP server")
 	}
 }
 
-func runMCPHTTPServer(addr string, enableWrite bool) {
+func runMCPHTTPServer(addr string, enableWrite bool, tripID string) {
 	readOnly := !enableWrite
 	s := createMCPServer(readOnly)
 
@@ -274,11 +304,23 @@ func runMCPHTTPServer(addr string, enableWrite bool) {
 	if enableWrite {
 		mode = "read-write"
 	}
-	logger.WithFields(map[string]interface{}{
-		"address": addr,
-		"mode":    mode,
-	}).Info("Starting Wanderlog MCP server on HTTP")
-	httpServer := server.NewStreamableHTTPServer(s)
+
+	logFields := map[string]interface{}{"address": addr, "mode": mode}
+	if tripID != "" {
+		logFields["default_trip_id"] = tripID
+	}
+	logger.WithFields(logFields).Info("Starting Wanderlog MCP server on HTTP")
+
+	var httpServer *server.StreamableHTTPServer
+	if tripID != "" {
+		// Use context function to inject trip ID from HTTP headers or use default
+		httpServer = server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(func(ctx context.Context, r *http.Request) context.Context {
+			return withTripID(ctx, tripID)
+		}))
+	} else {
+		httpServer = server.NewStreamableHTTPServer(s)
+	}
+
 	if err := httpServer.Start(addr); err != nil {
 		logger.WithError(err).Fatal("Failed to start HTTP MCP server")
 	}
@@ -325,9 +367,14 @@ func handleListTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 }
 
 func handleGetTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey, err := request.RequireString("trip_id")
-	if err != nil {
-		return mcp.NewToolResultError("trip_id is required"), nil
+	tripKey := request.GetString("trip_id", "")
+	if tripKey == "" {
+		// Try to get from context
+		if defaultTripID, ok := tripIDFromContext(ctx); ok {
+			tripKey = defaultTripID
+		} else {
+			return mcp.NewToolResultError("trip_id is required (either as parameter or default trip ID must be set)"), nil
+		}
 	}
 
 	format := request.GetString("format", "default")
@@ -370,9 +417,14 @@ func handleGetTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 }
 
 func handleListPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey, err := request.RequireString("trip_id")
-	if err != nil {
-		return mcp.NewToolResultError("trip_id is required"), nil
+	tripKey := request.GetString("trip_id", "")
+	if tripKey == "" {
+		// Try to get from context
+		if defaultTripID, ok := tripIDFromContext(ctx); ok {
+			tripKey = defaultTripID
+		} else {
+			return mcp.NewToolResultError("trip_id is required (either as parameter or default trip ID must be set)"), nil
+		}
 	}
 
 	format := request.GetString("format", "default")
@@ -457,9 +509,14 @@ func handleListPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 }
 
 func handleListSections(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey, err := request.RequireString("trip_id")
-	if err != nil {
-		return mcp.NewToolResultError("trip_id is required"), nil
+	tripKey := request.GetString("trip_id", "")
+	if tripKey == "" {
+		// Try to get from context
+		if defaultTripID, ok := tripIDFromContext(ctx); ok {
+			tripKey = defaultTripID
+		} else {
+			return mcp.NewToolResultError("trip_id is required (either as parameter or default trip ID must be set)"), nil
+		}
 	}
 
 	format := request.GetString("format", "default")
@@ -535,9 +592,14 @@ func handleListSections(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 }
 
 func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey, err := request.RequireString("trip_key")
-	if err != nil {
-		return mcp.NewToolResultError("trip_key is required"), nil
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		// Try to get from context
+		if defaultTripID, ok := tripIDFromContext(ctx); ok {
+			tripKey = defaultTripID
+		} else {
+			return mcp.NewToolResultError("trip_key is required (either as parameter or default trip ID must be set)"), nil
+		}
 	}
 
 	name, err := request.RequireString("name")
@@ -588,9 +650,14 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 }
 
 func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey, err := request.RequireString("trip_key")
-	if err != nil {
-		return mcp.NewToolResultError("trip_key is required"), nil
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		// Try to get from context
+		if defaultTripID, ok := tripIDFromContext(ctx); ok {
+			tripKey = defaultTripID
+		} else {
+			return mcp.NewToolResultError("trip_key is required (either as parameter or default trip ID must be set)"), nil
+		}
 	}
 
 	placeID, err := request.RequireInt("place_id")
