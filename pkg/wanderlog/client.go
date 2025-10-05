@@ -13,9 +13,12 @@ import (
 )
 
 const (
-	BaseURL          = "https://wanderlog.com/api"
 	ClientVersion    = "2"
 	DefaultUserAgent = "wanderlog-cli/1.0"
+)
+
+var (
+	BaseURL = "https://wanderlog.com/api"
 )
 
 type Client struct {
