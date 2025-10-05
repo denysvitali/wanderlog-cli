@@ -146,10 +146,32 @@ func (c *Client) DeleteTrip(tripKey string) error {
 	return nil
 }
 
+// ValidateAddPlaceRequest validates the AddPlaceRequest structure
+func ValidateAddPlaceRequest(req AddPlaceRequest) error {
+	if req.Place.PlaceID == "" {
+		return fmt.Errorf("place_id is required")
+	}
+	if req.Place.Name == "" {
+		return fmt.Errorf("place name is required")
+	}
+	if req.Place.Latitude < -90 || req.Place.Latitude > 90 {
+		return fmt.Errorf("latitude must be between -90 and 90, got %f", req.Place.Latitude)
+	}
+	if req.Place.Longitude < -180 || req.Place.Longitude > 180 {
+		return fmt.Errorf("longitude must be between -180 and 180, got %f", req.Place.Longitude)
+	}
+	return nil
+}
+
 // AddPlace adds a place to a trip section
 func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for adding places")
+	}
+
+	// Validate request
+	if err := ValidateAddPlaceRequest(req); err != nil {
+		return fmt.Errorf("invalid request: %w", err)
 	}
 
 	var url string
@@ -389,35 +411,53 @@ func (c *Client) DeleteSection(tripKey string, sectionID int) error {
 }
 
 // NukeTripPlaces removes all place blocks from all sections in a trip using operational transforms
+// This function first fetches the trip to determine which sections exist, then clears them
 func (c *Client) NukeTripPlaces(tripKey string) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for nuking trip places")
 	}
 
-	// Try multiple approaches to clear problematic place data
-	operations := []Operation{
-		// Try to clear common section blocks that might contain places
-		{Type: "replace", Path: "/itinerary/sections/0/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/1/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/2/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/3/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/4/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/5/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/6/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/7/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/8/blocks", Value: []interface{}{}},
-		{Type: "replace", Path: "/itinerary/sections/9/blocks", Value: []interface{}{}},
-		// Clear any place metadata that might be corrupted
-		{Type: "replace", Path: "/resources/placeMetadata", Value: map[string]interface{}{}},
+	// First fetch the trip to see what sections actually exist
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("failed to fetch trip: %w", err)
 	}
 
-	err := c.ApplyOperations(tripKey, operations)
+	if len(trip.TripPlan.Itinerary.Sections) == 0 {
+		c.logger.WithField("tripKey", tripKey).Info("No sections found in trip, nothing to clear")
+		return nil
+	}
+
+	// Build operations only for sections that exist
+	operations := []Operation{}
+	for i := range trip.TripPlan.Itinerary.Sections {
+		operations = append(operations, Operation{
+			Type:  "replace",
+			Path:  fmt.Sprintf("/itinerary/sections/%d/blocks", i),
+			Value: []interface{}{},
+		})
+	}
+
+	// Also clear place metadata
+	operations = append(operations, Operation{
+		Type:  "replace",
+		Path:  "/resources/placeMetadata",
+		Value: map[string]interface{}{},
+	})
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":         tripKey,
+		"sectionsCleared": len(trip.TripPlan.Itinerary.Sections),
+	}).Debug("Clearing sections from trip")
+
+	err = c.ApplyOperations(tripKey, operations)
 	if err != nil {
 		return fmt.Errorf("failed to nuke trip places: %w", err)
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"tripKey": tripKey,
+		"tripKey":  tripKey,
+		"sections": len(trip.TripPlan.Itinerary.Sections),
 	}).Info("Successfully nuked all place data from trip")
 
 	return nil
