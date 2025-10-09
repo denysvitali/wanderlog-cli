@@ -621,19 +621,33 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	req := wanderlog.AddPlaceRequest{
-		Place: struct {
-			PlaceID   string  `json:"place_id"`
-			Name      string  `json:"name"`
-			Latitude  float64 `json:"latitude"`
-			Longitude float64 `json:"longitude"`
+	// Build the place info with proper geometry structure
+	placeInfo := wanderlog.AddPlaceInfo{
+		PlaceID: placeID,
+		Name:    name,
+	}
+
+	// Only add geometry if coordinates are provided
+	if latitude != 0 || longitude != 0 {
+		placeInfo.Geometry = &struct {
+			Location struct {
+				Lat float64 `json:"lat"`
+				Lng float64 `json:"lng"`
+			} `json:"location"`
 		}{
-			PlaceID:   placeID,
-			Name:      name,
-			Latitude:  latitude,
-			Longitude: longitude,
-		},
-		Text: text,
+			Location: struct {
+				Lat float64 `json:"lat"`
+				Lng float64 `json:"lng"`
+			}{
+				Lat: latitude,
+				Lng: longitude,
+			},
+		}
+	}
+
+	req := wanderlog.AddPlaceRequest{
+		Place: placeInfo,
+		Text:  text,
 	}
 
 	err = client.AddPlace(tripKey, sectionID, req)
@@ -695,8 +709,9 @@ func handleTripResource(ctx context.Context, request mcp.ReadResourceRequest) ([
 	tripKey := ""
 
 	// Simple parsing - in production you might want more robust URI parsing
-	if len(uri) > 19 && uri[:19] == "wanderlog://trips/" {
-		tripKey = uri[19:]
+	prefix := "wanderlog://trips/"
+	if len(uri) > len(prefix) && uri[:len(prefix)] == prefix {
+		tripKey = uri[len(prefix):]
 	}
 
 	if tripKey == "" {
