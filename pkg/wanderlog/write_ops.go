@@ -37,13 +37,20 @@ type UpdateTripRequest struct {
 
 // AddPlaceRequest represents a request to add a place to a trip
 type AddPlaceRequest struct {
-	Place struct {
-		PlaceID   string  `json:"place_id"`
-		Name      string  `json:"name"`
-		Latitude  float64 `json:"latitude"`
-		Longitude float64 `json:"longitude"`
-	} `json:"place"`
-	Text string `json:"text"`
+	Place AddPlaceInfo `json:"place"`
+	Text  string       `json:"text"`
+}
+
+// AddPlaceInfo represents the place information when adding a place
+type AddPlaceInfo struct {
+	PlaceID  string `json:"place_id,omitempty"`  // API uses snake_case
+	Name     string `json:"name"`
+	Geometry *struct {
+		Location struct {
+			Lat float64 `json:"lat"`
+			Lng float64 `json:"lng"`
+		} `json:"location"`
+	} `json:"geometry,omitempty"`
 }
 
 // OperationRequest represents a batch operation request
@@ -51,12 +58,83 @@ type OperationRequest struct {
 	Ops []Operation `json:"ops"`
 }
 
-// Operation represents a single operation in the operational transform system
+// Operation represents a single ShareDB JSON0 operation
+// ShareDB uses a specific format with:
+// - p: path as array of keys/indices
+// - oi/od: object insert/delete (for replacing object values)
+// - li/ld: list insert/delete (for array operations)
 type Operation struct {
-	Type     string      `json:"type"`
-	Path     string      `json:"path,omitempty"`
-	Value    interface{} `json:"value,omitempty"`
-	OldValue interface{} `json:"oldValue,omitempty"`
+	P  []interface{} `json:"p"`            // Path as array (e.g., ["itinerary", "sections", 0, "blocks", 1])
+	OI interface{}   `json:"oi,omitempty"` // Object insert (new value for replace)
+	OD interface{}   `json:"od,omitempty"` // Object delete (old value for replace)
+	LI interface{}   `json:"li,omitempty"` // List insert (for array insertions)
+	LD interface{}   `json:"ld,omitempty"` // List delete (for array deletions)
+}
+
+// ShareDB Operation Helpers
+
+// ReplaceInObject creates a ShareDB operation to replace an object field
+// Path should be an array like: []interface{}{"itinerary", "sections", 0, "heading"}
+func ReplaceInObject(path []interface{}, oldValue, newValue interface{}) Operation {
+	return Operation{
+		P:  path,
+		OD: oldValue,
+		OI: newValue,
+	}
+}
+
+// InsertInObject creates a ShareDB operation to insert a new object field
+func InsertInObject(path []interface{}, value interface{}) Operation {
+	return Operation{
+		P:  path,
+		OI: value,
+	}
+}
+
+// DeleteInObject creates a ShareDB operation to delete an object field
+func DeleteInObject(path []interface{}, oldValue interface{}) Operation {
+	return Operation{
+		P:  path,
+		OD: oldValue,
+	}
+}
+
+// InsertInList creates a ShareDB operation to insert an item into an array at a specific index
+func InsertInList(path []interface{}, index int, value interface{}) Operation {
+	pathWithIndex := append(path, index)
+	return Operation{
+		P:  pathWithIndex,
+		LI: value,
+	}
+}
+
+// DeleteFromList creates a ShareDB operation to delete an item from an array at a specific index
+func DeleteFromList(path []interface{}, index int, oldValue interface{}) Operation {
+	pathWithIndex := append(path, index)
+	return Operation{
+		P:  pathWithIndex,
+		LD: oldValue,
+	}
+}
+
+// ReplaceInList creates a ShareDB operation to replace an item in an array
+func ReplaceInList(path []interface{}, index int, oldValue, newValue interface{}) Operation {
+	pathWithIndex := append(path, index)
+	return Operation{
+		P:  pathWithIndex,
+		LD: oldValue,
+		LI: newValue,
+	}
+}
+
+// FindSectionIndex finds the array index of a section by its ID
+func FindSectionIndex(sections []ItSections, sectionID int) int {
+	for i, section := range sections {
+		if section.ID == sectionID {
+			return i
+		}
+	}
+	return -1
 }
 
 // CreateTrip creates a new trip plan
@@ -347,8 +425,49 @@ func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
 	}
 	defer resp.Body.Close()
 
+	// Read the response body
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading response body: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":      tripKey,
+		"operations":   len(ops),
+		"statusCode":   resp.StatusCode,
+		"responseBody": string(respBody),
+	}).Debug("ApplyOperations API response")
+
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+		return fmt.Errorf("API returned status %d: %s - Response: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	// Try to parse the response to check for API-level errors
+	var apiResp map[string]interface{}
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		c.logger.WithField("responseBody", string(respBody)).Warn("Could not parse API response as JSON")
+	} else {
+		// Check if the response indicates success
+		if success, ok := apiResp["success"]; ok {
+			if successBool, ok := success.(bool); ok && !successBool {
+				// API returned success: false
+				errorMsg := "unknown error"
+				if msg, ok := apiResp["error"]; ok {
+					if msgStr, ok := msg.(string); ok {
+						errorMsg = msgStr
+					}
+				}
+				// Also check for messages array
+				if messages, ok := apiResp["messages"]; ok {
+					if msgArray, ok := messages.([]interface{}); ok && len(msgArray) > 0 {
+						if firstMsg, ok := msgArray[0].(string); ok {
+							errorMsg = firstMsg
+						}
+					}
+				}
+				return fmt.Errorf("API request failed: %s", errorMsg)
+			}
+		}
 	}
 
 	c.logger.WithFields(map[string]interface{}{

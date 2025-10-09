@@ -87,11 +87,11 @@ type Metadata struct {
 	Rating                   float64 `json:"rating,omitzero"`
 	RatingDistribution       struct {
 		Google struct {
-			_1 int `json:"1,omitzero"`
-			_2 int `json:"2,omitzero"`
-			_3 int `json:"3,omitzero"`
-			_4 int `json:"4,omitzero"`
-			_5 int `json:"5,omitzero"`
+			One   int `json:"1,omitzero"`
+			Two   int `json:"2,omitzero"`
+			Three int `json:"3,omitzero"`
+			Four  int `json:"4,omitzero"`
+			Five  int `json:"5,omitzero"`
 		} `json:"Google"`
 	} `json:"ratingDistribution"`
 	Reviews               []any    `json:"reviews"`
@@ -168,10 +168,10 @@ type CarouselItems struct {
 }
 
 type Resources struct {
-	Ancestors                   []any `json:"ancestors"`
+	Ancestors                   []any              `json:"ancestors"`
 	CurrencyRatesUsd            map[string]float64
 	DefaultPlacesListsGeo       PlacesListsGeo     `json:"defaultPlacesListsGeo"`
-	DistancesBetweenPlaces      struct{}           `json:"distancesBetweenPlaces"`
+	DistancesBetweenPlaces      map[string]any     `json:"distancesBetweenPlaces"`
 	DistancesBetweenPlacesError any                `json:"distancesBetweenPlacesError"`
 	ExploreCarouselItems        []CarouselItems    `json:"exploreCarouselItems"`
 	FlightUpdates               struct{}           `json:"flightUpdates"`
@@ -281,9 +281,10 @@ type Station struct {
 		Iata        string      `json:"iata,omitzero"`
 		Name        string      `json:"name,omitzero"`
 	} `json:"airport"`
-	Date string `json:"date,omitzero"`
-	Time string `json:"time,omitzero"`
-	Type string `json:"type,omitzero"`
+	Date  string      `json:"date,omitzero"`
+	Place *BlockPlace `json:"place,omitempty"`
+	Time  string      `json:"time,omitzero"`
+	Type  string      `json:"type,omitzero"`
 }
 
 type Flight struct {
@@ -299,6 +300,8 @@ type Flight struct {
 type Text struct {
 	Ops []struct {
 		Attributes *struct {
+			Bold bool   `json:"bold,omitempty"`
+			Link string `json:"link,omitempty"`
 			List string `json:"list,omitzero"`
 		} `json:"attributes,omitempty,omitzero"`
 		Insert string `json:"insert,omitzero"`
@@ -310,14 +313,29 @@ type ItSections struct {
 		AddedBy            By       `json:"addedBy"`
 		Arrive             *Station `json:"arrive,omitempty,omitzero"`
 		Attachments        []any    `json:"attachments"`
+		Carrier            string   `json:"carrier,omitempty"`
 		ConfirmationNumber string   `json:"confirmationNumber"`
 		Depart             Station  `json:"depart,omitempty,omitzero"`
+		EndTime            string   `json:"endTime,omitempty"`
 		FlightInfo         *Flight  `json:"flightInfo,omitempty,omitzero"`
+		Hotel              *struct {
+			CheckIn             string `json:"checkIn"`
+			CheckOut            string `json:"checkOut"`
+			TravelerNames       []any  `json:"travelerNames"`
+			ConfirmationNumber  string `json:"confirmationNumber"`
+		} `json:"hotel,omitempty"`
 		ID                 int      `json:"id,omitzero"`
+		ImageKeys          []string `json:"imageKeys,omitempty"`
+		ImageSize          string   `json:"imageSize,omitempty"`
+		NoteIcon           string   `json:"noteIcon,omitempty"`
 		Place              *BlockPlace `json:"place,omitempty"`
+		SelectedImageKey   string   `json:"selectedImageKey,omitempty"`
+		StartTime          string   `json:"startTime,omitempty"`
 		Text               Text     `json:"text"`
+		TravelMode         *string  `json:"travelMode"`
 		TravelerNames      []any    `json:"travelerNames"`
 		Type               string   `json:"type,omitzero"`
+		UpvotedBy          []any    `json:"upvotedBy"`
 	} `json:"blocks"`
 	Date             *string `json:"date"`
 	Heading          string  `json:"heading"`
@@ -330,13 +348,19 @@ type ItSections struct {
 }
 
 type Itinerary struct {
-	Budget   Budget       `json:"budget"`
+	Budget  Budget       `json:"budget"`
+	Journal struct {
+		Stops   []any  `json:"stops"`
+		Summary string `json:"summary"`
+	} `json:"journal"`
 	Options  struct{}     `json:"options"`
 	Sections []ItSections `json:"sections"`
 }
 
 type Plan struct {
 	TripPlanKeys              []TripPlanKey `json:"TripPlanKeys"`
+	TripPlanViews             []any         `json:"TripPlanViews"`
+	TripPlanJournalViews      []any         `json:"TripPlanJournalViews"`
 	AuthorBlurb               string        `json:"authorBlurb"`
 	CharacterCount            int           `json:"characterCount,omitzero"`
 	Contributors              []Author      `json:"contributors"`
@@ -358,6 +382,8 @@ type Plan struct {
 	IsHighQuality             bool          `json:"isHighQuality,omitzero"`
 	IsMapEmbed                bool          `json:"isMapEmbed"`
 	Itinerary                 Itinerary     `json:"itinerary"`
+	JournalKey                *string       `json:"journalKey"`
+	JournalStopCount          *int          `json:"journalStopCount"`
 	Key                       string        `json:"key,omitzero"`
 	LastSentUpdateEmailAt     time.Time     `json:"lastSentUpdateEmailAt,omitzero"`
 	LikeCount                 int           `json:"likeCount"`
@@ -384,10 +410,44 @@ type Plan struct {
 }
 
 type BlockPlace struct {
-	Name          string  `json:"name,omitempty"`
-	PlaceID       string  `json:"place_id,omitempty"`
-	Rating        float64 `json:"rating,omitempty"`
-	FormattedAddress string `json:"formatted_address,omitempty"`
+	Name                     string  `json:"name,omitempty"`
+	PlaceID                  string  `json:"place_id,omitempty"`
+	Rating                   float64 `json:"rating,omitempty"`
+	FormattedAddress         string  `json:"formatted_address,omitempty"`
+	Geometry                 *struct {
+		Location struct {
+			Lat float64 `json:"lat"`
+			Lng float64 `json:"lng"`
+		} `json:"location"`
+	} `json:"geometry,omitempty"`
+	UserRatingsTotal         int      `json:"user_ratings_total,omitempty"`
+	Website                  string   `json:"website,omitempty"`
+	InternationalPhoneNumber string   `json:"international_phone_number,omitempty"`
+	AddressComponents        []struct {
+		LongName  string   `json:"long_name,omitempty"`
+		ShortName string   `json:"short_name,omitempty"`
+		Types     []string `json:"types"`
+	} `json:"address_components,omitempty"`
+	OpeningHours *struct {
+		WeekdayText []string `json:"weekday_text,omitempty"`
+		Periods     []struct {
+			Open struct {
+				Day  int    `json:"day"`
+				Time string `json:"time"`
+			} `json:"open"`
+			Close struct {
+				Day  int    `json:"day"`
+				Time string `json:"time"`
+			} `json:"close"`
+		} `json:"periods,omitempty"`
+	} `json:"opening_hours,omitempty"`
+	Vicinity       string          `json:"vicinity,omitempty"`
+	Types          []string        `json:"types,omitempty"`
+	URL            string          `json:"url,omitempty"`
+	BusinessStatus string          `json:"business_status,omitempty"`
+	PhotoURLs      []string        `json:"photo_urls,omitempty"`
+	Amenities      map[string]bool `json:"amenities,omitempty"`
+	PriceLevel     *int            `json:"price_level,omitempty"`
 }
 
 type TripResponse struct {

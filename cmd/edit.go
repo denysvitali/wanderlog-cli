@@ -54,19 +54,33 @@ Examples:
 			os.Exit(1)
 		}
 
-		req := wanderlog.AddPlaceRequest{
-			Place: struct {
-				PlaceID   string  `json:"place_id"`
-				Name      string  `json:"name"`
-				Latitude  float64 `json:"latitude"`
-				Longitude float64 `json:"longitude"`
+		// Build the place info with proper geometry structure
+		placeInfo := wanderlog.AddPlaceInfo{
+			PlaceID: placeID,
+			Name:    placeName,
+		}
+
+		// Only add geometry if coordinates are provided
+		if latitude != 0 || longitude != 0 {
+			placeInfo.Geometry = &struct {
+				Location struct {
+					Lat float64 `json:"lat"`
+					Lng float64 `json:"lng"`
+				} `json:"location"`
 			}{
-				PlaceID:   placeID,
-				Name:      placeName,
-				Latitude:  latitude,
-				Longitude: longitude,
-			},
-			Text: placeText,
+				Location: struct {
+					Lat float64 `json:"lat"`
+					Lng float64 `json:"lng"`
+				}{
+					Lat: latitude,
+					Lng: longitude,
+				},
+			}
+		}
+
+		req := wanderlog.AddPlaceRequest{
+			Place: placeInfo,
+			Text:  placeText,
 		}
 
 		err := client.AddPlace(tripKey, sectionIDFlag, req)
