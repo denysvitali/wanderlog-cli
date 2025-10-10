@@ -1,6 +1,8 @@
 package wanderlog
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -308,6 +310,42 @@ type Text struct {
 	} `json:"ops"`
 }
 
+// FlexibleText can be either a string or a Text object
+type FlexibleText struct {
+	IsString bool
+	String   string
+	Text     Text
+}
+
+// UnmarshalJSON implements custom unmarshaling for FlexibleText
+func (ft *FlexibleText) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as string first
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		ft.IsString = true
+		ft.String = str
+		return nil
+	}
+
+	// Try to unmarshal as Text object
+	var text Text
+	if err := json.Unmarshal(data, &text); err == nil {
+		ft.IsString = false
+		ft.Text = text
+		return nil
+	}
+
+	return fmt.Errorf("FlexibleText: cannot unmarshal as string or Text object")
+}
+
+// MarshalJSON implements custom marshaling for FlexibleText
+func (ft FlexibleText) MarshalJSON() ([]byte, error) {
+	if ft.IsString {
+		return json.Marshal(ft.String)
+	}
+	return json.Marshal(ft.Text)
+}
+
 type ItSections struct {
 	Blocks []struct {
 		AddedBy            By       `json:"addedBy"`
@@ -331,7 +369,7 @@ type ItSections struct {
 		Place              *BlockPlace `json:"place,omitempty"`
 		SelectedImageKey   string   `json:"selectedImageKey,omitempty"`
 		StartTime          string   `json:"startTime,omitempty"`
-		Text               Text     `json:"text"`
+		Text               FlexibleText     `json:"text"`
 		TravelMode         *string  `json:"travelMode"`
 		TravelerNames      []any    `json:"travelerNames"`
 		Type               string   `json:"type,omitzero"`

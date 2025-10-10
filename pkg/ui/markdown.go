@@ -117,8 +117,8 @@ func printDestinationsMarkdown(sections []wanderlog.ItSections) {
 			for _, block := range section.Blocks {
 				switch block.Type {
 				case "note":
-					if len(block.Text.Ops) > 0 && block.Text.Ops[0].Insert != "\n" {
-						noteText := strings.TrimSpace(block.Text.Ops[0].Insert)
+					if !block.Text.IsString && len(block.Text.Text.Ops) > 0 && block.Text.Text.Ops[0].Insert != "\n" {
+						noteText := strings.TrimSpace(block.Text.Text.Ops[0].Insert)
 						if noteText != "" {
 							if !hasContent {
 								fmt.Println("**Notes:**")
