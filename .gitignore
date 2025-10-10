@@ -3,3 +3,4 @@
 /*.js
 /wanderlog-cli
 .credentials
+dist*.js

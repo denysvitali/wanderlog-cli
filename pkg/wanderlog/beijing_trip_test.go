@@ -4,11 +4,14 @@
 package wanderlog
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/sirupsen/logrus"
 )
 
@@ -96,6 +99,10 @@ func TestBeijingTripCreation(t *testing.T) {
 		},
 	}
 
+	// Capture initial snapshot
+	t.Log("\n=== Taking Initial Snapshot ===")
+	prevSnapshot := captureBeijingSnapshot(t, client, tripKey, "0-initial")
+
 	t.Log("\n=== Searching and Adding Places ===")
 	totalAdded := 0
 
@@ -107,7 +114,9 @@ func TestBeijingTripCreation(t *testing.T) {
 		sectionID := trip.TripPlan.Itinerary.Sections[day].ID
 		t.Logf("\n--- Day %d ---", day+1)
 
-		for _, q := range queries {
+		dayStartSnapshot := prevSnapshot
+
+		for placeIdx, q := range queries {
 			t.Logf("🔍 Searching: %s", q.query)
 
 			searchResp, err := client.SearchPlacesWithWanderllog(q.query, beijingLat, beijingLng)
@@ -148,10 +157,76 @@ func TestBeijingTripCreation(t *testing.T) {
 
 			t.Logf("✅ Added: %s", placeDetails.Data.Details.Name)
 			totalAdded++
+
+			// Take snapshot after each place addition
 			time.Sleep(500 * time.Millisecond)
+			newSnapshot := captureBeijingSnapshot(t, client, tripKey, fmt.Sprintf("day%d-place%d", day+1, placeIdx+1))
+			showBeijingDiff(t, prevSnapshot, newSnapshot, fmt.Sprintf("Day %d - After adding '%s'", day+1, placeDetails.Data.Details.Name))
+			prevSnapshot = newSnapshot
+		}
+
+		// Show cumulative diff for the day
+		if len(queries) > 0 {
+			showBeijingDiff(t, dayStartSnapshot, prevSnapshot, fmt.Sprintf("Day %d - Complete", day+1))
 		}
 	}
 
 	t.Logf("\n🎉 Added %d places", totalAdded)
 	t.Logf("🌐 https://wanderlog.com/view/%s", tripKey)
+}
+
+// captureBeijingSnapshot fetches the trip and returns the raw JSON
+func captureBeijingSnapshot(t *testing.T, client *Client, tripKey, label string) string {
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		t.Fatalf("Failed to capture snapshot '%s': %v", label, err)
+	}
+
+	jsonBytes, err := json.MarshalIndent(trip, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal snapshot '%s': %v", label, err)
+	}
+
+	// Save to file if requested
+	if os.Getenv("SAVE_SNAPSHOTS") == "1" {
+		filename := fmt.Sprintf("/tmp/beijing_snapshot_%s.json", label)
+		if err := os.WriteFile(filename, jsonBytes, 0644); err != nil {
+			t.Logf("Warning: Failed to save snapshot to %s: %v", filename, err)
+		} else {
+			t.Logf("💾 Saved snapshot to %s", filename)
+		}
+	}
+
+	return string(jsonBytes)
+}
+
+// showBeijingDiff displays the unified diff between two snapshots
+func showBeijingDiff(t *testing.T, before, after, label string) {
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(before),
+		B:        difflib.SplitLines(after),
+		FromFile: "Before",
+		ToFile:   "After",
+		Context:  2,
+	}
+
+	diffText, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		t.Logf("Warning: Failed to generate diff for '%s': %v", label, err)
+		return
+	}
+
+	if diffText == "" {
+		return
+	}
+
+	// Only show a summary to avoid overwhelming output
+	lines := difflib.SplitLines(diffText)
+	if len(lines) > 50 {
+		t.Logf("\n📊 Diff (%s): %d lines changed (showing first 30 lines)", label, len(lines))
+		t.Logf("%s", difflib.JoinLines(lines[:30]))
+		t.Logf("... (%d more lines)", len(lines)-30)
+	} else {
+		t.Logf("\n📊 Diff (%s):\n%s", label, diffText)
+	}
 }
