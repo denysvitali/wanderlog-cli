@@ -47,7 +47,28 @@ func TestBeijingTripCreation(t *testing.T) {
 	tripKey := copyResp.TripPlan.Key
 	t.Logf("✅ Copied trip: %s (Key: %s)", copyResp.TripPlan.Title, tripKey)
 
-	// Get the trip
+	// Set trip dates for a week-long Beijing trip
+	now := time.Now()
+	startDate := now.AddDate(0, 1, 0) // Start next month
+	endDate := startDate.AddDate(0, 0, 7) // 7-day trip
+
+	t.Logf("Setting trip dates: %s to %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	updateReq := UpdateTripRequest{
+		Title:     fmt.Sprintf("Week in Beijing - %s", now.Format("Jan 2006")),
+		StartDate: startDate.Format("2006-01-02"),
+		EndDate:   endDate.Format("2006-01-02"),
+		Privacy:   "private",
+	}
+
+	if err := client.UpdateTrip(tripKey, updateReq); err != nil {
+		t.Fatalf("Failed to update trip dates: %v", err)
+	}
+	t.Log("✅ Updated trip with dates")
+
+	// Wait for server to process the update
+	time.Sleep(2 * time.Second)
+
+	// Get the trip to see the new daily sections
 	trip, err := client.GetTrip(tripKey)
 	if err != nil {
 		t.Fatalf("Failed to get trip: %v", err)
@@ -56,6 +77,8 @@ func TestBeijingTripCreation(t *testing.T) {
 	if len(trip.TripPlan.Itinerary.Sections) == 0 {
 		t.Fatal("Trip has no sections")
 	}
+
+	t.Logf("Trip now has %d sections (should have 7 daily sections + 2 default sections)", len(trip.TripPlan.Itinerary.Sections))
 
 	// Beijing coordinates
 	beijingLat := 39.9042
@@ -97,16 +120,41 @@ func TestBeijingTripCreation(t *testing.T) {
 	t.Log("\n=== Taking Initial Snapshot ===")
 	prevSnapshot := captureBeijingSnapshot(t, client, tripKey, "0-initial")
 
+	// Find daily sections (those with dates)
+	dailySections := []ItSections{}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.Date != nil && *section.Date != "" {
+			dailySections = append(dailySections, section)
+		}
+	}
+
+	if len(dailySections) < 7 {
+		t.Logf("Warning: Expected 7 daily sections, got %d. Available sections:", len(dailySections))
+		for i, section := range trip.TripPlan.Itinerary.Sections {
+			dateStr := "no date"
+			if section.Date != nil {
+				dateStr = *section.Date
+			}
+			t.Logf("  Section %d: %s (date: %s, type: %s)", i, section.Heading, dateStr, section.Type)
+		}
+	}
+
 	t.Log("\n=== Searching and Adding Places ===")
 	totalAdded := 0
 
 	for day, queries := range dailyQueries {
-		if day >= len(trip.TripPlan.Itinerary.Sections) {
+		if day >= len(dailySections) {
+			t.Logf("⚠️  Skipping day %d - no daily section available", day+1)
 			continue
 		}
 
-		sectionID := trip.TripPlan.Itinerary.Sections[day].ID
-		t.Logf("\n--- Day %d ---", day+1)
+		section := dailySections[day]
+		sectionID := section.ID
+		dateStr := ""
+		if section.Date != nil {
+			dateStr = *section.Date
+		}
+		t.Logf("\n--- Day %d (%s) - %s ---", day+1, dateStr, section.Heading)
 
 		dayStartSnapshot := prevSnapshot
 

@@ -150,6 +150,77 @@ func (c *Client) DeleteTrip(tripKey string) error {
 	return nil
 }
 
+// UpdateTrip updates trip metadata (title, dates, privacy) using ShareDB operations
+func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for updating trips")
+	}
+
+	// First, get current trip to get old values for operations
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+
+	// Build operations to replace fields
+	ops := []models.Operation{}
+
+	if req.Title != "" && req.Title != trip.TripPlan.Title {
+		ops = append(ops, models.ReplaceInObject(
+			[]interface{}{"title"},
+			trip.TripPlan.Title,
+			req.Title,
+		))
+	}
+
+	if req.StartDate != "" && req.StartDate != trip.TripPlan.StartDate {
+		ops = append(ops, models.ReplaceInObject(
+			[]interface{}{"startDate"},
+			trip.TripPlan.StartDate,
+			req.StartDate,
+		))
+	}
+
+	if req.EndDate != "" && req.EndDate != trip.TripPlan.EndDate {
+		ops = append(ops, models.ReplaceInObject(
+			[]interface{}{"endDate"},
+			trip.TripPlan.EndDate,
+			req.EndDate,
+		))
+	}
+
+	if req.Privacy != "" && req.Privacy != trip.TripPlan.Privacy {
+		ops = append(ops, models.ReplaceInObject(
+			[]interface{}{"privacy"},
+			trip.TripPlan.Privacy,
+			req.Privacy,
+		))
+	}
+
+	if len(ops) == 0 {
+		c.logger.Debug("No changes to apply")
+		return nil
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"title":     req.Title,
+		"startDate": req.StartDate,
+		"endDate":   req.EndDate,
+		"privacy":   req.Privacy,
+		"numOps":    len(ops),
+	}).Debug("Updating trip via operations")
+
+	// Apply the operations
+	if err := c.ApplyOperations(tripKey, ops); err != nil {
+		return fmt.Errorf("applying operations: %w", err)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Info("Successfully updated trip")
+
+	return nil
+}
+
 // ValidateAddPlaceRequest validates the AddPlaceRequest structure
 func ValidateAddPlaceRequest(req AddPlaceRequest) error {
 	if req.Place.PlaceID == "" {
