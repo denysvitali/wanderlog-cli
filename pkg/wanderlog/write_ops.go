@@ -69,7 +69,13 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 		return nil, fmt.Errorf("adding auth headers: %w", err)
 	}
 
-	c.logger.WithField("title", req.Title).Debug("Creating new trip")
+	c.logger.WithFields(map[string]interface{}{
+		"title":     req.Title,
+		"startDate": req.StartDate,
+		"endDate":   req.EndDate,
+		"privacy":   req.Privacy,
+		"body":      string(reqBody),
+	}).Debug("Creating new trip")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -77,17 +83,28 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 	}
 	defer resp.Body.Close()
 
+	// Read response body for better error messages
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+		c.logger.WithFields(map[string]interface{}{
+			"status": resp.StatusCode,
+			"body":   string(respBody),
+		}).Error("API returned non-200 status")
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
 	}
 
 	var createResp CreateTripResponse
-	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+	if err := json.Unmarshal(respBody, &createResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
 	if !createResp.Success {
-		return nil, fmt.Errorf("failed to create trip")
+		c.logger.WithField("response", string(respBody)).Error("Trip creation failed")
+		return nil, fmt.Errorf("failed to create trip - response: %s", string(respBody))
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -522,26 +539,46 @@ func (c *Client) CopyTrip(sourceKey string) (*CreateTripResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	// Read response body
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 
-	var copyResp CreateTripResponse
-	if err := json.NewDecoder(resp.Body).Decode(&copyResp); err != nil {
+	c.logger.WithFields(map[string]interface{}{
+		"status": resp.StatusCode,
+		"body":   string(respBody),
+	}).Debug("CopyTrip API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var copyResp models.CopyTripResponse
+	if err := json.Unmarshal(respBody, &copyResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
 	if !copyResp.Success {
-		return nil, fmt.Errorf("failed to copy trip")
+		c.logger.WithField("response", string(respBody)).Error("Copy trip failed")
+		return nil, fmt.Errorf("failed to copy trip - response: %s", string(respBody))
 	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"sourceKey": sourceKey,
-		"newKey":    copyResp.TripPlan.Key,
-		"title":     copyResp.TripPlan.Title,
+		"newKey":    copyResp.Data.Key,
+		"title":     copyResp.Data.Title,
 	}).Info("Successfully copied trip")
 
-	return &copyResp, nil
+	// Convert to CreateTripResponse format for compatibility
+	return &CreateTripResponse{
+		Success: copyResp.Success,
+		TripPlan: models.TripPlanSummary{
+			ID:    copyResp.Data.ID,
+			Key:   copyResp.Data.Key,
+			Title: copyResp.Data.Title,
+		},
+	}, nil
 }
 
 // RestoreTrip restores a soft-deleted trip plan

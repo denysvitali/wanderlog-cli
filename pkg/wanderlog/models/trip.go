@@ -22,6 +22,17 @@ type TripPlanSummary struct {
 	Title   string `json:"title"`
 }
 
+// CopyTripResponse represents the response from copying a trip
+type CopyTripResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Key     string `json:"key"`
+		ViewKey string `json:"viewKey"`
+		ID      int    `json:"id"`
+		Title   string `json:"title"`
+	} `json:"data"`
+}
+
 // UpdateTripRequest represents a request to update trip metadata
 type UpdateTripRequest struct {
 	Title     string `json:"title,omitempty"`
