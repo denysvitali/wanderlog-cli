@@ -187,8 +187,8 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 						hasContent = true
 					}
 				case "note":
-					if len(block.Text.Ops) > 0 && block.Text.Ops[0].Insert != "\n" {
-						noteText := strings.TrimSpace(block.Text.Ops[0].Insert)
+					if !block.Text.IsString && len(block.Text.Text.Ops) > 0 && block.Text.Text.Ops[0].Insert != "\n" {
+						noteText := strings.TrimSpace(block.Text.Text.Ops[0].Insert)
 						if noteText != "" {
 							fmt.Println(infoStyle.Render("   📝 " + noteText))
 							hasContent = true
