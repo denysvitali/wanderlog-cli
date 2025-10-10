@@ -2,3 +2,4 @@
 /trips/*.json
 /*.js
 /wanderlog-cli
+.credentials

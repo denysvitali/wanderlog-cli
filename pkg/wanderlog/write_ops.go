@@ -6,126 +6,35 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
 
-// CreateTripRequest represents a request to create a new trip
-type CreateTripRequest struct {
-	Title     string `json:"title"`
-	StartDate string `json:"startDate,omitempty"` // YYYY-MM-DD format
-	EndDate   string `json:"endDate,omitempty"`   // YYYY-MM-DD format
-	Privacy   string `json:"privacy,omitempty"`   // "public", "private", "unlisted"
-}
+// Type aliases for backward compatibility
+type (
+	CreateTripRequest   = models.CreateTripRequest
+	CreateTripResponse  = models.CreateTripResponse
+	UpdateTripRequest   = models.UpdateTripRequest
+	AddPlaceRequest     = models.AddPlaceRequest
+	AddPlaceInfo        = models.AddPlaceInfo
+	OperationRequest    = models.OperationRequest
+	Operation           = models.Operation
+	SendInvitesRequest  = models.SendInvitesRequest
+	TripInvite          = models.TripInvite
+	LikeCount           = models.LikeCount
+	ShareKeyPermissions = models.ShareKeyPermissions
+	ShareKeyResponse    = models.ShareKeyResponse
+)
 
-// CreateTripResponse represents the response from creating a trip
-type CreateTripResponse struct {
-	Success  bool `json:"success"`
-	TripPlan struct {
-		ID      int    `json:"id"`
-		Key     string `json:"key"`
-		EditKey string `json:"editKey"`
-		Title   string `json:"title"`
-	} `json:"tripPlan"`
-}
-
-// UpdateTripRequest represents a request to update trip metadata
-type UpdateTripRequest struct {
-	Title     string `json:"title,omitempty"`
-	StartDate string `json:"startDate,omitempty"`
-	EndDate   string `json:"endDate,omitempty"`
-	Privacy   string `json:"privacy,omitempty"`
-}
-
-// AddPlaceRequest represents a request to add a place to a trip
-type AddPlaceRequest struct {
-	Place AddPlaceInfo `json:"place"`
-	Text  string       `json:"text"`
-}
-
-// AddPlaceInfo represents the place information when adding a place
-type AddPlaceInfo struct {
-	PlaceID  string `json:"place_id,omitempty"`  // API uses snake_case
-	Name     string `json:"name"`
-	Geometry *struct {
-		Location struct {
-			Lat float64 `json:"lat"`
-			Lng float64 `json:"lng"`
-		} `json:"location"`
-	} `json:"geometry,omitempty"`
-}
-
-// OperationRequest represents a batch operation request
-type OperationRequest struct {
-	Ops []Operation `json:"ops"`
-}
-
-// Operation represents a single ShareDB JSON0 operation
-// ShareDB uses a specific format with:
-// - p: path as array of keys/indices
-// - oi/od: object insert/delete (for replacing object values)
-// - li/ld: list insert/delete (for array operations)
-type Operation struct {
-	P  []interface{} `json:"p"`            // Path as array (e.g., ["itinerary", "sections", 0, "blocks", 1])
-	OI interface{}   `json:"oi,omitempty"` // Object insert (new value for replace)
-	OD interface{}   `json:"od,omitempty"` // Object delete (old value for replace)
-	LI interface{}   `json:"li,omitempty"` // List insert (for array insertions)
-	LD interface{}   `json:"ld,omitempty"` // List delete (for array deletions)
-}
-
-// ShareDB Operation Helpers
-
-// ReplaceInObject creates a ShareDB operation to replace an object field
-// Path should be an array like: []interface{}{"itinerary", "sections", 0, "heading"}
-func ReplaceInObject(path []interface{}, oldValue, newValue interface{}) Operation {
-	return Operation{
-		P:  path,
-		OD: oldValue,
-		OI: newValue,
-	}
-}
-
-// InsertInObject creates a ShareDB operation to insert a new object field
-func InsertInObject(path []interface{}, value interface{}) Operation {
-	return Operation{
-		P:  path,
-		OI: value,
-	}
-}
-
-// DeleteInObject creates a ShareDB operation to delete an object field
-func DeleteInObject(path []interface{}, oldValue interface{}) Operation {
-	return Operation{
-		P:  path,
-		OD: oldValue,
-	}
-}
-
-// InsertInList creates a ShareDB operation to insert an item into an array at a specific index
-func InsertInList(path []interface{}, index int, value interface{}) Operation {
-	pathWithIndex := append(path, index)
-	return Operation{
-		P:  pathWithIndex,
-		LI: value,
-	}
-}
-
-// DeleteFromList creates a ShareDB operation to delete an item from an array at a specific index
-func DeleteFromList(path []interface{}, index int, oldValue interface{}) Operation {
-	pathWithIndex := append(path, index)
-	return Operation{
-		P:  pathWithIndex,
-		LD: oldValue,
-	}
-}
-
-// ReplaceInList creates a ShareDB operation to replace an item in an array
-func ReplaceInList(path []interface{}, index int, oldValue, newValue interface{}) Operation {
-	pathWithIndex := append(path, index)
-	return Operation{
-		P:  pathWithIndex,
-		LD: oldValue,
-		LI: newValue,
-	}
-}
+// Operation helper functions
+var (
+	ReplaceInObject = models.ReplaceInObject
+	InsertInObject  = models.InsertInObject
+	DeleteInObject  = models.DeleteInObject
+	InsertInList    = models.InsertInList
+	DeleteFromList  = models.DeleteFromList
+	ReplaceInList   = models.ReplaceInList
+)
 
 // FindSectionIndex finds the array index of a section by its ID
 func FindSectionIndex(sections []ItSections, sectionID int) int {
@@ -232,11 +141,15 @@ func ValidateAddPlaceRequest(req AddPlaceRequest) error {
 	if req.Place.Name == "" {
 		return fmt.Errorf("place name is required")
 	}
-	if req.Place.Latitude < -90 || req.Place.Latitude > 90 {
-		return fmt.Errorf("latitude must be between -90 and 90, got %f", req.Place.Latitude)
-	}
-	if req.Place.Longitude < -180 || req.Place.Longitude > 180 {
-		return fmt.Errorf("longitude must be between -180 and 180, got %f", req.Place.Longitude)
+	if req.Place.Geometry != nil {
+		lat := req.Place.Geometry.Location.Lat
+		lng := req.Place.Geometry.Location.Lng
+		if lat < -90 || lat > 90 {
+			return fmt.Errorf("latitude must be between -90 and 90, got %f", lat)
+		}
+		if lng < -180 || lng > 180 {
+			return fmt.Errorf("longitude must be between -180 and 180, got %f", lng)
+		}
 	}
 	return nil
 }
@@ -485,11 +398,11 @@ func (c *Client) ClearSectionBlocks(tripKey string, sectionID int) error {
 	}
 
 	// Create an operation to replace the blocks array with an empty array
-	clearOp := Operation{
-		Type:  "replace",
-		Path:  fmt.Sprintf("/itinerary/sections/%d/blocks", sectionID),
-		Value: []interface{}{},
-	}
+	clearOp := ReplaceInObject(
+		[]interface{}{"itinerary", "sections", sectionID, "blocks"},
+		nil, // old value not needed for replace
+		[]interface{}{},
+	)
 
 	err := c.ApplyOperations(tripKey, []Operation{clearOp})
 	if err != nil {
@@ -511,10 +424,11 @@ func (c *Client) DeleteSection(tripKey string, sectionID int) error {
 	}
 
 	// Create an operation to remove the section
-	deleteOp := Operation{
-		Type: "remove",
-		Path: fmt.Sprintf("/itinerary/sections/%d", sectionID),
-	}
+	deleteOp := DeleteFromList(
+		[]interface{}{"itinerary", "sections"},
+		sectionID,
+		nil, // old value not needed
+	)
 
 	err := c.ApplyOperations(tripKey, []Operation{deleteOp})
 	if err != nil {
@@ -550,19 +464,19 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 	// Build operations only for sections that exist
 	operations := []Operation{}
 	for i := range trip.TripPlan.Itinerary.Sections {
-		operations = append(operations, Operation{
-			Type:  "replace",
-			Path:  fmt.Sprintf("/itinerary/sections/%d/blocks", i),
-			Value: []interface{}{},
-		})
+		operations = append(operations, ReplaceInObject(
+			[]interface{}{"itinerary", "sections", i, "blocks"},
+			nil, // old value not needed for replace
+			[]interface{}{},
+		))
 	}
 
 	// Also clear place metadata
-	operations = append(operations, Operation{
-		Type:  "replace",
-		Path:  "/resources/placeMetadata",
-		Value: map[string]interface{}{},
-	})
+	operations = append(operations, ReplaceInObject(
+		[]interface{}{"resources", "placeMetadata"},
+		nil, // old value not needed for replace
+		[]interface{}{},
+	))
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":         tripKey,
@@ -628,4 +542,341 @@ func (c *Client) CopyTrip(sourceKey string) (*CreateTripResponse, error) {
 	}).Info("Successfully copied trip")
 
 	return &copyResp, nil
+}
+
+// RestoreTrip restores a soft-deleted trip plan
+func (c *Client) RestoreTrip(tripKey string) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for restoring trips")
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/restore", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Debug("Restoring trip")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Info("Successfully restored trip")
+	return nil
+}
+
+// SendTripInvites sends invites for people to edit a trip plan
+func (c *Client) SendTripInvites(tripKey string, req SendInvitesRequest) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for sending invites")
+	}
+
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshaling send invites request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/invite", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":  tripKey,
+		"invitees": req.Invitees,
+	}).Debug("Sending trip invites")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Info("Successfully sent trip invites")
+	return nil
+}
+
+// ListTripInvites lists all invites that have been sent out for a trip plan
+func (c *Client) ListTripInvites(tripKey string) ([]TripInvite, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for listing invites")
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/invites", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var invites []TripInvite
+	if err := json.NewDecoder(resp.Body).Decode(&invites); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return invites, nil
+}
+
+// SetLike likes or unlikes a trip plan
+func (c *Client) SetLike(tripKey string, liked bool) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for liking trips")
+	}
+
+	reqBody, err := json.Marshal(models.SetLikeRequest{Liked: liked})
+	if err != nil {
+		return fmt.Errorf("marshaling set like request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/like", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"liked":   liked,
+	}).Debug("Setting like status for trip")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Info("Successfully set like status")
+	return nil
+}
+
+// GetLikeCount gets whether we've liked a trip plan and the total number of likes
+func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
+	url := fmt.Sprintf("%s/tripPlans/%s/likeCount", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	// Auth is optional for this endpoint
+	if c.auth != nil {
+		if err := c.addAuthHeaders(httpReq); err != nil {
+			return nil, fmt.Errorf("adding auth headers: %w", err)
+		}
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var likeCount LikeCount
+	if err := json.NewDecoder(resp.Body).Decode(&likeCount); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &likeCount, nil
+}
+
+// AddCollaborator adds a new collaborator to a trip plan with edit access
+func (c *Client) AddCollaborator(tripKey string, userID int) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for adding collaborators")
+	}
+
+	reqBody, err := json.Marshal(models.CollaboratorRequest{UserID: userID})
+	if err != nil {
+		return fmt.Errorf("marshaling add collaborator request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/collaborator", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"userID":  userID,
+	}).Debug("Adding collaborator to trip")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"userID":  userID,
+	}).Info("Successfully added collaborator")
+
+	return nil
+}
+
+// RemoveCollaborator removes a tripmate from a trip plan
+func (c *Client) RemoveCollaborator(tripKey string, userID int) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for removing collaborators")
+	}
+
+	reqBody, err := json.Marshal(models.CollaboratorRequest{UserID: userID})
+	if err != nil {
+		return fmt.Errorf("marshaling remove collaborator request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/collaborator", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("DELETE", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"userID":  userID,
+	}).Debug("Removing collaborator from trip")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"userID":  userID,
+	}).Info("Successfully removed collaborator")
+
+	return nil
+}
+
+// GetOrCreateShareKey creates or gets a share key with matching permissions
+func (c *Client) GetOrCreateShareKey(editKey string, permissions ShareKeyPermissions) (*ShareKeyResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for creating share keys")
+	}
+
+	type shareKeyRequest struct {
+		Permissions ShareKeyPermissions `json:"permissions"`
+	}
+	reqBody, err := json.Marshal(shareKeyRequest{Permissions: permissions})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling share key request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/shareKey", BaseURL, editKey)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"editKey":     editKey,
+		"permissions": permissions,
+	}).Debug("Creating/getting share key")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var shareKeyResp ShareKeyResponse
+	if err := json.NewDecoder(resp.Body).Decode(&shareKeyResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	c.logger.WithField("shareKey", shareKeyResp.ShareKey).Info("Successfully created/got share key")
+
+	return &shareKeyResp, nil
 }

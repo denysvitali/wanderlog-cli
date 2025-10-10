@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 	"github.com/sirupsen/logrus"
 )
 
@@ -233,16 +232,17 @@ func TestAddPlace(t *testing.T) {
 			tripKey:   "test-trip",
 			sectionID: 1,
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test Place",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 40.7128,
-   						Lng: -74.0060,
-   					},
-   				},
-   			},
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
+					PlaceID:   "ChIJ123",
+					Name:      "Test Place",
+					Latitude:  40.7128,
+					Longitude: -74.0060,
+				},
 				Text: "Test Place",
 			},
 			serverResponse: `{"success": true}`,
@@ -254,15 +254,14 @@ func TestAddPlace(t *testing.T) {
 			tripKey:   "test-trip",
 			sectionID: 1,
 			req: AddPlaceRequest{
-				Place: models.AddPlaceInfo{
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
 					PlaceID: "invalid",
 					Name:    "Invalid Place",
-					Geometry: &models.PlaceGeometry{
-						Location: models.PlaceLocation{
-							Lat: 0,
-							Lng: 0,
-						},
-					},
 				},
 			},
 			serverResponse: `{"success": false, "error": "Invalid place"}`,
@@ -404,7 +403,7 @@ func TestApplyOperations(t *testing.T) {
 			name:    "successful operations",
 			tripKey: "test-trip",
 			ops: []Operation{
-				{P: []interface{}{"itinerary", "sections", 0, "blocks"}, OD: []interface{}{}, OI: []interface{}{}},
+				{Type: "replace", Path: "/itinerary/sections/0/blocks", Value: []interface{}{}},
 			},
 			serverResponse: `{"success": true}`,
 			serverStatus:   http.StatusOK,
@@ -413,7 +412,7 @@ func TestApplyOperations(t *testing.T) {
 		{
 			name:           "server error",
 			tripKey:        "test-trip",
-			ops:            []Operation{{P: []interface{}{"invalid"}}},
+			ops:            []Operation{{Type: "invalid"}},
 			serverResponse: `{"error": "invalid operation"}`,
 			serverStatus:   http.StatusBadRequest,
 			expectError:    true,
@@ -476,16 +475,17 @@ func TestValidateAddPlaceRequest(t *testing.T) {
 		{
 			name: "valid request",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test Place",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 40.7128,
-   						Lng: -74.0060,
-   					},
-   				},
-   			},
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
+					PlaceID:   "ChIJ123",
+					Name:      "Test Place",
+					Latitude:  40.7128,
+					Longitude: -74.0060,
+				},
 				Text: "Test Place",
 			},
 			expectError: false,
@@ -493,64 +493,68 @@ func TestValidateAddPlaceRequest(t *testing.T) {
 		{
 			name: "invalid latitude (too high)",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 91.0,
-   						Lng: 0,
-   					},
-   				},
-   			},
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
+					PlaceID:   "ChIJ123",
+					Name:      "Test",
+					Latitude:  91.0, // Invalid
+					Longitude: 0,
+				},
 			},
 			expectError: true,
 		},
 		{
 			name: "invalid longitude (too low)",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 0,
-   						Lng: -181.0,
-   					},
-   				},
-   			},
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
+					PlaceID:   "ChIJ123",
+					Name:      "Test",
+					Latitude:  0,
+					Longitude: -181.0, // Invalid
+				},
 			},
 			expectError: true,
 		},
 		{
 			name: "empty place_id",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "",
-   				Name:    "Test",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 0,
-   						Lng: 0,
-   					},
-   				},
-   			},
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
+					PlaceID:   "", // Empty
+					Name:      "Test",
+					Latitude:  0,
+					Longitude: 0,
+				},
 			},
 			expectError: true,
 		},
 		{
 			name: "empty name",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 0,
-   						Lng: 0,
-   					},
-   				},
-   			},
+				Place: struct {
+					PlaceID   string  `json:"place_id"`
+					Name      string  `json:"name"`
+					Latitude  float64 `json:"latitude"`
+					Longitude float64 `json:"longitude"`
+				}{
+					PlaceID:   "ChIJ123",
+					Name:      "", // Empty
+					Latitude:  0,
+					Longitude: 0,
+				},
 			},
 			expectError: true,
 		},

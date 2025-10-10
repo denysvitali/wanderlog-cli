@@ -49,12 +49,21 @@ Examples:
 			os.Exit(1)
 		}
 
-		// Store credentials securely in system keychain
-		if err := wanderlog.SaveCredentials(creds); err != nil {
-			logger.WithError(err).Warn("Failed to save credentials to keychain")
+		// Store credentials in both keychain and config file
+		keychainErr := wanderlog.SaveCredentials(creds)
+		configErr := wanderlog.SaveCredentialsToConfig(creds, email, password)
+
+		if keychainErr != nil && configErr != nil {
+			logger.WithError(keychainErr).Warn("Failed to save credentials to keychain")
+			logger.WithError(configErr).Warn("Failed to save credentials to config file")
 			fmt.Printf("⚠️ Credentials saved in memory only (this session)\n")
 		} else {
-			fmt.Printf("🔐 Credentials saved to keychain for future use\n")
+			if keychainErr == nil {
+				fmt.Printf("🔐 Credentials saved to keychain\n")
+			}
+			if configErr == nil {
+				fmt.Printf("📝 Credentials saved to config file\n")
+			}
 		}
 
 		fmt.Printf("✅ Successfully logged in!\n")
@@ -73,13 +82,22 @@ This will require you to login again before performing write operations.
 Examples:
   wanderlog logout`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := wanderlog.DeleteCredentials(); err != nil {
-			logger.WithError(err).Error("Failed to clear credentials")
+		keychainErr := wanderlog.DeleteCredentials()
+		configErr := wanderlog.ClearCredentialsFromConfig()
+
+		if keychainErr != nil && configErr != nil {
+			logger.WithError(keychainErr).Error("Failed to clear credentials from keychain")
+			logger.WithError(configErr).Error("Failed to clear credentials from config")
 			os.Exit(1)
 		}
 
 		fmt.Printf("✅ Successfully logged out\n")
-		fmt.Printf("🗑️ Credentials cleared from keychain\n")
+		if keychainErr == nil {
+			fmt.Printf("🗑️ Credentials cleared from keychain\n")
+		}
+		if configErr == nil {
+			fmt.Printf("🗑️ Credentials cleared from config file\n")
+		}
 	},
 }
 

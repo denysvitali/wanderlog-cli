@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
+	"github.com/adrg/xdg"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,7 +38,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wanderlog.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/wanderlog/config.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 }
 
@@ -44,15 +46,16 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+		// Use XDG config directory
+		configDir := filepath.Join(xdg.ConfigHome, "wanderlog")
 
-		viper.AddConfigPath(home)
+		viper.AddConfigPath(configDir)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".wanderlog")
+		viper.SetConfigName("config")
 	}
 
 	viper.AutomaticEnv()
+	viper.SetEnvPrefix("WANDERLOG")
 
 	if err := viper.ReadInConfig(); err == nil {
 		logrus.WithField("config", viper.ConfigFileUsed()).Debug("Using config file")
