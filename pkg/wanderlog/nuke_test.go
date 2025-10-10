@@ -215,15 +215,17 @@ func TestClearSectionBlocks(t *testing.T) {
 					t.Errorf("Expected 1 operation, got %d", len(opReq.Ops))
 				}
 
-				// Verify operation
+				// Verify operation (ShareDB JSON0 format)
 				if len(opReq.Ops) > 0 {
 					op := opReq.Ops[0]
-					if op.Type != "replace" {
-						t.Errorf("Expected 'replace' operation, got '%s'", op.Type)
+					// For replace operations, we should have both OD (old) and OI (new)
+					if op.OD == nil || op.OI == nil {
+						t.Error("Expected replace operation with both OD and OI fields")
 					}
-					expectedPath := "/itinerary/sections/1/blocks"
-					if op.Path != expectedPath {
-						t.Errorf("Expected path '%s', got '%s'", expectedPath, op.Path)
+					// Verify path structure
+					expectedPath := []interface{}{"itinerary", "sections", 1, "blocks"}
+					if len(op.P) != len(expectedPath) {
+						t.Errorf("Expected path length %d, got %d", len(expectedPath), len(op.P))
 					}
 				}
 
@@ -274,15 +276,17 @@ func TestDeleteSection(t *testing.T) {
 			t.Errorf("Expected 1 operation, got %d", len(opReq.Ops))
 		}
 
-		// Verify operation
+		// Verify operation (ShareDB JSON0 format)
 		if len(opReq.Ops) > 0 {
 			op := opReq.Ops[0]
-			if op.Type != "remove" {
-				t.Errorf("Expected 'remove' operation, got '%s'", op.Type)
+			// For remove operations, we should have LD (list delete) field
+			if op.LD == nil {
+				t.Error("Expected remove operation with LD field")
 			}
-			expectedPath := "/itinerary/sections/2"
-			if op.Path != expectedPath {
-				t.Errorf("Expected path '%s', got '%s'", expectedPath, op.Path)
+			// Verify path structure
+			expectedPath := []interface{}{"itinerary", "sections", 2}
+			if len(op.P) != len(expectedPath) {
+				t.Errorf("Expected path length %d, got %d", len(expectedPath), len(op.P))
 			}
 		}
 

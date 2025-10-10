@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
 
 var (
@@ -62,16 +63,8 @@ Examples:
 
 		// Only add geometry if coordinates are provided
 		if latitude != 0 || longitude != 0 {
-			placeInfo.Geometry = &struct {
-				Location struct {
-					Lat float64 `json:"lat"`
-					Lng float64 `json:"lng"`
-				} `json:"location"`
-			}{
-				Location: struct {
-					Lat float64 `json:"lat"`
-					Lng float64 `json:"lng"`
-				}{
+			placeInfo.Geometry = &models.PlaceGeometry{
+				Location: models.PlaceLocation{
 					Lat: latitude,
 					Lng: longitude,
 				},

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
 
 // tripIDKey is a custom context key for storing the default trip ID.
@@ -241,6 +242,79 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		),
 	)
 	s.AddTool(wanderlogSearchTool, handleSearchPlacesWanderlog)
+
+	// Trip management tools
+	createTripTool := mcp.NewTool("create_trip",
+		mcp.WithDescription("Create a new trip plan"),
+		mcp.WithString("title", mcp.Required(),
+			mcp.Description("Trip title")),
+		mcp.WithString("start_date",
+			mcp.Description("Start date in YYYY-MM-DD format (optional)")),
+		mcp.WithString("end_date",
+			mcp.Description("End date in YYYY-MM-DD format (optional)")),
+		mcp.WithString("privacy",
+			mcp.Description("Privacy setting: public, private, or unlisted"),
+			mcp.DefaultString("private"),
+			mcp.Enum("public", "private", "unlisted")),
+	)
+	s.AddTool(createTripTool, handleCreateTrip)
+
+	deleteTripTool := mcp.NewTool("delete_trip",
+		mcp.WithDescription("Delete a trip plan"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key to delete")),
+	)
+	s.AddTool(deleteTripTool, handleDeleteTrip)
+
+	restoreTripTool := mcp.NewTool("restore_trip",
+		mcp.WithDescription("Restore a soft-deleted trip plan"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key to restore")),
+	)
+	s.AddTool(restoreTripTool, handleRestoreTrip)
+
+	copyTripTool := mcp.NewTool("copy_trip",
+		mcp.WithDescription("Create a copy of an existing trip"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key to copy")),
+	)
+	s.AddTool(copyTripTool, handleCopyTrip)
+
+	// Social features
+	likeTripTool := mcp.NewTool("like_trip",
+		mcp.WithDescription("Like or unlike a trip plan"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key")),
+		mcp.WithBoolean("liked", mcp.Required(),
+			mcp.Description("true to like, false to unlike")),
+	)
+	s.AddTool(likeTripTool, handleLikeTrip)
+
+	getLikeCountTool := mcp.NewTool("get_like_count",
+		mcp.WithDescription("Get like count and status for a trip"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key")),
+	)
+	s.AddTool(getLikeCountTool, handleGetLikeCount)
+
+	// Collaboration tools
+	sendInvitesTool := mcp.NewTool("send_trip_invites",
+		mcp.WithDescription("Send invites to collaborate on a trip"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key")),
+		mcp.WithString("invitees", mcp.Required(),
+			mcp.Description("Comma-separated list of email addresses")),
+		mcp.WithString("message",
+			mcp.Description("Optional message to include with the invite")),
+	)
+	s.AddTool(sendInvitesTool, handleSendInvites)
+
+	listInvitesTool := mcp.NewTool("list_trip_invites",
+		mcp.WithDescription("List all invites sent for a trip"),
+		mcp.WithString("trip_key", mcp.Required(),
+			mcp.Description("Trip key")),
+	)
+	s.AddTool(listInvitesTool, handleListInvites)
 
 	// Add trip resource
 	tripResource := mcp.NewResource(
@@ -629,16 +703,8 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	// Only add geometry if coordinates are provided
 	if latitude != 0 || longitude != 0 {
-		placeInfo.Geometry = &struct {
-			Location struct {
-				Lat float64 `json:"lat"`
-				Lng float64 `json:"lng"`
-			} `json:"location"`
-		}{
-			Location: struct {
-				Lat float64 `json:"lat"`
-				Lng float64 `json:"lng"`
-			}{
+		placeInfo.Geometry = &models.PlaceGeometry{
+			Location: models.PlaceLocation{
 				Lat: latitude,
 				Lng: longitude,
 			},
@@ -1069,4 +1135,220 @@ func handleAnalyzeTrip(ctx context.Context, request mcp.GetPromptRequest) (*mcp.
 			},
 		},
 	}, nil
+}
+
+// Handler functions for new MCP tools
+
+func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	title := request.GetString("title", "")
+	if title == "" {
+		return mcp.NewToolResultError("title is required"), nil
+	}
+
+	startDate := request.GetString("start_date", "")
+	endDate := request.GetString("end_date", "")
+	privacy := request.GetString("privacy", "private")
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	req := wanderlog.CreateTripRequest{
+		Title:     title,
+		StartDate: startDate,
+		EndDate:   endDate,
+		Privacy:   privacy,
+	}
+
+	resp, err := client.CreateTrip(req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to create trip: %v", err)), nil
+	}
+
+	result := fmt.Sprintf("✅ Created trip '%s' (Key: %s, ID: %d)", resp.TripPlan.Title, resp.TripPlan.Key, resp.TripPlan.ID)
+	return mcp.NewToolResultText(result), nil
+}
+
+func handleDeleteTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	err := client.DeleteTrip(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete trip: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("🗑️ Deleted trip %s", tripKey)), nil
+}
+
+func handleRestoreTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	err := client.RestoreTrip(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to restore trip: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("♻️ Restored trip %s", tripKey)), nil
+}
+
+func handleCopyTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	resp, err := client.CopyTrip(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to copy trip: %v", err)), nil
+	}
+
+	result := fmt.Sprintf("📋 Copied trip to '%s' (Key: %s)", resp.TripPlan.Title, resp.TripPlan.Key)
+	return mcp.NewToolResultText(result), nil
+}
+
+func handleLikeTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	liked := request.GetBool("liked", false)
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	err := client.SetLike(tripKey, liked)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to set like: %v", err)), nil
+	}
+
+	action := "liked"
+	if !liked {
+		action = "unliked"
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("👍 Successfully %s trip %s", action, tripKey)), nil
+}
+
+func handleGetLikeCount(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	likeCount, err := client.GetLikeCount(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get like count: %v", err)), nil
+	}
+
+	result := fmt.Sprintf("Trip %s has %d likes", tripKey, likeCount.Count)
+	if likeCount.UserLiked {
+		result += " (you liked this trip)"
+	}
+	return mcp.NewToolResultText(result), nil
+}
+
+func handleSendInvites(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	inviteesStr := request.GetString("invitees", "")
+	if inviteesStr == "" {
+		return mcp.NewToolResultError("invitees is required"), nil
+	}
+
+	message := request.GetString("message", "")
+
+	// Parse comma-separated invitees
+	invitees := strings.Split(inviteesStr, ",")
+	for i := range invitees {
+		invitees[i] = strings.TrimSpace(invitees[i])
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	req := wanderlog.SendInvitesRequest{
+		Invitees: invitees,
+		Message:  message,
+	}
+
+	err := client.SendTripInvites(tripKey, req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to send invites: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("📧 Sent invites to %d people for trip %s", len(invitees), tripKey)), nil
+}
+
+func handleListInvites(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		return mcp.NewToolResultError("trip_key is required"), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	invites, err := client.ListTripInvites(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to list invites: %v", err)), nil
+	}
+
+	if len(invites) == 0 {
+		return mcp.NewToolResultText(fmt.Sprintf("No invites found for trip %s", tripKey)), nil
+	}
+
+	result := fmt.Sprintf("Invites for trip %s:\n", tripKey)
+	for i, invite := range invites {
+		result += fmt.Sprintf("%d. %s - Status: %s (Sent: %s)\n", i+1, invite.Email, invite.Status, invite.InvitedAt)
+	}
+
+	return mcp.NewToolResultText(result), nil
 }
