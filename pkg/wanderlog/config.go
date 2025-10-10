@@ -10,6 +10,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// InitConfig initializes Viper configuration from the standard config file location
+// This is primarily for use in tests that need to load configuration
+func InitConfig() error {
+	// Use XDG config directory
+	configDir := filepath.Join(xdg.ConfigHome, "wanderlog")
+	configPath := filepath.Join(configDir, "config.yaml")
+
+	// Check if config file exists
+	if _, err := os.Stat(configPath); err != nil {
+		// Config file doesn't exist, that's okay
+		return nil
+	}
+
+	viper.AddConfigPath(configDir)
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("WANDERLOG")
+
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("reading config file: %w", err)
+	}
+
+	return nil
+}
+
 // ConfigAuth represents the auth section of the config file
 type ConfigAuth struct {
 	Email    string        `yaml:"email,omitempty"`
