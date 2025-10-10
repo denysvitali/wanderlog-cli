@@ -3,19 +3,21 @@ module github.com/denysvitali/wanderlog-cli
 go 1.24.5
 
 require (
+	github.com/adrg/xdg v0.5.3
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/mark3labs/mcp-go v0.41.1
+	github.com/pmezard/go-difflib v1.0.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/term v0.36.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
-	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -38,7 +40,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
@@ -52,5 +53,4 @@ require (
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
