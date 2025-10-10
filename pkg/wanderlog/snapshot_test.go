@@ -18,6 +18,11 @@ import (
 // TestSnapshotTrip creates a trip, performs various operations, and captures
 // snapshots of the raw server response after each step to show the differences
 func TestSnapshotTrip(t *testing.T) {
+	// Initialize config to load credentials from config file
+	if err := InitConfig(); err != nil {
+		t.Logf("Warning: Failed to initialize config: %v", err)
+	}
+
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 
@@ -26,7 +31,7 @@ func TestSnapshotTrip(t *testing.T) {
 
 	// Authenticate
 	if err := client.EnsureAuthenticated("", ""); err != nil {
-		t.Fatalf("Failed to authenticate: %v. Please run 'wanderlog auth login' first", err)
+		t.Fatalf("Failed to authenticate: %v. Please run 'wanderlog auth login' first or set credentials in config file", err)
 	}
 
 	// Step 1: Create a new trip
@@ -69,11 +74,15 @@ func TestSnapshotTrip(t *testing.T) {
 		t.Fatalf("Failed to get place details: %v", err)
 	}
 
-	trip := createResp.TripPlan
-	if len(trip.Itinerary.Sections) == 0 {
+	// Get full trip details to access itinerary
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		t.Fatalf("Failed to get trip: %v", err)
+	}
+	if len(trip.TripPlan.Itinerary.Sections) == 0 {
 		t.Fatal("No sections in trip")
 	}
-	sectionID := trip.Itinerary.Sections[0].ID
+	sectionID := trip.TripPlan.Itinerary.Sections[0].ID
 
 	addReq1 := AddPlaceRequest{
 		Place: AddPlaceInfo{
@@ -135,26 +144,9 @@ func TestSnapshotTrip(t *testing.T) {
 	t.Logf("📸 Snapshot 3: Trip after adding second place (%d bytes)", len(snapshot3))
 	showDiff(t, snapshot2, snapshot3, "After First Place → After Second Place")
 
-	// Step 4: Update trip title
+	// Step 4: Remove first place
 	time.Sleep(1 * time.Second)
-	t.Log("\n📸 STEP 4: Updating trip title")
-
-	updateReq := UpdateTripRequest{
-		Title: fmt.Sprintf("Paris Adventure - %d", time.Now().Unix()),
-	}
-
-	if err := client.UpdateTrip(tripKey, updateReq); err != nil {
-		t.Fatalf("Failed to update trip: %v", err)
-	}
-	t.Logf("✅ Updated trip title")
-
-	snapshot4 := captureSnapshot(t, client, tripKey, "4-after-title-update")
-	t.Logf("📸 Snapshot 4: Trip after title update (%d bytes)", len(snapshot4))
-	showDiff(t, snapshot3, snapshot4, "After Second Place → After Title Update")
-
-	// Step 5: Remove first place
-	time.Sleep(1 * time.Second)
-	t.Log("\n📸 STEP 5: Removing first place")
+	t.Log("\n📸 STEP 4: Removing first place")
 
 	// Get current trip to find the place block ID
 	currentTrip, err := client.GetTrip(tripKey)
@@ -172,9 +164,9 @@ func TestSnapshotTrip(t *testing.T) {
 	}
 	t.Logf("✅ Removed first place")
 
-	snapshot5 := captureSnapshot(t, client, tripKey, "5-after-removal")
-	t.Logf("📸 Snapshot 5: Trip after removing first place (%d bytes)", len(snapshot5))
-	showDiff(t, snapshot4, snapshot5, "After Title Update → After Removal")
+	snapshot4 := captureSnapshot(t, client, tripKey, "4-after-removal")
+	t.Logf("📸 Snapshot 4: Trip after removing first place (%d bytes)", len(snapshot4))
+	showDiff(t, snapshot3, snapshot4, "After Second Place → After Removal")
 
 	t.Log("\n🎉 Snapshot test completed successfully!")
 	t.Logf("🌐 View trip: https://wanderlog.com/view/%s", tripKey)

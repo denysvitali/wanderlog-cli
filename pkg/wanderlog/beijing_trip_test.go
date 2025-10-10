@@ -18,6 +18,11 @@ import (
 // TestBeijingTripCreation creates a complete week-long trip to Beijing using search
 // Run with: go test -v -tags=integration -run TestBeijingTripCreation -timeout 30m ./pkg/wanderlog
 func TestBeijingTripCreation(t *testing.T) {
+	// Initialize config to load credentials from config file
+	if err := InitConfig(); err != nil {
+		t.Logf("Warning: Failed to initialize config: %v", err)
+	}
+
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 
@@ -26,7 +31,7 @@ func TestBeijingTripCreation(t *testing.T) {
 
 	// Use the same authentication as the CLI
 	if err := client.EnsureAuthenticated("", ""); err != nil {
-		t.Fatalf("Failed to authenticate: %v. Please run 'wanderlog auth login' first", err)
+		t.Fatalf("Failed to authenticate: %v. Please run 'wanderlog auth login' first or set credentials in config file", err)
 	}
 
 	// Calculate dates for next month
@@ -224,7 +229,9 @@ func showBeijingDiff(t *testing.T, before, after, label string) {
 	lines := difflib.SplitLines(diffText)
 	if len(lines) > 50 {
 		t.Logf("\n📊 Diff (%s): %d lines changed (showing first 30 lines)", label, len(lines))
-		t.Logf("%s", difflib.JoinLines(lines[:30]))
+		for i := 0; i < 30 && i < len(lines); i++ {
+			t.Log(lines[i])
+		}
 		t.Logf("... (%d more lines)", len(lines)-30)
 	} else {
 		t.Logf("\n📊 Diff (%s):\n%s", label, diffText)

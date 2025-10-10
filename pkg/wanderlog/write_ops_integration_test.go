@@ -16,6 +16,11 @@ import (
 const testTripID = "vetyiadvqjgikbvx"
 
 func setupIntegrationClient(t *testing.T) *Client {
+	// Initialize config to load credentials from config file
+	if err := InitConfig(); err != nil {
+		t.Logf("Warning: Failed to initialize config: %v", err)
+	}
+
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 
@@ -23,7 +28,7 @@ func setupIntegrationClient(t *testing.T) *Client {
 	client.SetLogger(logger)
 
 	if err := client.EnsureAuthenticated("", ""); err != nil {
-		t.Fatalf("Failed to authenticate: %v. Please run 'wanderlog auth login' first", err)
+		t.Fatalf("Failed to authenticate: %v. Please run 'wanderlog auth login' first or set credentials in config file", err)
 	}
 
 	return client
