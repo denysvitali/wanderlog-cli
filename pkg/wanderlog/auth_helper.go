@@ -36,7 +36,7 @@ func (c *Client) EnsureAuthenticated(sessionCookie, xsrfToken string) error {
 	viperEmail := viper.GetString("auth.email")
 	viperPassword := viper.GetString("auth.password")
 
-	if viperSession != "" || viperXSRF != "" {
+	if viperSession != "" && viperXSRF != "" {
 		creds := &AuthCredentials{
 			SessionCookie: viperSession,
 			XSRFToken:     viperXSRF,
@@ -44,6 +44,25 @@ func (c *Client) EnsureAuthenticated(sessionCookie, xsrfToken string) error {
 		}
 		c.logger.Debug("Using session credentials from config file or environment variables")
 		c.SetAuth(creds)
+		return nil
+	}
+
+	// If we have session but no XSRF token, and we have email/password, re-login
+	if viperSession != "" && viperXSRF == "" && viperEmail != "" && viperPassword != "" {
+		c.logger.Debug("Session cookie found but no XSRF token, re-authenticating with email/password")
+		creds, err := c.Login(viperEmail, viperPassword)
+		if err != nil {
+			return fmt.Errorf("re-login failed: %w", err)
+		}
+		c.SetAuth(creds)
+
+		// Save the new session tokens to config file
+		if err := SaveCredentialsToConfig(creds, viperEmail, viperPassword); err != nil {
+			c.logger.WithError(err).Warn("Failed to update config file with new session tokens")
+		} else {
+			c.logger.Debug("Updated config file with new XSRF token")
+		}
+
 		return nil
 	}
 
