@@ -1,6 +1,6 @@
-# Wanderlog API Endpoints Implementation
+# Wanderlog API Endpoints Documentation
 
-This document lists all trip editing endpoints from the Wanderlog web application and their implementation status in the CLI.
+This document provides a comprehensive list of all API endpoints discovered in the Wanderlog web application (from `dist_public_compiled_mainjs.js`) and their implementation status in the CLI.
 
 ## Implemented Trip Editing Endpoints
 
@@ -8,18 +8,23 @@ This document lists all trip editing endpoints from the Wanderlog web applicatio
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
+| `/api/tripPlans` | GET | ✅ `GetTrip()` (with key) | `client.go:45` | Multiple tests |
 | `/api/tripPlans` | POST | ✅ `CreateTrip()` | `write_ops.go:141` | `TestIntegration_CreateAndDeleteTrip` |
+| `/api/tripPlans/:key` | PUT/POST | ✅ `UpdateTrip()` | `write_ops.go:251` | `TestIntegration_UpdateTrip` |
 | `/api/tripPlans/:key` | DELETE | ✅ `DeleteTrip()` | `write_ops.go:194` | `TestIntegration_CreateAndDeleteTrip` |
 | `/api/tripPlans/:key/restore` | POST | ✅ `RestoreTrip()` | `write_ops.go:638` | `TestIntegration_RestoreTrip` |
+| `/api/tripPlans/:key/sections` | GET | ✅ `GetTripSections()` | `client.go:106` | `TestIntegration_GetTripSections` |
 | `/api/tripPlans/copy/:key` | POST | ✅ `CopyTrip()` | `write_ops.go:590` | `TestIntegration_CopyTrip` |
 
 ### Place Management
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
-| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ `AddPlace()` | `write_ops.go:249` | `TestIntegration_AddAndRemovePlace` |
-| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ `RemovePlace()` | `write_ops.go:349` | `TestIntegration_AddAndRemovePlace` |
-| `/api/tripPlans/:key/applyOps` | POST | ✅ `ApplyOperations()` | `write_ops.go:397` | `TestIntegration_ApplyOperations` |
+| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ `AddPlace()` | `write_ops.go:371` | `TestIntegration_AddAndRemovePlace` |
+| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ `RemovePlace()` | `write_ops.go:471` | `TestIntegration_AddAndRemovePlace` |
+| `/api/tripPlans/:key/applyOps` | POST | ✅ `ApplyOperations()` | `write_ops.go:519` | `TestIntegration_ApplyOperations` |
+| `MovePlace` (uses applyOps) | - | ✅ `MovePlace()` | `write_ops.go:1120` | `TestMCPIntegration_MovePlace` |
+| `ReorderPlaces` (uses applyOps) | - | ✅ `ReorderPlaces()` | `write_ops.go:1243` | `TestMCPIntegration_ReorderPlacesTool` |
 
 ### Advanced Operations
 
@@ -54,19 +59,174 @@ This document lists all trip editing endpoints from the Wanderlog web applicatio
 | `/api/tripPlans/:key/like` | POST | ✅ `SetLike()` | `write_ops.go:799` | `TestIntegration_SetLike` |
 | `/api/tripPlans/:key/likeCount` | GET | ✅ `GetLikeCount()` | `write_ops.go:848` | `TestIntegration_GetLikeCount` |
 
-### Advanced Features (Not Implemented)
+## Complete API Endpoint Catalog
 
-These endpoints are available in the web app but not yet implemented in the CLI:
+### User Management & Authentication
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/tripPlans/:key/export/v2` | POST | Export to Google Maps |
-| `/api/tripPlans/:key/createGuideFromTripPlan` | POST | Convert trip to guide |
-| `/api/tripPlans/:key/updateTripPlanGeo/:geoId` | POST | Update trip geography |
-| `/api/tripPlans/:key/distinction` | GET/POST | Get/set trip distinction |
-| `/api/tripPlans/:key/registerView` | POST | Register trip view |
-| `/api/tripPlans/autofillDay` | POST | Auto-fill day with suggestions |
-| `/api/tripPlans/checklistSection` | POST | Manage checklist sections |
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/user` | GET/POST | ❌ | Get/update user profile |
+| `/api/user/login` | POST | ✅ Partial | User login (implemented in auth.go) |
+| `/api/user/logout` | POST | ❌ | User logout |
+| `/api/user/register` | POST | ❌ | User registration |
+| `/api/user/profilePicture` | POST | ❌ | Update profile picture |
+| `/api/user/loginFacebookAccessToken` | POST | ❌ | Facebook OAuth login |
+| `/api/user/loginGoogleAuthCode/v2` | POST | ❌ | Google OAuth login v2 |
+| `/api/user/loginGoogleIdToken` | POST | ❌ | Google ID token login |
+| `/api/user/loginAppleAuthCode` | POST | ❌ | Apple OAuth login |
+| `/api/user/createPendingUser` | POST | ❌ | Create pending user |
+| `/api/user/loginToken` | GET/POST | ❌ | Token-based login |
+| `/api/user/loginToken/login` | POST | ❌ | Login with token |
+| `/api/user/activate/:email/:key` | POST | ❌ | Activate user account |
+| `/api/user/startResetPassword` | POST | ❌ | Start password reset |
+| `/api/user/isValidPasswordResetToken` | POST | ❌ | Validate reset token |
+| `/api/user/resetPassword` | POST | ❌ | Reset password |
+| `/api/user/changeEmail/:token` | POST | ❌ | Change email address |
+| `/api/user/createIncompleteUserSignup` | POST | ❌ | Track incomplete signups |
+
+### User Settings & Preferences
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/user/utcOffset` | POST | ❌ | Set user timezone |
+| `/api/user/isUsernameTaken/:username` | GET | ❌ | Check username availability |
+| `/api/user/subscribeBlog` | POST | ❌ | Subscribe to blog |
+| `/api/user/keyValue/:key` | GET/POST | ❌ | Key-value storage |
+| `/api/user/notification/settings` | GET/POST | ❌ | Notification settings |
+| `/api/user/notifications` | GET | ❌ | Get notifications |
+| `/api/user/notifications/markRead` | POST | ❌ | Mark notifications read |
+| `/api/user/emails` | GET | ❌ | Get user emails |
+| `/api/user/fcmToken` | POST | ❌ | Firebase Cloud Messaging token |
+| `/api/user/saveFlightDealSettings` | POST | ❌ | Flight deal preferences |
+| `/api/user/isDeleting` | GET/POST | ❌ | Account deletion status |
+
+### Social Features
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/user/following/list` | GET | ❌ | List following |
+| `/api/user/following/visitedGeo/:geoId` | GET | ❌ | Following who visited location |
+| `/api/user/followingMultiple` | POST | ❌ | Follow multiple users |
+| `/api/user/mutuallyFollowing` | GET | ❌ | Get mutual followers |
+| `/api/user/:userId/follows` | GET | ❌ | Check if user follows |
+| `/api/user/:userId/email` | GET | ❌ | Get user email |
+| `/api/user/autocomplete/:search` | GET | ❌ | Autocomplete users |
+| `/api/user/byEmail` | POST | ❌ | Find user by email |
+| `/api/user/leaderboard` | GET | ❌ | Get leaderboard |
+| `/api/user/block` | POST | ❌ | Block user |
+| `/api/user/combine/:token` | GET/POST | ❌ | Combine accounts |
+
+### Trip Operations - Feed & Discovery
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/tripPlans` | GET | ✅ | List user trips |
+| `/api/tripPlans/feed` | GET | ❌ | Get trip feed |
+| `/api/tripPlans/feed/v2` | GET | ❌ | Get trip feed v2 |
+| `/api/tripPlans/feed/mostRecentlyEdited` | GET | ❌ | Recently edited trips |
+| `/api/tripPlans/home` | GET | ❌ | Home feed |
+| `/api/tripPlans/history` | GET | ❌ | Trip history |
+| `/api/tripPlans/friendsPlans` | GET | ❌ | Friends' trips |
+| `/api/tripPlans/myProfile/` | GET | ❌ | User's profile trips |
+| `/api/tripPlans/profile/:userId` | GET | ❌ | User profile trips |
+| `/api/tripPlans/profile/byUsername/:username` | GET | ❌ | Profile by username |
+| `/api/tripPlans/profile/sampleMapsByUsernames/:usernames` | GET | ❌ | Sample maps by usernames |
+
+### Trip Operations - Guides & Browse
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/tripPlans/browse/guides` | GET | ❌ | Browse guides |
+| `/api/tripPlans/browse/guides/:geoId` | GET | ❌ | Browse guides by location |
+| `/api/tripPlans/landingPage/guides` | GET | ❌ | Landing page guides |
+| `/api/tripPlans/landingPage/stories` | GET | ❌ | Landing page stories |
+| `/api/tripPlans/:key/:geoId/relatedGuides` | GET | ❌ | Related guides |
+
+### Trip Operations - Advanced
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/tripPlans/createExampleTripPlan` | POST | ❌ | Create example trip |
+| `/api/tripPlans/flights` | GET | ❌ | Get flights |
+| `/api/tripPlans/:key/export/v2` | POST | ❌ | Export to Google Maps |
+| `/api/tripPlans/:key/createGuideFromTripPlan` | POST | ❌ | Convert trip to guide |
+| `/api/tripPlans/:key/updateTripPlanGeo/:geoId` | POST | ❌ | Update trip geography |
+| `/api/tripPlans/:key/distinction` | GET/POST | ❌ | Get/set trip distinction |
+| `/api/tripPlans/:key/registerView` | POST | ❌ | Register trip view |
+| `/api/tripPlans/:key/updateRequired` | GET | ❌ | Check if update required |
+| `/api/tripPlans/getIfEdited` | POST | ❌ | Get if edited |
+| `/api/tripPlans/:key/sections` | GET | ✅ | Get trip sections (implemented) |
+| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ | Add place to section |
+| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ | Remove place from section |
+| `/api/tripPlans/autofillDay` | POST | ❌ | Auto-fill day with suggestions |
+| `/api/tripPlans/checklistSection` | POST | ❌ | Manage checklist sections |
+
+### Trip Operations - Journal & View Only
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/tripPlans/viewOnlyJournal/:journalKey` | GET | ❌ | View-only journal |
+| `/api/tripPlans/viewOnlyJournal/mobile/:journalKey` | GET | ❌ | Mobile view-only journal |
+| `/api/tripPlans/:key/expensesAsCSV` | GET | ❌ | Export expenses as CSV |
+
+### Payments & Subscriptions
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/payments/subscriptionsInfo` | GET | ❌ | Subscription info |
+| `/api/payments/discountInfo/v2` | GET | ❌ | Discount information |
+| `/api/payments/ensureStripeSubscriptionUpdated` | POST | ❌ | Update Stripe subscription |
+| `/api/payments/newStripeSubscriptionInfo` | GET | ❌ | New subscription info |
+| `/api/payments/maybeStartMobileSubscription` | POST | ❌ | Start mobile subscription |
+| `/api/payments/updateSubscriptionCanceled` | POST | ❌ | Cancel subscription |
+| `/api/payments/latestSubscriptionPrice` | GET | ❌ | Get latest price |
+| `/api/payments/changeStripeSubscription` | POST | ❌ | Change subscription |
+| `/api/payments/startStripeTrial` | POST | ❌ | Start trial |
+| `/api/payments/logSubscriptionError` | POST | ❌ | Log subscription error |
+| `/api/payments/proDiscountLandingPage/:slug` | GET | ❌ | Pro discount landing |
+
+### Admin & System
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/tripPlans/admin/recent/plans` | GET | ❌ | Recent plans (admin) |
+| `/api/tripPlans/admin/recent/recommendations` | GET | ❌ | Recent recommendations (admin) |
+| `/api/mailboxes/:id` | GET | ❌ | Get mailbox |
+| `/api/sessionStore` | GET/POST | ❌ | Session storage |
+| `/api/sessionStore/preferences/:key` | GET/POST | ❌ | Session preferences |
+| `/api/config/globalConfig` | GET | ❌ | Global configuration |
+
+### Analytics
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/analytics/firebaseAppInstanceId` | POST | ❌ | Firebase instance ID |
+| `/api/analytics/googleAnalyticsClientId` | POST | ❌ | GA client ID |
+| `/api/analytics/trackTestEvent` | POST | ❌ | Track test event |
+
+### Miscellaneous
+
+| Endpoint | Method | Status | Purpose |
+|----------|--------|--------|---------|
+| `/api/Constants` | GET | ❌ | API constants |
+| `/api/error` | POST | ❌ | Error reporting |
+| `/api/http` | * | ❌ | HTTP utilities |
+| `/api/buffer` | * | ❌ | Buffer operations |
+| `/api/util` | * | ❌ | Utilities |
+
+## Implementation Status Legend
+
+- ✅ **Fully Implemented** - Complete implementation with tests
+- ✅ **Partial** - Basic implementation exists but may lack full features
+- ❌ **Not Implemented** - Endpoint exists in web app but not in CLI
+
+## Notes
+
+1. The CLI focuses on core trip management functionality
+2. OAuth providers and social features are generally not implemented
+3. Payment/subscription endpoints are not needed for CLI usage
+4. Some endpoints may require specific cookies or tokens from the web app
+5. The `/api/tripPlans/:key/applyOps` endpoint is the primary method for complex trip edits using ShareDB operational transforms
 
 ## Data Models
 
