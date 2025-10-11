@@ -94,7 +94,68 @@ func (c *Client) GetTrip(key string) (*TripResponse, error) {
 		return nil, fmt.Errorf("failed to decode trip response: %w", err)
 	}
 
+	// Check if the API returned an error
+	if trip.Error != "" {
+		return nil, fmt.Errorf("API error: %s", trip.Error)
+	}
+
 	return &trip, nil
+}
+
+// GetTripSections retrieves only the sections of a trip without the full trip data
+func (c *Client) GetTripSections(key string) ([]ItSections, error) {
+	url := fmt.Sprintf("%s/tripPlans/%s/sections", BaseURL, key)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"tripKey": key,
+		"url":     url,
+	}).Debug("GetTripSections request details")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"tripKey":    key,
+		"statusCode": resp.StatusCode,
+		"bodySize":   len(respBody),
+	}).Debug("GetTripSections API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s - Response: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	// The API returns sections wrapped in a success response with "data" key
+	var response struct {
+		Success bool         `json:"success"`
+		Data    []ItSections `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode sections response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Data, nil
 }
 
 // SearchPlaces searches for places using Google Places API (New)

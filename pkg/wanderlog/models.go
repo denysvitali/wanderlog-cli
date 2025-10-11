@@ -377,6 +377,7 @@ type ItSections struct {
 	} `json:"blocks"`
 	Date             *string `json:"date"`
 	Heading          string  `json:"heading"`
+	DisplayHeading   string  `json:"displayHeading"` // Alternative heading field from sections endpoint
 	ID               int     `json:"id,omitzero"`
 	Mode             string  `json:"mode,omitzero"`
 	PlaceMarkerColor string  `json:"placeMarkerColor,omitzero"`
@@ -493,5 +494,6 @@ type TripResponse struct {
 	Resources      Resources       `json:"resources"`
 	Settings       struct{}        `json:"settings"`
 	Success        bool            `json:"success,omitzero"`
+	Error          string          `json:"error,omitempty"`
 	TripPlan       Plan            `json:"tripPlan"`
 }
