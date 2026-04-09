@@ -1,6 +1,10 @@
 # Wanderlog CLI
 
-A beautiful command-line interface for interacting with Wanderlog trip data. Built with Go using Cobra, Viper, Logrus, and Charm's Lipgloss for stunning terminal output.
+> **Unofficial** command-line client for [Wanderlog](https://wanderlog.com). Not affiliated with Wanderlog or Travelchime Inc.
+
+A command-line interface for interacting with Wanderlog trip data. Built with Go using Cobra, Viper, Logrus, and Charm's Lipgloss for terminal output.
+
+**Note:** This tool uses Wanderlog's unofficial API, which may change or break at any time without notice.
 
 ## Features
 
