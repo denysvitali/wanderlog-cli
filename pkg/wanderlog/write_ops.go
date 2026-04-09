@@ -488,7 +488,7 @@ func (c *Client) ClearSectionBlocks(tripKey string, sectionID int) error {
 	// Create an operation to replace the blocks array with an empty array
 	clearOp := ReplaceInObject(
 		[]interface{}{"itinerary", "sections", sectionID, "blocks"},
-		nil, // old value not needed for replace
+		[]interface{}{}, // old value placeholder for ShareDB OD field
 		[]interface{}{},
 	)
 
@@ -515,7 +515,7 @@ func (c *Client) DeleteSection(tripKey string, sectionID int) error {
 	deleteOp := DeleteFromList(
 		[]interface{}{"itinerary", "sections"},
 		sectionID,
-		nil, // old value not needed
+		map[string]interface{}{}, // old value placeholder for ShareDB LD field
 	)
 
 	err := c.ApplyOperations(tripKey, []Operation{deleteOp})
@@ -554,7 +554,7 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 	for i := range trip.TripPlan.Itinerary.Sections {
 		operations = append(operations, ReplaceInObject(
 			[]interface{}{"itinerary", "sections", i, "blocks"},
-			nil, // old value not needed for replace
+			[]interface{}{}, // old value placeholder for ShareDB OD field
 			[]interface{}{},
 		))
 	}
@@ -562,7 +562,7 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 	// Also clear place metadata
 	operations = append(operations, ReplaceInObject(
 		[]interface{}{"resources", "placeMetadata"},
-		nil, // old value not needed for replace
+		[]interface{}{}, // old value placeholder for ShareDB OD field
 		[]interface{}{},
 	))
 
@@ -580,6 +580,128 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 		"tripKey":  tripKey,
 		"sections": len(trip.TripPlan.Itinerary.Sections),
 	}).Info("Successfully nuked all place data from trip")
+
+	return nil
+}
+
+// MovePlace moves a place from one section to another at a specific position
+func (c *Client) MovePlace(tripKey string, placeID, fromSectionID, toSectionID, position int) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for moving places")
+	}
+
+	// First, get the current trip to find the place data
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+
+	fromIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, fromSectionID)
+	if fromIdx < 0 {
+		return fmt.Errorf("source section %d not found", fromSectionID)
+	}
+
+	toIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, toSectionID)
+	if toIdx < 0 {
+		return fmt.Errorf("destination section %d not found", toSectionID)
+	}
+
+	// Find the block index of the place in the source section
+	blockIdx := -1
+	var blockData interface{}
+	for i, block := range trip.TripPlan.Itinerary.Sections[fromIdx].Blocks {
+		if block.ID == placeID {
+			blockIdx = i
+			blockData = block
+			break
+		}
+	}
+	if blockIdx < 0 {
+		return fmt.Errorf("place %d not found in section %d", placeID, fromSectionID)
+	}
+
+	// Build operations: delete from source, insert into destination
+	ops := []Operation{
+		DeleteFromList(
+			[]interface{}{"itinerary", "sections", fromIdx, "blocks"},
+			blockIdx,
+			blockData,
+		),
+		InsertInList(
+			[]interface{}{"itinerary", "sections", toIdx, "blocks"},
+			position,
+			blockData,
+		),
+	}
+
+	if err := c.ApplyOperations(tripKey, ops); err != nil {
+		return fmt.Errorf("applying move operations: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":       tripKey,
+		"placeID":       placeID,
+		"fromSectionID": fromSectionID,
+		"toSectionID":   toSectionID,
+		"position":      position,
+	}).Info("Successfully moved place")
+
+	return nil
+}
+
+// ReorderPlaces reorders places within a section by replacing the blocks list
+func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for reordering places")
+	}
+
+	// First, get the current trip to find the section data
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+
+	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+	if sectionIdx < 0 {
+		return fmt.Errorf("section %d not found", sectionID)
+	}
+
+	section := trip.TripPlan.Itinerary.Sections[sectionIdx]
+
+	// Build a map of block ID -> block data
+	blockMap := make(map[int]interface{})
+	for _, block := range section.Blocks {
+		blockMap[block.ID] = block
+	}
+
+	// Build the new blocks list in the requested order
+	newBlocks := make([]interface{}, 0, len(placeIDs))
+	for _, id := range placeIDs {
+		block, ok := blockMap[id]
+		if !ok {
+			return fmt.Errorf("place %d not found in section %d", id, sectionID)
+		}
+		newBlocks = append(newBlocks, block)
+	}
+
+	// Replace the entire blocks array
+	ops := []Operation{
+		ReplaceInObject(
+			[]interface{}{"itinerary", "sections", sectionIdx, "blocks"},
+			section.Blocks,
+			newBlocks,
+		),
+	}
+
+	if err := c.ApplyOperations(tripKey, ops); err != nil {
+		return fmt.Errorf("applying reorder operations: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"placeIDs":  placeIDs,
+	}).Info("Successfully reordered places")
 
 	return nil
 }

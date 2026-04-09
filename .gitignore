@@ -1,6 +1,30 @@
+# Binaries
 /wanderlog
-/trips/*.json
-/*.js
 /wanderlog-cli
+wanderlog-*-*
+
+# Test & coverage
+coverage.out
+coverage.html
+
+# Data
+/trips/*.json
+
+# Credentials
 .credentials
+*.env
+.env
+
+# JS artifacts
+/*.js
 dist*.js
+
+# Build
+/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
