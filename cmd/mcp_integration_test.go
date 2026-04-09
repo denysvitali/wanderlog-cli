@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -848,20 +847,23 @@ func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 			if i == blockIndex {
 				// Update this block's text
 				blockCopy := block
-				blockCopy.Text = wanderlog.Text{
-					Ops: []struct {
-						Attributes *struct {
-							Bold bool   `json:"bold,omitempty"`
-							Link string `json:"link,omitempty"`
-							List string `json:"list,omitzero"`
-						} `json:"attributes,omitempty,omitzero"`
-						Insert string `json:"insert,omitzero"`
-					}{
-						{
-							Insert: "Updated note - testing operational transforms for note editing!",
-						},
-						{
-							Insert: "\n",
+				blockCopy.Text = wanderlog.FlexibleText{
+					IsString: false,
+					Text: wanderlog.Text{
+						Ops: []struct {
+							Attributes *struct {
+								Bold bool   `json:"bold,omitempty"`
+								Link string `json:"link,omitempty"`
+								List string `json:"list,omitzero"`
+							} `json:"attributes,omitempty,omitzero"`
+							Insert string `json:"insert,omitzero"`
+						}{
+							{
+								Insert: "Updated note - testing operational transforms for note editing!",
+							},
+							{
+								Insert: "\n",
+							},
 						},
 					},
 				}
@@ -872,11 +874,11 @@ func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 		}
 
 		// Replace the entire blocks array
-		updateOp := wanderlog.Operation{
-			Type:  "replace",
-			Path:  fmt.Sprintf("/itinerary/sections/%d/blocks", secIdx),
-			Value: updatedBlocks,
-		}
+		updateOp := wanderlog.ReplaceInObject(
+			[]interface{}{"itinerary", "sections", secIdx, "blocks"},
+			section.Blocks,
+			updatedBlocks,
+		)
 
 		t.Logf("Replacing entire blocks array at path: /itinerary/sections/%d/blocks", secIdx)
 		err = client.ApplyOperations(testTripID, []wanderlog.Operation{updateOp})
@@ -897,8 +899,8 @@ func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 		// Verify the text was updated
 		require.True(t, len(section.Blocks) > blockIndex, "Block disappeared after update")
 		updatedBlock := section.Blocks[blockIndex]
-		require.True(t, len(updatedBlock.Text.Ops) > 0, "Text ops are empty")
-		assert.Contains(t, updatedBlock.Text.Ops[0].Insert, "Updated note", "Text was not updated")
+		require.True(t, len(updatedBlock.Text.Text.Ops) > 0, "Text ops are empty")
+		assert.Contains(t, updatedBlock.Text.Text.Ops[0].Insert, "Updated note", "Text was not updated")
 
 		t.Logf("✓ Successfully updated place notes using operational transforms")
 	})
@@ -999,11 +1001,11 @@ func TestMCPIntegration_ReorderPlaces(t *testing.T) {
 		}
 
 		// Apply operation to replace the blocks array
-		reorderOp := wanderlog.Operation{
-			Type:  "replace",
-			Path:  fmt.Sprintf("/itinerary/sections/%d/blocks", secIdx),
-			Value: reorderedBlocks,
-		}
+		reorderOp := wanderlog.ReplaceInObject(
+			[]interface{}{"itinerary", "sections", secIdx, "blocks"},
+			section.Blocks,
+			reorderedBlocks,
+		)
 
 		t.Logf("Swapping places at indices %d and %d", firstPlaceIdx, secondPlaceIdx)
 		err = client.ApplyOperations(testTripID, []wanderlog.Operation{reorderOp})
