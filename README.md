@@ -347,6 +347,10 @@ go build -o wanderlog
 4. Add tests if applicable
 5. Submit a pull request
 
+## Disclaimer
+
+This project is **not affiliated with, endorsed by, or associated with** [Wanderlog](https://wanderlog.com) or Travelchime Inc. in any way. It is an independent, unofficial command-line client that interacts with publicly available APIs. "Wanderlog" is a trademark of Travelchime Inc.
+
 ## License
 
 MIT License - see LICENSE file for details.
