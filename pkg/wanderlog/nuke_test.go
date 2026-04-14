@@ -64,11 +64,11 @@ func TestNukeTripPlaces(t *testing.T) {
 			// Should not call applyOps since there are no sections
 		},
 		{
-			name:    "trip fetch fails",
-			tripKey: "nonexistent",
+			name:         "trip fetch fails",
+			tripKey:      "nonexistent",
 			tripResponse: `{"error": "not found"}`,
-			tripStatus:  http.StatusNotFound,
-			expectError: true,
+			tripStatus:   http.StatusNotFound,
+			expectError:  true,
 		},
 		{
 			name:    "successful nuke with 5 sections",

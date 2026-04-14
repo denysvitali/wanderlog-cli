@@ -49,7 +49,7 @@ func TestBeijingTripCreation(t *testing.T) {
 
 	// Set trip dates for a week-long Beijing trip
 	now := time.Now()
-	startDate := now.AddDate(0, 1, 0) // Start next month
+	startDate := now.AddDate(0, 1, 0)     // Start next month
 	endDate := startDate.AddDate(0, 0, 7) // 7-day trip
 
 	t.Logf("Setting trip dates: %s to %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
@@ -85,7 +85,7 @@ func TestBeijingTripCreation(t *testing.T) {
 	beijingLng := 116.4074
 
 	// Define daily attractions to search for
-	dailyQueries := [][]struct{query, notes string}{
+	dailyQueries := [][]struct{ query, notes string }{
 		{ // Day 1
 			{"Forbidden City Beijing", "Start early at 8:30 AM. Explore Imperial Palace (3-4 hours)."},
 			{"Jingshan Park Beijing", "Panoramic views of Forbidden City. Best for sunset!"},

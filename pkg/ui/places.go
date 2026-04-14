@@ -26,7 +26,7 @@ func PrintPlaces(places []wanderlog.Metadata) {
 			}
 			name += fmt.Sprintf(" %s (%.1f)", stars, place.Rating)
 		}
-		
+
 		fmt.Println(placeStyle.Render(fmt.Sprintf("📍 %s", name)))
 
 		// Address

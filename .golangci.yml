@@ -25,6 +25,8 @@ linters-settings:
     disabled-checks:
       - appendAssign
       - hugeParam
+      - rangeValCopy
+      - singleCaseSwitch
 
   errorlint:
     errorf: true
@@ -43,5 +45,6 @@ issues:
     - path: cmd/mcp\.go
       linters:
         - gocritic
+        - nilerr
   max-issues-per-linter: 50
   max-same-issues: 10

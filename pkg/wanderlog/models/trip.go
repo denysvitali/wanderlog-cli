@@ -10,7 +10,7 @@ type CreateTripRequest struct {
 
 // CreateTripResponse represents the response from creating a trip
 type CreateTripResponse struct {
-	Success  bool           `json:"success"`
+	Success  bool            `json:"success"`
 	TripPlan TripPlanSummary `json:"tripPlan"`
 }
 

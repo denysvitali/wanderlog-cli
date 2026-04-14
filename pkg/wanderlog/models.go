@@ -170,7 +170,7 @@ type CarouselItems struct {
 }
 
 type Resources struct {
-	Ancestors                   []any              `json:"ancestors"`
+	Ancestors                   []any `json:"ancestors"`
 	CurrencyRatesUsd            map[string]float64
 	DefaultPlacesListsGeo       PlacesListsGeo     `json:"defaultPlacesListsGeo"`
 	DistancesBetweenPlaces      map[string]any     `json:"distancesBetweenPlaces"`
@@ -357,23 +357,23 @@ type ItSections struct {
 		EndTime            string   `json:"endTime,omitempty"`
 		FlightInfo         *Flight  `json:"flightInfo,omitempty,omitzero"`
 		Hotel              *struct {
-			CheckIn             string `json:"checkIn"`
-			CheckOut            string `json:"checkOut"`
-			TravelerNames       []any  `json:"travelerNames"`
-			ConfirmationNumber  string `json:"confirmationNumber"`
+			CheckIn            string `json:"checkIn"`
+			CheckOut           string `json:"checkOut"`
+			TravelerNames      []any  `json:"travelerNames"`
+			ConfirmationNumber string `json:"confirmationNumber"`
 		} `json:"hotel,omitempty"`
-		ID                 int      `json:"id,omitzero"`
-		ImageKeys          []string `json:"imageKeys,omitempty"`
-		ImageSize          string   `json:"imageSize,omitempty"`
-		NoteIcon           string   `json:"noteIcon,omitempty"`
-		Place              *BlockPlace `json:"place,omitempty"`
-		SelectedImageKey   string   `json:"selectedImageKey,omitempty"`
-		StartTime          string   `json:"startTime,omitempty"`
-		Text               FlexibleText     `json:"text"`
-		TravelMode         *string  `json:"travelMode"`
-		TravelerNames      []any    `json:"travelerNames"`
-		Type               string   `json:"type,omitzero"`
-		UpvotedBy          []any    `json:"upvotedBy"`
+		ID               int          `json:"id,omitzero"`
+		ImageKeys        []string     `json:"imageKeys,omitempty"`
+		ImageSize        string       `json:"imageSize,omitempty"`
+		NoteIcon         string       `json:"noteIcon,omitempty"`
+		Place            *BlockPlace  `json:"place,omitempty"`
+		SelectedImageKey string       `json:"selectedImageKey,omitempty"`
+		StartTime        string       `json:"startTime,omitempty"`
+		Text             FlexibleText `json:"text"`
+		TravelMode       *string      `json:"travelMode"`
+		TravelerNames    []any        `json:"travelerNames"`
+		Type             string       `json:"type,omitzero"`
+		UpvotedBy        []any        `json:"upvotedBy"`
 	} `json:"blocks"`
 	Date             *string `json:"date"`
 	Heading          string  `json:"heading"`
@@ -387,7 +387,7 @@ type ItSections struct {
 }
 
 type Itinerary struct {
-	Budget  Budget       `json:"budget"`
+	Budget  Budget `json:"budget"`
 	Journal struct {
 		Stops   []any  `json:"stops"`
 		Summary string `json:"summary"`
@@ -449,19 +449,19 @@ type Plan struct {
 }
 
 type BlockPlace struct {
-	Name                     string  `json:"name,omitempty"`
-	PlaceID                  string  `json:"place_id,omitempty"`
-	Rating                   float64 `json:"rating,omitempty"`
-	FormattedAddress         string  `json:"formatted_address,omitempty"`
-	Geometry                 *struct {
+	Name             string  `json:"name,omitempty"`
+	PlaceID          string  `json:"place_id,omitempty"`
+	Rating           float64 `json:"rating,omitempty"`
+	FormattedAddress string  `json:"formatted_address,omitempty"`
+	Geometry         *struct {
 		Location struct {
 			Lat float64 `json:"lat"`
 			Lng float64 `json:"lng"`
 		} `json:"location"`
 	} `json:"geometry,omitempty"`
-	UserRatingsTotal         int      `json:"user_ratings_total,omitempty"`
-	Website                  string   `json:"website,omitempty"`
-	InternationalPhoneNumber string   `json:"international_phone_number,omitempty"`
+	UserRatingsTotal         int    `json:"user_ratings_total,omitempty"`
+	Website                  string `json:"website,omitempty"`
+	InternationalPhoneNumber string `json:"international_phone_number,omitempty"`
 	AddressComponents        []struct {
 		LongName  string   `json:"long_name,omitempty"`
 		ShortName string   `json:"short_name,omitempty"`

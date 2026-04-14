@@ -741,12 +741,14 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	name, err := request.RequireString("name")
 	if err != nil {
-		return mcp.NewToolResultError("name is required"), nil
+		_ = err
+		return mcp.NewToolResultError("name is required"), nil //nolint:nilerr
 	}
 
 	sectionID, err := request.RequireInt("section_id")
 	if err != nil {
-		return mcp.NewToolResultError("section_id is required (use list_sections tool to get available section IDs)"), nil
+		_ = err
+		return mcp.NewToolResultError("section_id is required (use list_sections tool to get available section IDs)"), nil //nolint:nilerr
 	}
 
 	placeID := request.GetString("place_id", "")
@@ -851,6 +853,7 @@ func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 
 	placeID, err := request.RequireInt("place_id")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("place_id is required"), nil
 	}
 
@@ -898,17 +901,17 @@ func handleTripResource(ctx context.Context, request mcp.ReadResourceRequest) ([
 
 	// Ensure authentication
 	if err := client.EnsureAuthenticated("", ""); err != nil {
-		return nil, fmt.Errorf("authentication failed: %v", err)
+		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
 	trip, err := client.GetTrip(tripKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trip: %v", err)
+		return nil, fmt.Errorf("failed to get trip: %w", err)
 	}
 
 	jsonData, err := json.Marshal(trip)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal trip data: %v", err)
+		return nil, fmt.Errorf("failed to marshal trip data: %w", err)
 	}
 
 	return []mcp.ResourceContents{
@@ -924,6 +927,7 @@ func handleTripResource(ctx context.Context, request mcp.ReadResourceRequest) ([
 func handleSearchPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("query is required"), nil
 	}
 
@@ -1080,6 +1084,7 @@ func handleSearchPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 func handleGetPlaceDetails(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	placeID, err := request.RequireString("place_id")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("place_id is required"), nil
 	}
 
@@ -1152,6 +1157,7 @@ func handleGetPlaceDetails(ctx context.Context, request mcp.CallToolRequest) (*m
 func handleSearchPlacesWanderlog(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("query is required"), nil
 	}
 
@@ -1533,21 +1539,25 @@ func handleMovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 
 	placeID, err := request.RequireInt("place_id")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("place_id is required"), nil
 	}
 
 	fromSectionID, err := request.RequireInt("from_section_id")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("from_section_id is required"), nil
 	}
 
 	toSectionID, err := request.RequireInt("to_section_id")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("to_section_id is required"), nil
 	}
 
 	position, err := request.RequireInt("position")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("position is required"), nil
 	}
 
@@ -1583,11 +1593,13 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	sectionID, err := request.RequireInt("section_id")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("section_id is required"), nil
 	}
 
 	placeIDsStr, err := request.RequireString("place_ids")
 	if err != nil {
+		_ = err
 		return mcp.NewToolResultError("place_ids is required"), nil
 	}
 

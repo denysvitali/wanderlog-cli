@@ -9,52 +9,52 @@ import (
 
 // UserTripsResponse represents the response from getting user's trips
 type UserTripsResponse struct {
-	Success   bool `json:"success"`
-	Data []struct {
-		ID                int    `json:"id"`
-		Key               string `json:"key"`
-		Title             string `json:"title"`
-		StartDate         string `json:"startDate"`
-		EndDate           string `json:"endDate"`
-		PlaceCount        int    `json:"placeCount"`
-		ViewCount         int    `json:"viewCount"`
-		LikeCount         int    `json:"likeCount"`
-		HeaderImageKey    string `json:"headerImageKey"`
-		TopImageKeys      []any  `json:"topImageKeys"`
-		EditedAt          string `json:"editedAt"`
-		OpenedAt          string `json:"openedAt"`
-		IsPrimary         bool   `json:"isPrimary"`
-		CommentCount      *int   `json:"commentCount"`
-		Distinction       *string `json:"distinction"`
-		ItemType          string `json:"itemType"`
-		AuthorBlurb       string `json:"authorBlurb"`
-		IsDraft           bool   `json:"isDraft"`
-		ImageCount        *int   `json:"imageCount"`
-		Type              string `json:"type"`
-		KeyType           string `json:"keyType"`
-		
+	Success bool `json:"success"`
+	Data    []struct {
+		ID             int     `json:"id"`
+		Key            string  `json:"key"`
+		Title          string  `json:"title"`
+		StartDate      string  `json:"startDate"`
+		EndDate        string  `json:"endDate"`
+		PlaceCount     int     `json:"placeCount"`
+		ViewCount      int     `json:"viewCount"`
+		LikeCount      int     `json:"likeCount"`
+		HeaderImageKey string  `json:"headerImageKey"`
+		TopImageKeys   []any   `json:"topImageKeys"`
+		EditedAt       string  `json:"editedAt"`
+		OpenedAt       string  `json:"openedAt"`
+		IsPrimary      bool    `json:"isPrimary"`
+		CommentCount   *int    `json:"commentCount"`
+		Distinction    *string `json:"distinction"`
+		ItemType       string  `json:"itemType"`
+		AuthorBlurb    string  `json:"authorBlurb"`
+		IsDraft        bool    `json:"isDraft"`
+		ImageCount     *int    `json:"imageCount"`
+		Type           string  `json:"type"`
+		KeyType        string  `json:"keyType"`
+
 		// User who created the trip
 		User struct {
-			ID                   int    `json:"id"`
-			Username             string `json:"username"`
-			Name                 string `json:"name"`
-			ProfilePictureKey    string `json:"profilePictureKey"`
-			VisitGeosCount       int    `json:"visitGeosCount"`
-			CountriesCount       int    `json:"countriesCount"`
-			ShowProfileProBadge  bool   `json:"showProfileProBadge"`
-			IsProUser            bool   `json:"isProUser"`
+			ID                  int    `json:"id"`
+			Username            string `json:"username"`
+			Name                string `json:"name"`
+			ProfilePictureKey   string `json:"profilePictureKey"`
+			VisitGeosCount      int    `json:"visitGeosCount"`
+			CountriesCount      int    `json:"countriesCount"`
+			ShowProfileProBadge bool   `json:"showProfileProBadge"`
+			IsProUser           bool   `json:"isProUser"`
 		} `json:"user"`
-		
+
 		// Collaborators on the trip
 		Collaborators []struct {
-			ID                   int    `json:"id"`
-			Username             string `json:"username"`
-			Name                 string `json:"name"`
-			ProfilePictureKey    *string `json:"profilePictureKey"`
-			VisitGeosCount       int    `json:"visitGeosCount"`
-			CountriesCount       int    `json:"countriesCount"`
-			ShowProfileProBadge  bool   `json:"showProfileProBadge"`
-			IsProUser            bool   `json:"isProUser"`
+			ID                  int     `json:"id"`
+			Username            string  `json:"username"`
+			Name                string  `json:"name"`
+			ProfilePictureKey   *string `json:"profilePictureKey"`
+			VisitGeosCount      int     `json:"visitGeosCount"`
+			CountriesCount      int     `json:"countriesCount"`
+			ShowProfileProBadge bool    `json:"showProfileProBadge"`
+			IsProUser           bool    `json:"isProUser"`
 		} `json:"collaborators"`
 	} `json:"data"`
 	RecentlyOpened []interface{} `json:"recentlyOpened"`
@@ -64,14 +64,14 @@ type UserTripsResponse struct {
 type TripImagesResponse struct {
 	Success bool `json:"success"`
 	Images  []struct {
-		ID          int    `json:"id"`
-		Key         string `json:"key"`
-		Width       int    `json:"width"`
-		Height      int    `json:"height"`
-		URL         string `json:"url"`
+		ID           int    `json:"id"`
+		Key          string `json:"key"`
+		Width        int    `json:"width"`
+		Height       int    `json:"height"`
+		URL          string `json:"url"`
 		ThumbnailURL string `json:"thumbnailUrl"`
-		Caption     string `json:"caption"`
-		PlaceID     string `json:"placeId,omitempty"`
+		Caption      string `json:"caption"`
+		PlaceID      string `json:"placeId,omitempty"`
 	} `json:"images"`
 }
 
@@ -79,14 +79,14 @@ type TripImagesResponse struct {
 type TripStatsResponse struct {
 	Success bool `json:"success"`
 	Stats   struct {
-		TotalDistance   float64 `json:"totalDistance"`
-		FlightDistance  float64 `json:"flightDistance"`
-		GroundDistance  float64 `json:"groundDistance"`
-		Countries       int     `json:"countries"`
-		Cities          int     `json:"cities"`
-		TimeZones       int     `json:"timeZones"`
-		FlightDuration  int     `json:"flightDuration"` // minutes
-		EstimatedCost   struct {
+		TotalDistance  float64 `json:"totalDistance"`
+		FlightDistance float64 `json:"flightDistance"`
+		GroundDistance float64 `json:"groundDistance"`
+		Countries      int     `json:"countries"`
+		Cities         int     `json:"cities"`
+		TimeZones      int     `json:"timeZones"`
+		FlightDuration int     `json:"flightDuration"` // minutes
+		EstimatedCost  struct {
 			Amount       float64 `json:"amount"`
 			CurrencyCode string  `json:"currencyCode"`
 		} `json:"estimatedCost"`
@@ -96,7 +96,7 @@ type TripStatsResponse struct {
 // GetUserTrips retrieves all trips for the authenticated user
 func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
 	url := fmt.Sprintf("%s/tripPlans", BaseURL)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -106,7 +106,7 @@ func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
 	req.Header.Set("Accept", "application/json")
 
 	if c.auth != nil {
-		c.addAuthHeaders(req)
+		_ = c.addAuthHeaders(req)
 	}
 
 	c.logger.Debug("Fetching user trips")
@@ -134,7 +134,7 @@ func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
 // GetTripImages retrieves images for a trip
 func (c *Client) GetTripImages(tripKey string) (*TripImagesResponse, error) {
 	url := fmt.Sprintf("%s/tripPlans/%s/images", BaseURL, tripKey)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -171,7 +171,7 @@ func (c *Client) GetTripImages(tripKey string) (*TripImagesResponse, error) {
 // GetTripPlaces retrieves places for a trip with additional details
 func (c *Client) GetTripPlaces(tripKey string) (*TripResponse, error) {
 	url := fmt.Sprintf("%s/tripPlans/%s/places", BaseURL, tripKey)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -227,7 +227,7 @@ func (c *Client) LikeTrip(tripKey string, liked bool) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
-	
+
 	if err := c.addAuthHeaders(req); err != nil {
 		return fmt.Errorf("adding auth headers: %w", err)
 	}
@@ -262,7 +262,7 @@ func (c *Client) LikeTrip(tripKey string, liked bool) error {
 // RegisterView registers a view for analytics
 func (c *Client) RegisterView(tripKey string) error {
 	url := fmt.Sprintf("%s/tripPlans/%s/registerView", BaseURL, tripKey)
-	
+
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
@@ -272,7 +272,7 @@ func (c *Client) RegisterView(tripKey string) error {
 
 	// Views can be registered without authentication
 	if c.auth != nil {
-		c.addAuthHeaders(req)
+		_ = c.addAuthHeaders(req)
 	}
 
 	c.logger.WithField("tripKey", tripKey).Debug("Registering trip view")

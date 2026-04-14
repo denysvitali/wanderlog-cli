@@ -233,16 +233,16 @@ func TestAddPlace(t *testing.T) {
 			tripKey:   "test-trip",
 			sectionID: 1,
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test Place",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 40.7128,
-   						Lng: -74.0060,
-   					},
-   				},
-   			},
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test Place",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 40.7128,
+							Lng: -74.0060,
+						},
+					},
+				},
 				Text: "Test Place",
 			},
 			serverResponse: `{"success": true}`,
@@ -476,16 +476,16 @@ func TestValidateAddPlaceRequest(t *testing.T) {
 		{
 			name: "valid request",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test Place",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 40.7128,
-   						Lng: -74.0060,
-   					},
-   				},
-   			},
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test Place",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 40.7128,
+							Lng: -74.0060,
+						},
+					},
+				},
 				Text: "Test Place",
 			},
 			expectError: false,
@@ -493,64 +493,64 @@ func TestValidateAddPlaceRequest(t *testing.T) {
 		{
 			name: "invalid latitude (too high)",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 91.0,
-   						Lng: 0,
-   					},
-   				},
-   			},
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 91.0,
+							Lng: 0,
+						},
+					},
+				},
 			},
 			expectError: true,
 		},
 		{
 			name: "invalid longitude (too low)",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "Test",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 0,
-   						Lng: -181.0,
-   					},
-   				},
-   			},
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: -181.0,
+						},
+					},
+				},
 			},
 			expectError: true,
 		},
 		{
 			name: "empty place_id",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "",
-   				Name:    "Test",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 0,
-   						Lng: 0,
-   					},
-   				},
-   			},
+				Place: models.AddPlaceInfo{
+					PlaceID: "",
+					Name:    "Test",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: 0,
+						},
+					},
+				},
 			},
 			expectError: true,
 		},
 		{
 			name: "empty name",
 			req: AddPlaceRequest{
-   			Place: models.AddPlaceInfo{
-   				PlaceID: "ChIJ123",
-   				Name:    "",
-   				Geometry: &models.PlaceGeometry{
-   					Location: models.PlaceLocation{
-   						Lat: 0,
-   						Lng: 0,
-   					},
-   				},
-   			},
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: 0,
+						},
+					},
+				},
 			},
 			expectError: true,
 		},
