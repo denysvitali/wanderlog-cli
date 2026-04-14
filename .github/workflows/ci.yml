@@ -56,3 +56,22 @@ jobs:
         with:
           name: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
           path: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    # Only run on master/main branch pushes, not pull requests
+    # because secrets are not available to PRs from forks
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run integration tests
+        env:
+          INTEGRATION_TESTS: "1"
+          WANDERLOG_AUTH_SESSION_COOKIE: ${{ secrets.WANDERLOG_AUTH_SESSION_COOKIE }}
+          WANDERLOG_AUTH_SESSION_XSRF_TOKEN: ${{ secrets.WANDERLOG_AUTH_SESSION_XSRF_TOKEN }}
+          WANDERLOG_AUTH_SESSION_USER_ID: ${{ secrets.WANDERLOG_AUTH_SESSION_USER_ID }}
+        run: go test -v ./cmd/... -run "Integration"
