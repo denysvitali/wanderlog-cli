@@ -10,10 +10,10 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	
-//	fmt.Printf("Trip: %s (%s to %s)\n", 
-//		trip.TripPlan.Title, 
-//		trip.TripPlan.StartDate, 
+//
+//	fmt.Printf("Trip: %s (%s to %s)\n",
+//		trip.TripPlan.Title,
+//		trip.TripPlan.StartDate,
 //		trip.TripPlan.EndDate)
 //
 // The client supports fetching trip data with detailed information including:

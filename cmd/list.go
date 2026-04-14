@@ -164,10 +164,10 @@ func printTripsMarkdown(trips *wanderlog.UserTripsResponse) {
 
 	for _, trip := range trips.Data {
 		fmt.Printf("## %s\n\n", trip.Title)
-		
+
 		fmt.Printf("- **Trip Key:** %s\n", trip.Key)
 		fmt.Printf("- **Type:** %s\n", trip.Type)
-		
+
 		if trip.StartDate != "" && trip.EndDate != "" {
 			startDate, _ := time.Parse("2006-01-02", trip.StartDate)
 			endDate, _ := time.Parse("2006-01-02", trip.EndDate)
@@ -177,20 +177,20 @@ func printTripsMarkdown(trips *wanderlog.UserTripsResponse) {
 				endDate.Format("January 2, 2006"),
 				days)
 		}
-		
+
 		fmt.Printf("- **Places:** %d\n", trip.PlaceCount)
 		fmt.Printf("- **Views:** %d\n", trip.ViewCount)
 		if trip.LikeCount > 0 {
 			fmt.Printf("- **Likes:** %d\n", trip.LikeCount)
 		}
-		
+
 		if trip.IsPrimary {
 			fmt.Printf("- **Status:** Primary Trip ⭐\n")
 		}
-		
+
 		editedAt, _ := time.Parse(time.RFC3339, trip.EditedAt)
 		fmt.Printf("- **Last Edited:** %s\n", editedAt.Format("January 2, 2006"))
-		
+
 		fmt.Println()
 	}
 }

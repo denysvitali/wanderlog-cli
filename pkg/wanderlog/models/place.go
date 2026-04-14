@@ -8,8 +8,8 @@ type AddPlaceRequest struct {
 
 // AddPlaceInfo represents the place information when adding a place
 type AddPlaceInfo struct {
-	PlaceID  string        `json:"place_id,omitempty"` // API uses snake_case
-	Name     string        `json:"name"`
+	PlaceID  string         `json:"place_id,omitempty"` // API uses snake_case
+	Name     string         `json:"name"`
 	Geometry *PlaceGeometry `json:"geometry,omitempty"`
 }
 

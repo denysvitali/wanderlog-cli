@@ -11,12 +11,12 @@ import (
 )
 
 var (
-	tripTitle      string
-	tripStartDate  string
-	tripEndDate    string
-	tripPrivacy    string
-	sessionCookie  string
-	xsrfToken      string
+	tripTitle     string
+	tripStartDate string
+	tripEndDate   string
+	tripPrivacy   string
+	sessionCookie string
+	xsrfToken     string
 )
 
 var createCmd = &cobra.Command{
@@ -107,12 +107,12 @@ WARNING: This action cannot be undone!`,
 
 		fmt.Printf("⚠️  Are you sure you want to delete trip %s? This cannot be undone.\n", tripKey)
 		fmt.Print("Type 'yes' to confirm: ")
-		
+
 		var confirmation string
-		fmt.Scanln(&confirmation)
-		
+		_, _ = fmt.Scanln(&confirmation)
+
 		if confirmation != "yes" {
-			fmt.Println("Trip deletion cancelled.")
+			fmt.Println("Trip deletion canceled.")
 			return
 		}
 

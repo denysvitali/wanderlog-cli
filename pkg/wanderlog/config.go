@@ -18,7 +18,7 @@ func InitConfig() error {
 	configPath := filepath.Join(configDir, "config.yaml")
 
 	// Check if config file exists
-	if _, err := os.Stat(configPath); err != nil {
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Config file doesn't exist, that's okay
 		return nil
 	}
@@ -124,7 +124,7 @@ func ClearCredentialsFromConfig() error {
 
 	// Read existing config
 	var config Config
-	if _, err := os.Stat(configPath); err != nil {
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Config file doesn't exist
 		return nil
 	}

@@ -34,27 +34,6 @@ type PlaceData struct {
 	Name    string
 }
 
-// Helper function to search for a place and return its place_id (deprecated - use searchAndGetPlaceData instead)
-func searchAndGetPlaceID(t *testing.T, query string) string {
-	t.Helper()
-
-	client := wanderlog.NewClient()
-	client.SetLogger(logger)
-
-	// Search using Wanderlog's autocomplete API (Paris coordinates for location bias)
-	result, err := client.SearchPlacesWithWanderllog(query, 48.8566, 2.3522)
-	require.NoError(t, err, "Failed to search for place: %s", query)
-	require.True(t, result.Success, "Search API returned success=false")
-	require.NotEmpty(t, result.Data, "No search results found for: %s", query)
-
-	// Return the first result's place_id
-	placeID := result.Data[0].PlaceID
-	require.NotEmpty(t, placeID, "First search result has empty place_id")
-
-	t.Logf("Found place_id for '%s': %s (Description: %s)", query, placeID, result.Data[0].Description)
-	return placeID
-}
-
 // searchAndGetPlaceData searches for a place and returns complete data including coordinates
 func searchAndGetPlaceData(t *testing.T, query string) PlaceData {
 	t.Helper()

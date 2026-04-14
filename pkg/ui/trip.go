@@ -45,7 +45,7 @@ var (
 func PrintJSON(data interface{}) {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	encoder.Encode(data)
+	_ = encoder.Encode(data)
 }
 
 func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
@@ -122,15 +122,15 @@ func printFlights(sections []wanderlog.ItSections) {
 		if section.Heading == "Flights" && len(section.Blocks) > 0 {
 			fmt.Println(headerStyle.Render("✈️  Flights"))
 			fmt.Println()
-			
+
 			for _, block := range section.Blocks {
 				if block.Type == "flight" && block.FlightInfo != nil {
 					// Flight header
-					flightInfo := fmt.Sprintf("%s %d", 
-						block.FlightInfo.Airline.Name, 
+					flightInfo := fmt.Sprintf("%s %d",
+						block.FlightInfo.Airline.Name,
 						block.FlightInfo.Number)
 					fmt.Println(placeStyle.Render("🛫 " + flightInfo))
-					
+
 					// Departure
 					departTime, _ := time.Parse("2006-01-02", block.Depart.Date)
 					departInfo := fmt.Sprintf("   Depart: %s %s from %s (%s)",
@@ -139,7 +139,7 @@ func printFlights(sections []wanderlog.ItSections) {
 						block.Depart.Airport.Iata,
 						block.Depart.Airport.CityName)
 					fmt.Println(infoStyle.Render(departInfo))
-					
+
 					// Arrival
 					if block.Arrive != nil {
 						arriveTime, _ := time.Parse("2006-01-02", block.Arrive.Date)
@@ -164,7 +164,7 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 	for _, section := range sections {
 		// Skip empty sections and special sections
 		if section.Heading == "" || section.Heading == "Notes" ||
-		   section.Heading == "Flights" || section.Heading == "Places to visit" {
+			section.Heading == "Flights" || section.Heading == "Places to visit" {
 			continue
 		}
 

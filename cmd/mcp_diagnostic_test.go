@@ -95,10 +95,10 @@ func TestDiagnostic_AddPlaceStepByStep(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_place",
 				Arguments: map[string]interface{}{
-					"trip_key": testTripID,
-					"name":     placeData2.Name,
-					"place_id": placeData2.PlaceID,
-					"latitude": placeData2.Lat,
+					"trip_key":  testTripID,
+					"name":      placeData2.Name,
+					"place_id":  placeData2.PlaceID,
+					"latitude":  placeData2.Lat,
 					"longitude": placeData2.Lng,
 				},
 			},
@@ -124,11 +124,11 @@ func TestDiagnostic_AddPlaceStepByStep(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_place",
 				Arguments: map[string]interface{}{
-					"trip_key": testTripID,
-					"name":     placeData3.Name,
-					"place_id": placeData3.PlaceID,
-					"text":     "Complete test with all fields",
-					"latitude": placeData3.Lat,
+					"trip_key":  testTripID,
+					"name":      placeData3.Name,
+					"place_id":  placeData3.PlaceID,
+					"text":      "Complete test with all fields",
+					"latitude":  placeData3.Lat,
 					"longitude": placeData3.Lng,
 				},
 			},

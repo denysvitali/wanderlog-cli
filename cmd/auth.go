@@ -24,14 +24,14 @@ Examples:
   wanderlog login --email user@example.com`,
 	Run: func(cmd *cobra.Command, args []string) {
 		email, _ := cmd.Flags().GetString("email")
-		
+
 		if email == "" {
 			fmt.Print("Email: ")
-			fmt.Scanln(&email)
+			_, _ = fmt.Scanln(&email)
 		}
 
 		fmt.Print("Password: ")
-		passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
+		passwordBytes, err := term.ReadPassword(syscall.Stdin)
 		if err != nil {
 			logger.WithError(err).Error("Failed to read password")
 			os.Exit(1)
