@@ -7,6 +7,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +25,41 @@ func init() {
 		// Use DEBUG level for operational transform tests to see API responses
 		logger.SetLevel(logrus.DebugLevel)
 	}
+}
+
+// loadAuthFromEnvOrKeychain loads authentication from environment variables or keychain.
+// Environment variables take precedence.
+// Required env vars: WANDERLOG_AUTH_SESSION_COOKIE and WANDERLOG_AUTH_SESSION_XSRF_TOKEN
+// Optional: WANDERLOG_AUTH_SESSION_USER_ID, WANDERLOG_AUTH_EMAIL, WANDERLOG_AUTH_PASSWORD
+func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
+	// Check environment variables first
+	sessionCookie := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE")
+	xsrfToken := os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN")
+	userID := os.Getenv("WANDERLOG_AUTH_SESSION_USER_ID")
+
+	if sessionCookie != "" && xsrfToken != "" {
+		return &wanderlog.AuthCredentials{
+			SessionCookie: sessionCookie,
+			XSRFToken:     xsrfToken,
+			UserID:        userID,
+		}, nil
+	}
+
+	// Also check viper-managed env vars (WANDERLOG_AUTH_*)
+	viperSession := viper.GetString("auth.session.cookie")
+	viperXSRF := viper.GetString("auth.session.xsrf_token")
+	viperUserID := viper.GetString("auth.session.user_id")
+
+	if viperSession != "" && viperXSRF != "" {
+		return &wanderlog.AuthCredentials{
+			SessionCookie: viperSession,
+			XSRFToken:     viperXSRF,
+			UserID:        viperUserID,
+		}, nil
+	}
+
+	// Fall back to keychain
+	return loadAuthFromEnvOrKeychain()
 }
 
 // PlaceData holds both place_id and coordinates for adding places
@@ -80,7 +116,7 @@ func getDatedItinerarySectionID(t *testing.T, tripID string) int {
 	client.SetLogger(logger)
 
 	// Load authentication
-	auth, err := wanderlog.LoadCredentials()
+	auth, err := loadAuthFromEnvOrKeychain()
 	require.NoError(t, err, "Failed to load credentials")
 	client.SetAuth(auth)
 
@@ -114,7 +150,7 @@ func skipIntegrationTest(t *testing.T) {
 func TestMCPIntegration_ListTrips(t *testing.T) {
 	skipIntegrationTest(t)
 	// Skip if not authenticated
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -137,7 +173,7 @@ func TestMCPIntegration_ListTrips(t *testing.T) {
 // TestMCPIntegration_GetTrip tests the get_trip tool
 func TestMCPIntegration_GetTrip(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -195,7 +231,7 @@ func TestMCPIntegration_GetTrip(t *testing.T) {
 // TestMCPIntegration_ListPlaces tests the list_places tool
 func TestMCPIntegration_ListPlaces(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -239,7 +275,7 @@ func TestMCPIntegration_ListPlaces(t *testing.T) {
 // TestMCPIntegration_ListSections tests the list_sections tool
 func TestMCPIntegration_ListSections(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -377,7 +413,7 @@ func TestMCPIntegration_SearchPlacesWanderlog(t *testing.T) {
 // TestMCPIntegration_TripResource tests the trip resource handler
 func TestMCPIntegration_TripResource(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -482,7 +518,7 @@ func TestMCPIntegration_ContextWithTripID(t *testing.T) {
 // TestMCPIntegration_AddPlace tests the add_place tool (write operation)
 func TestMCPIntegration_AddPlace(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -654,7 +690,7 @@ func TestMCPIntegration_AddPlace(t *testing.T) {
 // TestMCPIntegration_RemovePlace tests the remove_place tool (write operation)
 func TestMCPIntegration_RemovePlace(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -706,7 +742,7 @@ func TestMCPIntegration_RemovePlace(t *testing.T) {
 // Add a place, verify it exists, remove it, verify it's gone
 func TestMCPIntegration_WriteOperationsWorkflow(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -777,7 +813,7 @@ func TestMCPIntegration_WriteOperationsWorkflow(t *testing.T) {
 // TestMCPIntegration_UpdatePlaceNotes tests updating notes on existing places using operational transforms
 func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -786,7 +822,7 @@ func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 		client.SetLogger(logger)
 
 		// Load authentication
-		auth, err := wanderlog.LoadCredentials()
+		auth, err := loadAuthFromEnvOrKeychain()
 		require.NoError(t, err, "Failed to load credentials")
 		client.SetAuth(auth)
 
@@ -898,7 +934,7 @@ func sectionIndex(sections []wanderlog.ItSections, sectionID int) int {
 // TestMCPIntegration_ReorderPlaces tests reordering places in a section using operational transforms
 func TestMCPIntegration_ReorderPlaces(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := wanderlog.LoadCredentials(); err != nil {
+	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
 		t.Skip("Skipping integration test: not authenticated")
 	}
 
@@ -907,7 +943,7 @@ func TestMCPIntegration_ReorderPlaces(t *testing.T) {
 		client.SetLogger(logger)
 
 		// Load authentication
-		auth, err := wanderlog.LoadCredentials()
+		auth, err := loadAuthFromEnvOrKeychain()
 		require.NoError(t, err, "Failed to load credentials")
 		client.SetAuth(auth)
 
