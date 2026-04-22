@@ -500,22 +500,22 @@ type TripResponse struct {
 
 // AirlinesResponse represents the response from the all airlines API
 type AirlinesResponse struct {
-	Success bool     `json:"success"`
+	Success bool      `json:"success"`
 	Data    []Airline `json:"data"`
 }
 
 // Airline represents an airline with IATA/ICAO codes and names
 type Airline struct {
-	Iata           string `json:"iata,omitempty"`
-	Icao           string `json:"icao,omitempty"`
-	Name           string `json:"name,omitempty"`
-	LocalizedName  string `json:"localizedName,omitempty"`
+	Iata          string `json:"iata,omitempty"`
+	Icao          string `json:"icao,omitempty"`
+	Name          string `json:"name,omitempty"`
+	LocalizedName string `json:"localizedName,omitempty"`
 }
 
 // AirportAutocompleteResponse represents the response from the airport autocomplete API
 type AirportAutocompleteResponse struct {
-	Success bool                 `json:"success"`
-	Data    []AirportSuggestion   `json:"data"`
+	Success bool                `json:"success"`
+	Data    []AirportSuggestion `json:"data"`
 }
 
 // AirportSuggestion represents a single airport suggestion
@@ -528,8 +528,8 @@ type AirportSuggestion struct {
 
 // FlightStopsResponse represents the response from the flight stops API
 type FlightStopsResponse struct {
-	Success bool          `json:"success"`
-	Data    []FlightStop  `json:"data"`
+	Success bool         `json:"success"`
+	Data    []FlightStop `json:"data"`
 }
 
 // FlightStop represents a single flight stop (leg)
