@@ -149,10 +149,12 @@ func skipIntegrationTest(t *testing.T) {
 // TestMCPIntegration_ListTrips tests the list_trips tool
 func TestMCPIntegration_ListTrips(t *testing.T) {
 	skipIntegrationTest(t)
-	// Skip if not authenticated
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	// Fail if not authenticated (credentials are required for integration tests)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 	request := mcp.CallToolRequest{
@@ -173,9 +175,11 @@ func TestMCPIntegration_ListTrips(t *testing.T) {
 // TestMCPIntegration_GetTrip tests the get_trip tool
 func TestMCPIntegration_GetTrip(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -231,9 +235,11 @@ func TestMCPIntegration_GetTrip(t *testing.T) {
 // TestMCPIntegration_ListPlaces tests the list_places tool
 func TestMCPIntegration_ListPlaces(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -275,9 +281,11 @@ func TestMCPIntegration_ListPlaces(t *testing.T) {
 // TestMCPIntegration_ListSections tests the list_sections tool
 func TestMCPIntegration_ListSections(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -413,9 +421,11 @@ func TestMCPIntegration_SearchPlacesWanderlog(t *testing.T) {
 // TestMCPIntegration_TripResource tests the trip resource handler
 func TestMCPIntegration_TripResource(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -518,9 +528,11 @@ func TestMCPIntegration_ContextWithTripID(t *testing.T) {
 // TestMCPIntegration_AddPlace tests the add_place tool (write operation)
 func TestMCPIntegration_AddPlace(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -690,9 +702,11 @@ func TestMCPIntegration_AddPlace(t *testing.T) {
 // TestMCPIntegration_RemovePlace tests the remove_place tool (write operation)
 func TestMCPIntegration_RemovePlace(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -742,9 +756,11 @@ func TestMCPIntegration_RemovePlace(t *testing.T) {
 // Add a place, verify it exists, remove it, verify it's gone
 func TestMCPIntegration_WriteOperationsWorkflow(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	ctx := context.Background()
 
@@ -813,9 +829,11 @@ func TestMCPIntegration_WriteOperationsWorkflow(t *testing.T) {
 // TestMCPIntegration_UpdatePlaceNotes tests updating notes on existing places using operational transforms
 func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	t.Run("update_notes_on_place", func(t *testing.T) {
 		client := wanderlog.NewClient()
@@ -934,9 +952,11 @@ func sectionIndex(sections []wanderlog.ItSections, sectionID int) int {
 // TestMCPIntegration_ReorderPlaces tests reordering places in a section using operational transforms
 func TestMCPIntegration_ReorderPlaces(t *testing.T) {
 	skipIntegrationTest(t)
-	if _, err := loadAuthFromEnvOrKeychain(); err != nil {
-		t.Skip("Skipping integration test: not authenticated")
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
+	_ = auth
 
 	t.Run("reorder_places_in_section", func(t *testing.T) {
 		client := wanderlog.NewClient()
