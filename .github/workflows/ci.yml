@@ -71,7 +71,6 @@ jobs:
       - name: Run integration tests
         env:
           INTEGRATION_TESTS: "1"
-          WANDERLOG_AUTH_SESSION_COOKIE: ${{ secrets.WANDERLOG_AUTH_SESSION_COOKIE }}
-          WANDERLOG_AUTH_SESSION_XSRF_TOKEN: ${{ secrets.WANDERLOG_AUTH_SESSION_XSRF_TOKEN }}
-          WANDERLOG_AUTH_SESSION_USER_ID: ${{ secrets.WANDERLOG_AUTH_SESSION_USER_ID }}
+          WANDERLOG_AUTH_EMAIL: ${{ secrets.WANDERLOG_AUTH_EMAIL }}
+          WANDERLOG_AUTH_PASSWORD: ${{ secrets.WANDERLOG_AUTH_PASSWORD }}
         run: go test -v ./cmd/... -run "Integration"

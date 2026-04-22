@@ -29,10 +29,11 @@ func init() {
 
 // loadAuthFromEnvOrKeychain loads authentication from environment variables or keychain.
 // Environment variables take precedence.
-// Required env vars: WANDERLOG_AUTH_SESSION_COOKIE and WANDERLOG_AUTH_SESSION_XSRF_TOKEN
-// Optional: WANDERLOG_AUTH_SESSION_USER_ID, WANDERLOG_AUTH_EMAIL, WANDERLOG_AUTH_PASSWORD
+// Required env vars for session auth: WANDERLOG_AUTH_SESSION_COOKIE and WANDERLOG_AUTH_SESSION_XSRF_TOKEN
+// Required env vars for login auth: WANDERLOG_AUTH_EMAIL and WANDERLOG_AUTH_PASSWORD
+// Optional: WANDERLOG_AUTH_SESSION_USER_ID
 func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
-	// Check environment variables first
+	// Check environment variables for session cookies first
 	sessionCookie := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE")
 	xsrfToken := os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN")
 	userID := os.Getenv("WANDERLOG_AUTH_SESSION_USER_ID")
@@ -56,6 +57,19 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 			XSRFToken:     viperXSRF,
 			UserID:        viperUserID,
 		}, nil
+	}
+
+	// Try login with email/password from environment variables
+	email := os.Getenv("WANDERLOG_AUTH_EMAIL")
+	password := os.Getenv("WANDERLOG_AUTH_PASSWORD")
+	if email != "" && password != "" {
+		client := wanderlog.NewClient()
+		creds, err := client.Login(email, password)
+		if err == nil {
+			return creds, nil
+		}
+		// Login failed, continue to try keychain
+		logger.WithError(err).Warn("Login failed with env vars, trying keychain")
 	}
 
 	// Fall back to keychain
