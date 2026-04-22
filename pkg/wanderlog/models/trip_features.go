@@ -76,6 +76,7 @@ type ChecklistSectionRequest struct {
 	SectionID int             `json:"sectionId"`
 	Items     []ChecklistItem `json:"items,omitempty"`
 	ItemID    int             `json:"itemId,omitempty"`
+	Checked   bool            `json:"checked,omitempty"`
 }
 
 // ChecklistItem represents a single checklist item
