@@ -39,11 +39,16 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 	userID := os.Getenv("WANDERLOG_AUTH_SESSION_USER_ID")
 
 	if sessionCookie != "" && xsrfToken != "" {
-		return &wanderlog.AuthCredentials{
+		creds := &wanderlog.AuthCredentials{
 			SessionCookie: sessionCookie,
 			XSRFToken:     xsrfToken,
 			UserID:        userID,
-		}, nil
+		}
+		// Also set in viper so EnsureAuthenticated() can find them
+		viper.Set("auth.session.cookie", sessionCookie)
+		viper.Set("auth.session.xsrf_token", xsrfToken)
+		viper.Set("auth.session.user_id", userID)
+		return creds, nil
 	}
 
 	// Also check viper-managed env vars (WANDERLOG_AUTH_*)
@@ -66,6 +71,13 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 		client := wanderlog.NewClient()
 		creds, err := client.Login(email, password)
 		if err == nil {
+			// Set in viper so EnsureAuthenticated() can find them
+			viper.Set("auth.session.cookie", creds.SessionCookie)
+			viper.Set("auth.session.xsrf_token", creds.XSRFToken)
+			viper.Set("auth.session.user_id", creds.UserID)
+			// Also store email/password for potential re-login
+			viper.Set("auth.email", email)
+			viper.Set("auth.password", password)
 			return creds, nil
 		}
 		// Login failed, continue to try keychain
@@ -73,7 +85,15 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 	}
 
 	// Fall back to keychain
-	return wanderlog.LoadCredentials()
+	creds, err := wanderlog.LoadCredentials()
+	if err != nil {
+		return nil, err
+	}
+	// Set in viper so EnsureAuthenticated() can find them
+	viper.Set("auth.session.cookie", creds.SessionCookie)
+	viper.Set("auth.session.xsrf_token", creds.XSRFToken)
+	viper.Set("auth.session.user_id", creds.UserID)
+	return creds, nil
 }
 
 // PlaceData holds both place_id and coordinates for adding places
