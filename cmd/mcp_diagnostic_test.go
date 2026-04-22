@@ -13,7 +13,7 @@ import (
 // TestDiagnostic_AddPlaceStepByStep performs step-by-step diagnostics to identify what causes trip corruption
 func TestDiagnostic_AddPlaceStepByStep(t *testing.T) {
 	skipIntegrationTest(t)
-	auth, err := wanderlog.LoadCredentials()
+	auth, err := loadAuthFromEnvOrKeychain()
 	if err != nil {
 		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
 	}
