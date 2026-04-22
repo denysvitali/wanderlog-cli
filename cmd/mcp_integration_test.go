@@ -59,7 +59,7 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 	}
 
 	// Fall back to keychain
-	return loadAuthFromEnvOrKeychain()
+	return wanderlog.LoadCredentials()
 }
 
 // PlaceData holds both place_id and coordinates for adding places
