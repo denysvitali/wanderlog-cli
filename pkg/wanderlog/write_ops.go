@@ -12,18 +12,25 @@ import (
 
 // Type aliases for backward compatibility
 type (
-	CreateTripRequest   = models.CreateTripRequest
-	CreateTripResponse  = models.CreateTripResponse
-	UpdateTripRequest   = models.UpdateTripRequest
-	AddPlaceRequest     = models.AddPlaceRequest
-	AddPlaceInfo        = models.AddPlaceInfo
-	OperationRequest    = models.OperationRequest
-	Operation           = models.Operation
-	SendInvitesRequest  = models.SendInvitesRequest
-	TripInvite          = models.TripInvite
-	LikeCount           = models.LikeCount
-	ShareKeyPermissions = models.ShareKeyPermissions
-	ShareKeyResponse    = models.ShareKeyResponse
+	CreateTripRequest        = models.CreateTripRequest
+	CreateTripResponse       = models.CreateTripResponse
+	UpdateTripRequest        = models.UpdateTripRequest
+	AddPlaceRequest          = models.AddPlaceRequest
+	AddPlaceInfo             = models.AddPlaceInfo
+	OperationRequest         = models.OperationRequest
+	Operation                = models.Operation
+	SendInvitesRequest       = models.SendInvitesRequest
+	TripInvite               = models.TripInvite
+	LikeCount                = models.LikeCount
+	ShareKeyPermissions      = models.ShareKeyPermissions
+	ShareKeyResponse         = models.ShareKeyResponse
+	TripFlightsResponse      = models.TripFlightsResponse
+	AutofillDayRequest       = models.AutofillDayRequest
+	AutofillDayResponse      = models.AutofillDayResponse
+	ChecklistSectionRequest  = models.ChecklistSectionRequest
+	ChecklistSectionResponse = models.ChecklistSectionResponse
+	ChecklistItem            = models.ChecklistItem
+	ExportTripResponse       = models.ExportTripResponse
 )
 
 // Operation helper functions
@@ -1109,4 +1116,304 @@ func (c *Client) GetOrCreateShareKey(editKey string, permissions ShareKeyPermiss
 	c.logger.WithField("shareKey", shareKeyResp.ShareKey).Info("Successfully created/got share key")
 
 	return &shareKeyResp, nil
+}
+
+// GetTripFlights retrieves all flights associated with a trip plan
+func (c *Client) GetTripFlights(tripKey string) (*TripFlightsResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for getting trip flights")
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/flights", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Debug("Getting trip flights")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"status":  resp.StatusCode,
+		"body":    string(respBody),
+	}).Debug("GetTripFlights API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var flightsResp TripFlightsResponse
+	if err := json.Unmarshal(respBody, &flightsResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	c.logger.WithField("flightCount", len(flightsResp.Data.Flights)).Info("Successfully retrieved trip flights")
+
+	return &flightsResp, nil
+}
+
+// ExportTrip exports a trip plan to Google Maps
+func (c *Client) ExportTrip(tripKey string) (*ExportTripResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for exporting trips")
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/%s/export/v2", BaseURL, tripKey)
+	httpReq, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithField("tripKey", tripKey).Debug("Exporting trip")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey": tripKey,
+		"status":  resp.StatusCode,
+		"body":    string(respBody),
+	}).Debug("ExportTrip API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var exportResp ExportTripResponse
+	if err := json.Unmarshal(respBody, &exportResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	c.logger.Info("Successfully exported trip")
+
+	return &exportResp, nil
+}
+
+// AutofillDay fills a day section with place suggestions
+func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*AutofillDayResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for autofilling days")
+	}
+
+	reqBody, err := json.Marshal(AutofillDayRequest{
+		TripPlanKey: tripKey,
+		SectionID:   sectionID,
+		Query:       query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling autofill request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/autofillDay", BaseURL)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"query":     query,
+	}).Debug("Autofilling day with suggestions")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"status":    resp.StatusCode,
+		"body":      string(respBody),
+	}).Debug("AutofillDay API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var autofillResp AutofillDayResponse
+	if err := json.Unmarshal(respBody, &autofillResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	c.logger.WithField("suggestionCount", len(autofillResp.Data.Suggestions)).Info("Successfully autofilled day")
+
+	return &autofillResp, nil
+}
+
+// AddChecklistItems adds items to a checklist section in a trip
+func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []ChecklistItem) (*ChecklistSectionResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for adding checklist items")
+	}
+
+	reqBody, err := json.Marshal(ChecklistSectionRequest{
+		Action:    "addItems",
+		SectionID: sectionID,
+		Items:     items,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling checklist request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/checklistSection", BaseURL)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"itemCount": len(items),
+	}).Debug("Adding checklist items")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"status":    resp.StatusCode,
+		"body":      string(respBody),
+	}).Debug("AddChecklistItems API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var checklistResp ChecklistSectionResponse
+	if err := json.Unmarshal(respBody, &checklistResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	c.logger.WithField("itemCount", len(checklistResp.Data.Section.Items)).Info("Successfully added checklist items")
+
+	return &checklistResp, nil
+}
+
+// ToggleChecklistItem toggles a checklist item's checked state
+func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, checked bool) (*ChecklistSectionResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for toggling checklist items")
+	}
+
+	reqBody, err := json.Marshal(ChecklistSectionRequest{
+		Action:    "toggleItem",
+		SectionID: sectionID,
+		ItemID:    itemID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling checklist request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/checklistSection", BaseURL)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	// Add checked state to request body
+	type toggleRequest struct {
+		Action    string `json:"action"`
+		SectionID int    `json:"sectionId"`
+		ItemID    int    `json:"itemId"`
+		Checked   bool   `json:"checked"`
+	}
+
+	_ = checked // suppress unused warning
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"itemID":    itemID,
+		"checked":   checked,
+	}).Debug("Toggling checklist item")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var checklistResp ChecklistSectionResponse
+	if err := json.Unmarshal(respBody, &checklistResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	c.logger.Info("Successfully toggled checklist item")
+
+	return &checklistResp, nil
 }

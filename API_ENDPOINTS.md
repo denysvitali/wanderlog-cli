@@ -24,6 +24,15 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `POST /api/tripPlans/{key}/restore` | `RestoreTrip()` | `write_ops.go:778` |
 | `GET /api/tripPlans/myProfile/` | `GetUserTrips()` | `visualization.go:97` |
 
+### Trip Planning Features (Recently Added)
+
+| Endpoint | Go Implementation | Location | Integration Test |
+|----------|-------------------|----------|------------------|
+| `GET /api/tripPlans/{key}/flights` | `GetTripFlights()` | `write_ops.go:1125` | `TestIntegration_GetTripFlights` |
+| `POST /api/tripPlans/{key}/export/v2` | `ExportTrip()` | `write_ops.go:1155` | `TestIntegration_ExportTrip` |
+| `POST /api/tripPlans/autofillDay` | `AutofillDay()` | `write_ops.go:1201` | `TestIntegration_AutofillDay` |
+| `POST /api/tripPlans/checklistSection` | `AddChecklistItems()` | `write_ops.go:1257` | `TestIntegration_AddChecklistItems` |
+
 ### Partially Covered
 
 | Endpoint | Status | MCP Tool |
@@ -32,7 +41,6 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `search_flights` |
 | `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `search_flights` |
 | `GET /api/flights/flightStopsLista` | `GetFlightStops()` | - |
-| `GET /api/tripPlans/flights` | **Not Implemented** | - |
 | `POST /api/lodging/searchLodgings` | `SearchLodgings()` | `search_hotels` |
 | `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | - |
 | `GET /api/placesAPI/getPlaceDetailsAndCardData` | `GetPlaceDetails()` | `get_place_details` |
@@ -63,9 +71,6 @@ This document provides a comprehensive list of all API endpoints discovered in t
 - All `/api/payments/*` endpoints (subscription management via Stripe)
 
 **Trip Features:**
-- `/api/tripPlans/{key}/export/v2` - Export to Google Maps
-- `/api/tripPlans/autofillDay` - Auto-fill day with suggestions
-- `/api/tripPlans/checklistSection` - Manage checklist sections
 - `/api/tripPlans/browse/guides` - Browse guides
 - `/api/tripPlans/landingPage/*` - Landing page content
 
@@ -232,22 +237,22 @@ This document provides a comprehensive list of all API endpoints discovered in t
 
 ### Trip Operations - Advanced
 
-| Endpoint | Method | Status | Purpose |
-|----------|--------|--------|---------|
-| `/api/tripPlans/createExampleTripPlan` | POST | ❌ | Create example trip |
-| `/api/tripPlans/flights` | GET | ❌ | Get flights |
-| `/api/tripPlans/:key/export/v2` | POST | ❌ | Export to Google Maps |
-| `/api/tripPlans/:key/createGuideFromTripPlan` | POST | ❌ | Convert trip to guide |
-| `/api/tripPlans/:key/updateTripPlanGeo/:geoId` | POST | ❌ | Update trip geography |
-| `/api/tripPlans/:key/distinction` | GET/POST | ❌ | Get/set trip distinction |
-| `/api/tripPlans/:key/registerView` | POST | ❌ | Register trip view |
-| `/api/tripPlans/:key/updateRequired` | GET | ❌ | Check if update required |
-| `/api/tripPlans/getIfEdited` | POST | ❌ | Get if edited |
-| `/api/tripPlans/:key/sections` | GET | ✅ | Get trip sections |
-| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ | Add place to section |
-| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ | Remove place from section |
-| `/api/tripPlans/autofillDay` | POST | ❌ | Auto-fill day with suggestions |
-| `/api/tripPlans/checklistSection` | POST | ❌ | Manage checklist sections |
+| Endpoint | Method | Implementation | Location | Test |
+|----------|--------|----------------|----------|------|
+| `/api/tripPlans/createExampleTripPlan` | POST | ❌ | - | - |
+| `/api/tripPlans/:key/flights` | GET | ✅ `GetTripFlights()` | `write_ops.go:1125` | `TestIntegration_GetTripFlights` |
+| `/api/tripPlans/:key/export/v2` | POST | ✅ `ExportTrip()` | `write_ops.go:1155` | `TestIntegration_ExportTrip` |
+| `/api/tripPlans/:key/createGuideFromTripPlan` | POST | ❌ | - | - |
+| `/api/tripPlans/:key/updateTripPlanGeo/:geoId` | POST | ❌ | - | - |
+| `/api/tripPlans/:key/distinction` | GET/POST | ❌ | - | - |
+| `/api/tripPlans/:key/registerView` | POST | ❌ | - | - |
+| `/api/tripPlans/:key/updateRequired` | GET | ❌ | - | - |
+| `/api/tripPlans/getIfEdited` | POST | ❌ | - | - |
+| `/api/tripPlans/:key/sections` | GET | ✅ | `GetTripSections()` | |
+| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ | `AddPlace()` | |
+| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ | `RemovePlace()` | |
+| `/api/tripPlans/autofillDay` | POST | ✅ `AutofillDay()` | `write_ops.go:1201` | `TestIntegration_AutofillDay` |
+| `/api/tripPlans/checklistSection` | POST | ✅ `AddChecklistItems()` | `write_ops.go:1257` | `TestIntegration_AddChecklistItems` |
 
 ### Trip Operations - Journal & View Only
 

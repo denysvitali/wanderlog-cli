@@ -88,3 +88,94 @@ func TestIntegration_GetLikeCount(t *testing.T) {
 
 	t.Logf("Likes: %d, User liked: %v", likeCount.Count, likeCount.UserLiked)
 }
+
+func TestIntegration_GetTripFlights(t *testing.T) {
+	client := setupIntegrationClient(t)
+	tripID := getTestTripID()
+
+	flightsResp, err := client.GetTripFlights(tripID)
+	if err != nil {
+		t.Fatalf("Failed to get trip flights: %v", err)
+	}
+
+	t.Logf("Flight count: %d", len(flightsResp.Data.Flights))
+	for i, flight := range flightsResp.Data.Flights {
+		t.Logf("  Flight %d: %s %s -> %s", i+1, flight.Airline, flight.FlightNumber, flight.Destination.IATA)
+	}
+}
+
+func TestIntegration_ExportTrip(t *testing.T) {
+	client := setupIntegrationClient(t)
+	tripID := getTestTripID()
+
+	exportResp, err := client.ExportTrip(tripID)
+	if err != nil {
+		t.Fatalf("Failed to export trip: %v", err)
+	}
+
+	t.Logf("Export URL: %s", exportResp.URL)
+	if exportResp.URL == "" {
+		t.Logf("Export Data URL: %s", exportResp.Data.ExportURL)
+	}
+}
+
+func TestIntegration_AutofillDay(t *testing.T) {
+	client := setupIntegrationClient(t)
+	tripID := getTestTripID()
+
+	// First get the trip sections to find a valid section ID
+	sections, err := client.GetTripSections(tripID)
+	if err != nil {
+		t.Fatalf("Failed to get trip sections: %v", err)
+	}
+
+	if len(sections) == 0 {
+		t.Skip("No sections found in trip, skipping autofill test")
+	}
+
+	sectionID := sections[0].ID
+	t.Logf("Testing autofill for section ID: %d", sectionID)
+
+	autofillResp, err := client.AutofillDay(tripID, sectionID, "restaurant")
+	if err != nil {
+		t.Fatalf("Failed to autofill day: %v", err)
+	}
+
+	t.Logf("Got %d suggestions", len(autofillResp.Data.Suggestions))
+	for i, suggestion := range autofillResp.Data.Suggestions {
+		t.Logf("  Suggestion %d: %s (%s)", i+1, suggestion.Name, suggestion.Address)
+	}
+}
+
+func TestIntegration_AddChecklistItems(t *testing.T) {
+	client := setupIntegrationClient(t)
+	tripID := getTestTripID()
+
+	// First get the trip sections to find a valid section ID
+	sections, err := client.GetTripSections(tripID)
+	if err != nil {
+		t.Fatalf("Failed to get trip sections: %v", err)
+	}
+
+	if len(sections) == 0 {
+		t.Skip("No sections found in trip, skipping checklist test")
+	}
+
+	sectionID := sections[0].ID
+	t.Logf("Testing checklist for section ID: %d", sectionID)
+
+	items := []ChecklistItem{
+		{Text: "Passport", Checked: false, Category: "Documents"},
+		{Text: "Phone charger", Checked: false, Category: "Electronics"},
+	}
+
+	checklistResp, err := client.AddChecklistItems(tripID, sectionID, items)
+	if err != nil {
+		t.Fatalf("Failed to add checklist items: %v", err)
+	}
+
+	t.Logf("Added %d items, section now has %d items", len(items), len(checklistResp.Data.Section.Items))
+	for i, item := range checklistResp.Data.Section.Items {
+		t.Logf("  Item %d: %s (checked: %v)", i+1, item.Text, item.Checked)
+	}
+}
