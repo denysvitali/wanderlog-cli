@@ -32,9 +32,11 @@ jobs:
           go-version-file: go.mod
       - run: go test -race -coverprofile=coverage.out ./...
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: coverage
           path: coverage.out
+          retention-days: 3
 
   build:
     name: Build
@@ -53,9 +55,11 @@ jobs:
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
             go build -ldflags "-s -w" -o wanderlog-${{ matrix.goos }}-${{ matrix.goarch }} .
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
           path: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
+          retention-days: 3
 
   integration-test:
     name: Integration Test
