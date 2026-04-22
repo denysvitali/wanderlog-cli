@@ -2,37 +2,113 @@
 
 This document provides a comprehensive list of all API endpoints discovered in the Wanderlog web application (from `dist_public_compiled_mainjs.js`) and their implementation status in the CLI.
 
-## Implemented Trip Editing Endpoints
+## API Coverage Summary
+
+### Well Covered (Core Trip Operations)
+
+| Endpoint | Go Implementation | Location |
+|----------|-------------------|----------|
+| `GET /api/tripPlans/{key}` | `GetTrip()` | `client.go:45` |
+| `GET /api/tripPlans/{key}/sections` | `GetTripSections()` | `client.go:106` |
+| `POST /api/tripPlans` | `CreateTrip()` | `write_ops.go:50` |
+| `DELETE /api/tripPlans/{key}` | `DeleteTrip()` | `write_ops.go:120` |
+| `POST /api/tripPlans/{key}/applyOps` | `UpdateTrip()`, `ApplyOperations()` | `write_ops.go:154,394` |
+| `POST /api/tripPlans/{key}/sections/{id}/places` | `AddPlace()` | `write_ops.go:246` |
+| `DELETE /api/tripPlans/{key}/sections/{id}/places/{id}` | `RemovePlace()` | `write_ops.go:346` |
+| `GET /api/tripPlans/{key}/images` | `GetTripImages()` | `visualization.go:135` |
+| `POST /api/tripPlans/{key}/like` | `SetLike()` | `write_ops.go:891` |
+| `GET /api/tripPlans/{key}/likeCount` | `GetLikeCount()` | `write_ops.go:934` |
+| `POST /api/tripPlans/{key}/invite` | `SendTripInvites()` | `write_ops.go:812` |
+| `GET /api/tripPlans/{key}/invites` | `ListTripInvites()` | `write_ops.go:855` |
+| `POST /api/tripPlans/copy/{key}` | `CopyTrip()` | `write_ops.go:710` |
+| `POST /api/tripPlans/{key}/restore` | `RestoreTrip()` | `write_ops.go:778` |
+| `GET /api/tripPlans/myProfile/` | `GetUserTrips()` | `visualization.go:97` |
+
+### Partially Covered
+
+| Endpoint | Status | MCP Tool |
+|----------|--------|----------|
+| `GET /api/flights/allAirlines` | `GetAllAirlines()` | - |
+| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `search_flights` |
+| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `search_flights` |
+| `GET /api/flights/flightStopsLista` | `GetFlightStops()` | - |
+| `GET /api/tripPlans/flights` | **Not Implemented** | - |
+| `POST /api/lodging/searchLodgings` | `SearchLodgings()` | `search_hotels` |
+| `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | - |
+| `GET /api/placesAPI/getPlaceDetailsAndCardData` | `GetPlaceDetails()` | `get_place_details` |
+| `GET /api/placesAPI/autocomplete/v2` | `SearchPlacesWithWanderllog()` | `search_places` |
+
+### Not Covered (Significant Gaps)
+
+**User/Auth (social login missing):**
+- `/api/user/loginFacebookAccessToken` - Facebook OAuth login
+- `/api/user/loginGoogleAuthCode/v2` - Google OAuth login v2
+- `/api/user/loginGoogleIdToken` - Google ID token login
+- `/api/user/loginAppleAuthCode` - Apple OAuth login
+- `/api/user/register` - User registration
+- `/api/user/resetPassword` - Password reset
+- `/api/user/isValidPasswordResetToken` - Validate reset token
+- `/api/user/profilePicture` - Profile picture upload
+- `/api/user/following/*` - Following users
+- `/api/user/block` - Block users
+- `/api/user/byEmail` - Find user by email
+
+**Social/Feed:**
+- `/api/tripPlans/feed` - Trip feed
+- `/api/tripPlans/home` - Home feed
+- `/api/tripPlans/friendsPlans` - Friends' trips
+- `/api/user/leaderboard` - Leaderboard
+
+**Payments (not applicable for CLI):**
+- All `/api/payments/*` endpoints (subscription management via Stripe)
+
+**Trip Features:**
+- `/api/tripPlans/{key}/export/v2` - Export to Google Maps
+- `/api/tripPlans/autofillDay` - Auto-fill day with suggestions
+- `/api/tripPlans/checklistSection` - Manage checklist sections
+- `/api/tripPlans/browse/guides` - Browse guides
+- `/api/tripPlans/landingPage/*` - Landing page content
+
+---
+
+## Implementation Status Legend
+
+- ✅ **Fully Implemented** - Complete implementation with tests
+- ✅ **Partial** - Basic implementation exists but may lack full features
+- ❌ **Not Implemented** - Endpoint exists in web app but not in CLI
+
+## Complete API Endpoint Catalog
 
 ### Core Trip Operations
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
 | `/api/tripPlans` | GET | ✅ `GetTrip()` (with key) | `client.go:45` | Multiple tests |
-| `/api/tripPlans` | POST | ✅ `CreateTrip()` | `write_ops.go:141` | `TestIntegration_CreateAndDeleteTrip` |
-| `/api/tripPlans/:key` | PUT/POST | ✅ `UpdateTrip()` | `write_ops.go:251` | `TestIntegration_UpdateTrip` |
-| `/api/tripPlans/:key` | DELETE | ✅ `DeleteTrip()` | `write_ops.go:194` | `TestIntegration_CreateAndDeleteTrip` |
-| `/api/tripPlans/:key/restore` | POST | ✅ `RestoreTrip()` | `write_ops.go:638` | `TestIntegration_RestoreTrip` |
+| `/api/tripPlans` | POST | ✅ `CreateTrip()` | `write_ops.go:50` | `TestIntegration_CreateAndDeleteTrip` |
+| `/api/tripPlans/:key` | PUT/POST | ✅ `UpdateTrip()` | `write_ops.go:154` | `TestIntegration_UpdateTrip` |
+| `/api/tripPlans/:key` | DELETE | ✅ `DeleteTrip()` | `write_ops.go:120` | `TestIntegration_CreateAndDeleteTrip` |
+| `/api/tripPlans/:key/restore` | POST | ✅ `RestoreTrip()` | `write_ops.go:778` | `TestIntegration_RestoreTrip` |
 | `/api/tripPlans/:key/sections` | GET | ✅ `GetTripSections()` | `client.go:106` | `TestIntegration_GetTripSections` |
-| `/api/tripPlans/copy/:key` | POST | ✅ `CopyTrip()` | `write_ops.go:590` | `TestIntegration_CopyTrip` |
+| `/api/tripPlans/copy/:key` | POST | ✅ `CopyTrip()` | `write_ops.go:710` | `TestIntegration_CopyTrip` |
+| `/api/tripPlans/myProfile/` | GET | ✅ `GetUserTrips()` | `visualization.go:97` | - |
 
 ### Place Management
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
-| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ `AddPlace()` | `write_ops.go:371` | `TestIntegration_AddAndRemovePlace` |
-| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ `RemovePlace()` | `write_ops.go:471` | `TestIntegration_AddAndRemovePlace` |
-| `/api/tripPlans/:key/applyOps` | POST | ✅ `ApplyOperations()` | `write_ops.go:519` | `TestIntegration_ApplyOperations` |
-| `MovePlace` (uses applyOps) | - | ✅ `MovePlace()` | `write_ops.go:1120` | `TestMCPIntegration_MovePlace` |
-| `ReorderPlaces` (uses applyOps) | - | ✅ `ReorderPlaces()` | `write_ops.go:1243` | `TestMCPIntegration_ReorderPlacesTool` |
+| `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ `AddPlace()` | `write_ops.go:246` | `TestIntegration_AddAndRemovePlace` |
+| `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ `RemovePlace()` | `write_ops.go:346` | `TestIntegration_AddAndRemovePlace` |
+| `/api/tripPlans/:key/applyOps` | POST | ✅ `ApplyOperations()` | `write_ops.go:394` | `TestIntegration_ApplyOperations` |
+| `MovePlace` (uses applyOps) | - | ✅ `MovePlace()` | `write_ops.go:588` | `TestMCPIntegration_MovePlace` |
+| `ReorderPlaces` (uses applyOps) | - | ✅ `ReorderPlaces()` | `write_ops.go:653` | `TestMCPIntegration_ReorderPlacesTool` |
 
 ### Advanced Operations
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
-| `NukeTripPlaces` (custom) | - | ✅ `NukeTripPlaces()` | `write_ops.go:539` | `TestIntegration_NukeTripPlaces` |
-| `ClearSectionBlocks` (custom) | - | ✅ `ClearSectionBlocks()` | `write_ops.go:486` | - |
-| `DeleteSection` (custom) | - | ✅ `DeleteSection()` | `write_ops.go:512` | - |
+| `NukeTripPlaces` (custom) | - | ✅ `NukeTripPlaces()` | `write_ops.go:536` | `TestIntegration_NukeTripPlaces` |
+| `ClearSectionBlocks` (custom) | - | ✅ `ClearSectionBlocks()` | `write_ops.go:483` | - |
+| `DeleteSection` (custom) | - | ✅ `DeleteSection()` | `write_ops.go:509` | - |
 
 ### Images & Media
 
@@ -60,20 +136,18 @@ This document provides a comprehensive list of all API endpoints discovered in t
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
-| `/api/tripPlans/:key/invite` | POST | ✅ `SendTripInvites()` | `write_ops.go:713` | - |
-| `/api/tripPlans/:key/invites` | GET | ✅ `ListTripInvites()` | `write_ops.go:763` | `TestIntegration_ListTripInvites` |
-| `/api/tripPlans/:key/collaborator` | POST | ✅ `AddCollaborator()` | `write_ops.go:883` | - |
-| `/api/tripPlans/:key/collaborator` | DELETE | ✅ `RemoveCollaborator()` | `write_ops.go:930` | - |
-| `/api/tripPlans/:editKey/shareKey` | POST | ✅ `GetOrCreateShareKey()` | `write_ops.go:988` | - |
+| `/api/tripPlans/:key/invite` | POST | ✅ `SendTripInvites()` | `write_ops.go:812` | - |
+| `/api/tripPlans/:key/invites` | GET | ✅ `ListTripInvites()` | `write_ops.go:855` | `TestIntegration_ListTripInvites` |
+| `/api/tripPlans/:key/collaborator` | POST | ✅ `AddCollaborator()` | `write_ops.go:969` | - |
+| `/api/tripPlans/:key/collaborator` | DELETE | ✅ `RemoveCollaborator()` | `write_ops.go:1016` | - |
+| `/api/tripPlans/:editKey/shareKey` | POST | ✅ `GetOrCreateShareKey()` | `write_ops.go:1063` | - |
 
 ### Social Features
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
-| `/api/tripPlans/:key/like` | POST | ✅ `SetLike()` | `write_ops.go:799` | `TestIntegration_SetLike` |
-| `/api/tripPlans/:key/likeCount` | GET | ✅ `GetLikeCount()` | `write_ops.go:848` | `TestIntegration_GetLikeCount` |
-
-## Complete API Endpoint Catalog
+| `/api/tripPlans/:key/like` | POST | ✅ `SetLike()` | `write_ops.go:891` | `TestIntegration_SetLike` |
+| `/api/tripPlans/:key/likeCount` | GET | ✅ `GetLikeCount()` | `write_ops.go:934` | `TestIntegration_GetLikeCount` |
 
 ### User Management & Authentication
 
@@ -114,7 +188,7 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `/api/user/saveFlightDealSettings` | POST | ❌ | Flight deal preferences |
 | `/api/user/isDeleting` | GET/POST | ❌ | Account deletion status |
 
-### Social Features
+### Social Features (Users)
 
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
@@ -141,7 +215,7 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `/api/tripPlans/home` | GET | ❌ | Home feed |
 | `/api/tripPlans/history` | GET | ❌ | Trip history |
 | `/api/tripPlans/friendsPlans` | GET | ❌ | Friends' trips |
-| `/api/tripPlans/myProfile/` | GET | ❌ | User's profile trips |
+| `/api/tripPlans/myProfile/` | GET | ✅ | User's profile trips |
 | `/api/tripPlans/profile/:userId` | GET | ❌ | User profile trips |
 | `/api/tripPlans/profile/byUsername/:username` | GET | ❌ | Profile by username |
 | `/api/tripPlans/profile/sampleMapsByUsernames/:usernames` | GET | ❌ | Sample maps by usernames |
@@ -169,7 +243,7 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `/api/tripPlans/:key/registerView` | POST | ❌ | Register trip view |
 | `/api/tripPlans/:key/updateRequired` | GET | ❌ | Check if update required |
 | `/api/tripPlans/getIfEdited` | POST | ❌ | Get if edited |
-| `/api/tripPlans/:key/sections` | GET | ✅ | Get trip sections (implemented) |
+| `/api/tripPlans/:key/sections` | GET | ✅ | Get trip sections |
 | `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ | Add place to section |
 | `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ | Remove place from section |
 | `/api/tripPlans/autofillDay` | POST | ❌ | Auto-fill day with suggestions |
@@ -217,22 +291,6 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `/api/analytics/firebaseAppInstanceId` | POST | ❌ | Firebase instance ID |
 | `/api/analytics/googleAnalyticsClientId` | POST | ❌ | GA client ID |
 | `/api/analytics/trackTestEvent` | POST | ❌ | Track test event |
-
-### Miscellaneous
-
-| Endpoint | Method | Status | Purpose |
-|----------|--------|--------|---------|
-| `/api/Constants` | GET | ❌ | API constants |
-| `/api/error` | POST | ❌ | Error reporting |
-| `/api/http` | * | ❌ | HTTP utilities |
-| `/api/buffer` | * | ❌ | Buffer operations |
-| `/api/util` | * | ❌ | Utilities |
-
-## Implementation Status Legend
-
-- ✅ **Fully Implemented** - Complete implementation with tests
-- ✅ **Partial** - Basic implementation exists but may lack full features
-- ❌ **Not Implemented** - Endpoint exists in web app but not in CLI
 
 ## Notes
 
