@@ -470,6 +470,135 @@ func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) 
 	return &result, nil
 }
 
+// GetAllAirlines retrieves all available airlines
+func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
+	url := fmt.Sprintf("%s/flights/allAirlines", BaseURL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result AirlinesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// AutocompleteAirport searches for airports by query
+func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse, error) {
+	url := fmt.Sprintf("%s/flights/autocompleteAirport?query=%s", BaseURL, url.QueryEscape(query))
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result AirportAutocompleteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// AutocompleteAirportWithLocation searches for airports by query with location bias
+func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64) (*AirportAutocompleteResponse, error) {
+	url := fmt.Sprintf("%s/flights/autocompleteAirportWithLocation?query=%s&latitude=%f&longitude=%f",
+		BaseURL, url.QueryEscape(query), lat, lng)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result AirportAutocompleteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetFlightStops retrieves flight stops for a given flight number
+func (c *Client) GetFlightStops(flightNumber string) (*FlightStopsResponse, error) {
+	url := fmt.Sprintf("%s/flights/flightStopsLista?flightNumber=%s", BaseURL, url.QueryEscape(flightNumber))
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result FlightStopsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // WanderlLogAutocompleteRequest represents the request for Wanderlog place autocomplete
 type WanderlLogAutocompleteRequest struct {
 	Input        string `json:"input"`

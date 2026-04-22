@@ -497,3 +497,79 @@ type TripResponse struct {
 	Error          string          `json:"error,omitempty"`
 	TripPlan       Plan            `json:"tripPlan"`
 }
+
+// AirlinesResponse represents the response from the all airlines API
+type AirlinesResponse struct {
+	Success bool     `json:"success"`
+	Data    []Airline `json:"data"`
+}
+
+// Airline represents an airline with IATA/ICAO codes and names
+type Airline struct {
+	Iata           string `json:"iata,omitempty"`
+	Icao           string `json:"icao,omitempty"`
+	Name           string `json:"name,omitempty"`
+	LocalizedName  string `json:"localizedName,omitempty"`
+}
+
+// AirportAutocompleteResponse represents the response from the airport autocomplete API
+type AirportAutocompleteResponse struct {
+	Success bool                 `json:"success"`
+	Data    []AirportSuggestion   `json:"data"`
+}
+
+// AirportSuggestion represents a single airport suggestion
+type AirportSuggestion struct {
+	Code    string `json:"code"`
+	Name    string `json:"name"`
+	City    string `json:"city"`
+	Country string `json:"country"`
+}
+
+// FlightStopsResponse represents the response from the flight stops API
+type FlightStopsResponse struct {
+	Success bool          `json:"success"`
+	Data    []FlightStop  `json:"data"`
+}
+
+// FlightStop represents a single flight stop (leg)
+type FlightStop struct {
+	DepartureAirport string `json:"departureAirport"`
+	ArrivalAirport   string `json:"arrivalAirport"`
+	DepartureTime    string `json:"departureTime"`
+	ArrivalTime      string `json:"arrivalTime"`
+}
+
+// LodgingSearchResponse represents the response from the lodging search API
+type LodgingSearchResponse struct {
+	Success bool              `json:"success"`
+	Data    []LodgingProperty `json:"data"`
+}
+
+// LodgingProperty represents a single lodging/hotel result
+type LodgingProperty struct {
+	PropertyID    string  `json:"propertyId"`
+	Name          string  `json:"name"`
+	Address       string  `json:"address"`
+	City          string  `json:"city"`
+	Country       string  `json:"country"`
+	Rating        float64 `json:"rating,omitempty"`
+	PricePerNight string  `json:"pricePerNight,omitempty"`
+	Currency      string  `json:"currency,omitempty"`
+	ImageURL      string  `json:"imageUrl,omitempty"`
+	BookerType    string  `json:"bookerType,omitempty"` // e.g., "google", "expedia", "hotels.com"
+}
+
+// GooglePriceRatesResponse represents the response from the Google price rates API
+type GooglePriceRatesResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		PropertyID string `json:"propertyId"`
+		Rates      []struct {
+			BookerType string `json:"bookerType"`
+			Price      string `json:"price"`
+			Currency   string `json:"currency"`
+			URL        string `json:"url"`
+		} `json:"rates"`
+	} `json:"data"`
+}
