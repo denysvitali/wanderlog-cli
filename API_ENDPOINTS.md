@@ -42,6 +42,20 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `/api/tripPlans/:key/image` | POST | ❌ Not Implemented | - | - |
 | `/api/tripPlans/:key/attachment` | POST | ❌ Not Implemented | - | - |
 
+### Flight & Lodging Search
+
+| Endpoint | Method | Implementation | Location | MCP Tool |
+|----------|--------|----------------|----------|----------|
+| `/api/flights/allAirlines` | GET | ✅ `GetAllAirlines()` | `client.go:474` | - |
+| `/api/flights/autocompleteAirport` | GET | ✅ `AutocompleteAirport()` | `client.go:506` | `search_flights` |
+| `/api/flights/autocompleteAirportWithLocation` | GET | ✅ `AutocompleteAirportWithLocation()` | `client.go:538` | `search_flights` |
+| `/api/flights/flightStopsLista` | GET | ✅ `GetFlightStops()` | `client.go:571` | - |
+| `/api/tripPlans/flights` | GET | ❌ Not Implemented | - | - |
+| `/api/lodging/searchLodgings` | POST | ✅ `SearchLodgings()` | `client.go:671` | `search_hotels` |
+| `/api/lodging/getGooglePriceRates` | POST | ✅ `GetGooglePriceRates()` | `client.go:721` | - |
+
+> **Note:** The MCP tools `search_flights` and `search_hotels` (added in commit `f25b96d`) use the airport autocomplete and lodging search methods respectively. However, the `/api/tripPlans/flights` endpoint for retrieving flights attached to a trip is not yet implemented in the Go client.
+
 ### Collaboration
 
 | Endpoint | Method | Implementation | Location | Test |
