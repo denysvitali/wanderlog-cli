@@ -1345,7 +1345,7 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 	t.Run("delete_trip_missing_key", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
-				Name: "delete_trip",
+				Name:      "delete_trip",
 				Arguments: map[string]interface{}{},
 			},
 		}
