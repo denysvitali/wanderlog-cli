@@ -666,3 +666,100 @@ func (c *Client) SearchPlacesWithWanderllog(query string, lat, lng float64) (*Wa
 
 	return &result, nil
 }
+
+// SearchLodgings searches for hotels/lodgings for given dates and guest count
+func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*LodgingSearchResponse, error) {
+	apiURL := fmt.Sprintf("%s/lodging/searchLodgings", BaseURL)
+
+	requestBody := map[string]interface{}{
+		"query":          query,
+		"checkIn":        checkIn,
+		"checkOut":       checkOut,
+		"numberOfGuests": guests,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s - Response: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var result LodgingSearchResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetGooglePriceRates retrieves Google price rates for a specific lodging property
+func (c *Client) GetGooglePriceRates(propertyID string) (*GooglePriceRatesResponse, error) {
+	apiURL := fmt.Sprintf("%s/lodging/getGooglePriceRates", BaseURL)
+
+	requestBody := map[string]interface{}{
+		"propertyId": propertyID,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.auth != nil && c.auth.SessionCookie != "" {
+		req.Header.Set("Cookie", c.auth.SessionCookie)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s - Response: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var result GooglePriceRatesResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}

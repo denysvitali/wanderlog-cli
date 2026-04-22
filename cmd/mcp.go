@@ -299,6 +299,46 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	)
 	s.AddTool(wanderlogSearchTool, handleSearchPlacesWanderlog)
 
+	// Add search flights tool
+	searchFlightsTool := mcp.NewTool("search_flights",
+		mcp.WithDescription("Search for flights between airports"),
+		mcp.WithString("origin",
+			mcp.Required(),
+			mcp.Description("Origin airport code (e.g., 'SFO')"),
+		),
+		mcp.WithString("destination",
+			mcp.Required(),
+			mcp.Description("Destination airport code (e.g., 'JFK')"),
+		),
+		mcp.WithString("date",
+			mcp.Required(),
+			mcp.Description("Departure date (YYYY-MM-DD)"),
+		),
+	)
+	s.AddTool(searchFlightsTool, handleAutocompleteAirport)
+
+	// Add search hotels tool
+	searchHotelsTool := mcp.NewTool("search_hotels",
+		mcp.WithDescription("Search for hotels/lodging"),
+		mcp.WithString("location",
+			mcp.Required(),
+			mcp.Description("Location to search (e.g., 'Paris', 'Times Square NYC')"),
+		),
+		mcp.WithString("check_in",
+			mcp.Required(),
+			mcp.Description("Check-in date (YYYY-MM-DD)"),
+		),
+		mcp.WithString("check_out",
+			mcp.Required(),
+			mcp.Description("Check-out date (YYYY-MM-DD)"),
+		),
+		mcp.WithNumber("guests",
+			mcp.Description("Number of guests"),
+			mcp.DefaultNumber(1),
+		),
+	)
+	s.AddTool(searchHotelsTool, handleSearchHotels)
+
 	// Trip management tools
 	createTripTool := mcp.NewTool("create_trip",
 		mcp.WithDescription("Create a new trip plan"),
@@ -1635,4 +1675,74 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	result := fmt.Sprintf("📋 Successfully reordered %d places in section %d", len(placeIDs), sectionID)
 
 	return mcp.NewToolResultText(result), nil
+}
+
+// handleAutocompleteAirport searches for flights between airports
+func handleAutocompleteAirport(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	origin, err := request.RequireString("origin")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("origin is required"), nil
+	}
+
+	destination, err := request.RequireString("destination")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("destination is required"), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	// Set up authentication if available
+	auth, err := wanderlog.LoadCredentials()
+	if err == nil {
+		client.SetAuth(auth)
+	}
+
+	results, err := client.AutocompleteAirport(origin + " " + destination)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error searching flights: %v", err)), nil
+	}
+
+	return mcp.NewToolResultStructuredOnly(results), nil
+}
+
+// handleSearchHotels searches for hotels/lodging
+func handleSearchHotels(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	location, err := request.RequireString("location")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("location is required"), nil
+	}
+
+	checkIn, err := request.RequireString("check_in")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("check_in is required"), nil
+	}
+
+	checkOut, err := request.RequireString("check_out")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("check_out is required"), nil
+	}
+
+	guests := request.GetInt("guests", 1)
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	// Set up authentication if available
+	auth, err := wanderlog.LoadCredentials()
+	if err == nil {
+		client.SetAuth(auth)
+	}
+
+	results, err := client.SearchLodgings(location, checkIn, checkOut, guests)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error searching hotels: %v", err)), nil
+	}
+
+	return mcp.NewToolResultStructuredOnly(results), nil
 }
