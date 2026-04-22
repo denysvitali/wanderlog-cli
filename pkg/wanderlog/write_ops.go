@@ -1362,6 +1362,7 @@ func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, chec
 		Action:    "toggleItem",
 		SectionID: sectionID,
 		ItemID:    itemID,
+		Checked:   checked,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshaling checklist request: %w", err)
@@ -1375,16 +1376,6 @@ func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, chec
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("User-Agent", c.userAgent)
-
-	// Add checked state to request body
-	type toggleRequest struct {
-		Action    string `json:"action"`
-		SectionID int    `json:"sectionId"`
-		ItemID    int    `json:"itemId"`
-		Checked   bool   `json:"checked"`
-	}
-
-	_ = checked // suppress unused warning
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
