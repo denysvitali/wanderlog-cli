@@ -6,6 +6,7 @@ type CreateTripRequest struct {
 	StartDate string `json:"startDate,omitempty"` // YYYY-MM-DD format
 	EndDate   string `json:"endDate,omitempty"`   // YYYY-MM-DD format
 	Privacy   string `json:"privacy,omitempty"`   // "public", "private", "unlisted"
+	Language  string `json:"language,omitempty"`  // Language code (e.g., "en", "it")
 }
 
 // CreateTripResponse represents the response from creating a trip

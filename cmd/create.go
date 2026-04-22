@@ -64,6 +64,7 @@ Examples:
 			StartDate: tripStartDate,
 			EndDate:   tripEndDate,
 			Privacy:   tripPrivacy,
+			Language:  "en",
 		}
 
 		resp, err := client.CreateTrip(req)
