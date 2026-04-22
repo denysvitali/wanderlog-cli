@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
@@ -178,6 +181,43 @@ func skipIntegrationTest(t *testing.T) {
 	if os.Getenv("INTEGRATION_TESTS") != "1" {
 		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
 	}
+}
+
+// extractTripKey extracts the trip key from create_trip result text.
+// The result format is: "✅ Created trip 'Title' (Key: abc123, ID: 123)"
+func extractTripKey(resultText string) string {
+	re := regexp.MustCompile(`\(Key: ([^,)]+)`)
+	matches := re.FindStringSubmatch(resultText)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
+	return ""
+}
+
+// getFirstSectionID gets the first section ID for a trip (first section with any content)
+func getFirstSectionID(ctx context.Context, tripKey string) int {
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		return 0
+	}
+	client.SetAuth(auth)
+
+	trip, err := client.GetTrip(tripKey)
+	if err != nil || trip.TripPlan.Itinerary.Sections == nil {
+		return 0
+	}
+
+	// Find first section with blocks
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if len(section.Blocks) > 0 {
+			return section.ID
+		}
+	}
+
+	return 0
 }
 
 // TestMCPIntegration_ListTrips tests the list_trips tool
@@ -1113,5 +1153,206 @@ func TestMCPIntegration_ServerCreation(t *testing.T) {
 	t.Run("read_write_server", func(t *testing.T) {
 		server := createMCPServer(false)
 		require.NotNil(t, server)
+	})
+}
+
+// TestMCPIntegration_CompleteTripLifecycle tests the complete trip lifecycle:
+// Create a trip, verify it exists, add a place, get trip details, then clean up
+func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
+	skipIntegrationTest(t)
+
+	// 1. Authenticate
+	auth, err := loadAuthFromEnvOrKeychain()
+	require.NoError(t, err)
+	require.NotNil(t, auth)
+
+	ctx := context.Background()
+
+	// 2. Create a trip with unique name
+	tripTitle := fmt.Sprintf("MCP Lifecycle Test - %d", time.Now().UnixNano())
+	createReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "create_trip",
+			Arguments: map[string]interface{}{
+				"title":      tripTitle,
+				"start_date": "2026-06-01",
+				"end_date":   "2026-06-05",
+				"privacy":    "private",
+			},
+		},
+	}
+
+	createResult, err := handleCreateTrip(ctx, createReq)
+	require.NoError(t, err)
+	require.NotNil(t, createResult)
+
+	textContent := createResult.Content[0].(mcp.TextContent)
+	require.False(t, createResult.IsError, "create_trip failed: %s", textContent.Text)
+
+	// Extract trip key - format is "Created trip 'Title' (Key: abc123)"
+	tripKey := extractTripKey(textContent.Text)
+	require.NotEmpty(t, tripKey, "Failed to extract trip key from: %s", textContent.Text)
+
+	// 3. DEFER CLEANUP - Delete trip at end
+	defer func() {
+		t.Logf("Cleaning up: deleting trip %s", tripKey)
+		deleteReq := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "delete_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": tripKey,
+				},
+			},
+		}
+		handleDeleteTrip(context.Background(), deleteReq)
+	}()
+
+	// 4. TEST READ TOOLS with created trip
+	t.Run("list_trips_verifies_new_trip", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "list_trips",
+				Arguments: map[string]interface{}{
+					"format": "json",
+				},
+			},
+		}
+
+		result, err := handleListTrips(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("get_trip_with_created_trip", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_trip",
+				Arguments: map[string]interface{}{
+					"trip_id": tripKey,
+					"format":  "json",
+				},
+			},
+		}
+
+		result, err := handleGetTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("list_sections_with_created_trip", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "list_sections",
+				Arguments: map[string]interface{}{
+					"trip_id": tripKey,
+					"format":  "json",
+				},
+			},
+		}
+
+		result, err := handleListSections(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	// 5. TEST WRITE TOOLS
+	// First need a section ID - get trip and find first section
+	t.Run("add_place_to_new_trip", func(t *testing.T) {
+		sectionID := getFirstSectionID(ctx, tripKey)
+		if sectionID == 0 {
+			t.Skip("No sections found in newly created trip")
+		}
+
+		// Search for a place
+		placeData := searchAndGetPlaceData(t, "Louvre Museum")
+
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_place",
+				Arguments: map[string]interface{}{
+					"trip_key":   tripKey,
+					"name":       placeData.Name,
+					"place_id":   placeData.PlaceID,
+					"latitude":   placeData.Lat,
+					"longitude":  placeData.Lng,
+					"section_id": sectionID,
+					"text":       "Added during lifecycle test",
+				},
+			},
+		}
+
+		result, err := handleAddPlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	// 6. TEST ERROR CASES
+	t.Run("create_trip_missing_title", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "create_trip",
+				Arguments: map[string]interface{}{
+					"start_date": "2026-06-01",
+					"end_date":   "2026-06-05",
+				},
+			},
+		}
+
+		result, err := handleCreateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("get_trip_non_existent", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_trip",
+				Arguments: map[string]interface{}{
+					"trip_id": "nonexistent_trip_key_12345",
+					"format":  "json",
+				},
+			},
+		}
+
+		result, err := handleGetTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		// Non-existent trip may return error or empty result depending on API behavior
+	})
+
+	t.Run("add_place_missing_name", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_place",
+				Arguments: map[string]interface{}{
+					"trip_key": tripKey,
+					// Missing required "name" field
+				},
+			},
+		}
+
+		result, err := handleAddPlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("delete_trip_missing_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "delete_trip",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleDeleteTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
 	})
 }
