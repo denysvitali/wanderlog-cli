@@ -59,30 +59,66 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 		return nil, fmt.Errorf("authentication required for creating trips")
 	}
 
-	reqBody, err := json.Marshal(req)
+	// The direct POST /tripPlans endpoint has a server bug (returns
+	// "Cannot read properties of undefined (reading 'map')").
+	// Workaround: create an example trip and update it with the requested fields.
+	exampleResp, err := c.CreateExampleTrip()
 	if err != nil {
-		return nil, fmt.Errorf("marshaling create trip request: %w", err)
+		return nil, fmt.Errorf("failed to create example trip: %w", err)
 	}
 
-	httpReq, err := http.NewRequest("POST", BaseURL+"/tripPlans", bytes.NewReader(reqBody))
+	tripKey := exampleResp.TripPlan.Key
+
+	// Update the example trip with the requested fields
+	if req.Title != "" || req.StartDate != "" || req.EndDate != "" || req.Privacy != "" {
+		updateReq := UpdateTripRequest{
+			Title:     req.Title,
+			StartDate: req.StartDate,
+			EndDate:   req.EndDate,
+			Privacy:   req.Privacy,
+		}
+		if err := c.UpdateTrip(tripKey, updateReq); err != nil {
+			// Clean up the example trip if update fails
+			_ = c.DeleteTrip(tripKey)
+			return nil, fmt.Errorf("failed to update trip: %w", err)
+		}
+	}
+
+	// Fetch the updated trip to get the correct title
+	updatedTrip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get updated trip: %w", err)
+	}
+
+	return &CreateTripResponse{
+		Success: true,
+		TripPlan: models.TripPlanSummary{
+			ID:      updatedTrip.TripPlan.ID,
+			Key:     updatedTrip.TripPlan.Key,
+			EditKey: updatedTrip.TripPlan.EditKey,
+			Title:   updatedTrip.TripPlan.Title,
+		},
+	}, nil
+}
+
+// CreateExampleTrip creates a new trip plan with example data (no body required)
+func (c *Client) CreateExampleTrip() (*CreateTripResponse, error) {
+	if c.auth == nil {
+		return nil, fmt.Errorf("authentication required for creating trips")
+	}
+
+	httpReq, err := http.NewRequest("POST", BaseURL+"/tripPlans/createExampleTripPlan", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
 
-	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("User-Agent", c.userAgent)
 
 	if err := c.addAuthHeaders(httpReq); err != nil {
 		return nil, fmt.Errorf("adding auth headers: %w", err)
 	}
 
-	c.logger.WithFields(map[string]interface{}{
-		"title":     req.Title,
-		"startDate": req.StartDate,
-		"endDate":   req.EndDate,
-		"privacy":   req.Privacy,
-		"body":      string(reqBody),
-	}).Debug("Creating new trip")
+	c.logger.Debug("Creating example trip")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -90,37 +126,48 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 	}
 	defer resp.Body.Close()
 
-	// Read response body for better error messages
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 
+	c.logger.WithFields(map[string]interface{}{
+		"status": resp.StatusCode,
+		"body":   string(respBody),
+	}).Debug("CreateExampleTrip API response")
+
 	if resp.StatusCode != http.StatusOK {
-		c.logger.WithFields(map[string]interface{}{
-			"status": resp.StatusCode,
-			"body":   string(respBody),
-		}).Error("API returned non-200 status")
 		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
 	}
 
-	var createResp CreateTripResponse
-	if err := json.Unmarshal(respBody, &createResp); err != nil {
+	// The createExampleTripPlan response uses "data" with viewKey (like CopyTripResponse)
+	var exampleResp models.CopyTripResponse
+	if err := json.Unmarshal(respBody, &exampleResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	if !createResp.Success {
-		c.logger.WithField("response", string(respBody)).Error("Trip creation failed")
-		return nil, fmt.Errorf("failed to create trip - response: %s", string(respBody))
+	if !exampleResp.Success {
+		c.logger.WithField("response", string(respBody)).Error("Example trip creation failed")
+		return nil, fmt.Errorf("failed to create example trip - response: %s", string(respBody))
+	}
+
+	// Convert to CreateTripResponse format
+	createResp := &CreateTripResponse{
+		Success: exampleResp.Success,
+		TripPlan: models.TripPlanSummary{
+			ID:    exampleResp.Data.ID,
+			Key:   exampleResp.Data.Key,
+			Title: exampleResp.Data.Title,
+		},
 	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripID": createResp.TripPlan.ID,
 		"key":    createResp.TripPlan.Key,
 		"title":  createResp.TripPlan.Title,
-	}).Info("Successfully created trip")
+	}).Info("Successfully created example trip")
 
-	return &createResp, nil
+	return createResp, nil
 }
 
 // DeleteTrip deletes a trip plan
