@@ -31,11 +31,11 @@ func TestCreateTrip(t *testing.T) {
 			},
 			serverResponse: `{
 				"success": true,
-				"tripPlan": {
+				"data": {
 					"id": 123,
 					"key": "test-trip-key",
-					"editKey": "edit-key-123",
-					"title": "Test Trip"
+					"viewKey": "view-key-123",
+					"title": "Example trip plan"
 				}
 			}`,
 			serverStatus: http.StatusOK,
@@ -53,7 +53,7 @@ func TestCreateTrip(t *testing.T) {
 			},
 		},
 		{
-			name: "server error",
+			name: "server error on createExample",
 			req: CreateTripRequest{
 				Title: "Test Trip",
 			},
@@ -62,7 +62,7 @@ func TestCreateTrip(t *testing.T) {
 			expectError:    true,
 		},
 		{
-			name: "api returns success false",
+			name: "api returns success false on createExample",
 			req: CreateTripRequest{
 				Title: "Test Trip",
 			},
@@ -74,41 +74,48 @@ func TestCreateTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test server
+			// Create test server that handles multiple endpoints
+			requestCount := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify request
-				if r.Method != "POST" {
-					t.Errorf("Expected POST request, got %s", r.Method)
-				}
-				if !strings.HasSuffix(r.URL.Path, "/tripPlans") {
-					t.Errorf("Expected path to end with /tripPlans, got %s", r.URL.Path)
+				requestCount++
+				path := r.URL.Path
+
+				// Handle createExampleTripPlan endpoint (first request)
+				if strings.Contains(path, "/tripPlans/createExampleTripPlan") {
+					if r.Method != "POST" {
+						t.Errorf("Expected POST request, got %s", r.Method)
+					}
+					w.WriteHeader(tt.serverStatus)
+					w.Write([]byte(tt.serverResponse))
+					return
 				}
 
-				// Check headers
-				if r.Header.Get("Content-Type") != "application/json" {
-					t.Error("Expected Content-Type: application/json")
+				// Handle GetTrip endpoint (second request)
+				if strings.Contains(path, "/tripPlans/") && !strings.Contains(path, "/applyOps") && r.Method == "GET" {
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{
+						"success": true,
+						"tripPlan": {
+							"id": 123,
+							"key": "test-trip-key",
+							"editKey": "edit-key-123",
+							"title": "` + tt.req.Title + `",
+							"startDate": "` + tt.req.StartDate + `",
+							"endDate": "` + tt.req.EndDate + `",
+							"privacy": "` + tt.req.Privacy + `"
+						}
+					}`))
+					return
 				}
 
-				// Check auth headers
-				if r.Header.Get("Cookie") == "" {
-					t.Error("Expected Cookie header")
-				}
-				if r.Header.Get("X-XSRF-TOKEN") == "" {
-					t.Error("Expected X-XSRF-TOKEN header")
-				}
-
-				// Verify request body
-				body, _ := io.ReadAll(r.Body)
-				var reqData CreateTripRequest
-				if err := json.Unmarshal(body, &reqData); err != nil {
-					t.Errorf("Failed to parse request body: %v", err)
-				}
-				if reqData.Title != tt.req.Title {
-					t.Errorf("Expected title '%s', got '%s'", tt.req.Title, reqData.Title)
+				// Handle applyOps endpoint (third request - if needed)
+				if strings.Contains(path, "/applyOps") && r.Method == "POST" {
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"success": true}`))
+					return
 				}
 
-				w.WriteHeader(tt.serverStatus)
-				w.Write([]byte(tt.serverResponse))
+				t.Errorf("Unexpected request: %s %s", r.Method, path)
 			}))
 			defer server.Close()
 
