@@ -53,14 +53,27 @@ This is a Go CLI application for interacting with the Wanderlog travel planning 
 - Login credentials (email/password) are NEVER stored - only session tokens
 
 **Command Structure**:
-- `trip` - View trip details and itineraries
-- `places` - View places in a trip
-- `auth` (login/logout/status) - Authentication management
-- `create` - Create new trips
-- `edit` - Modify existing trips (add/remove places)
-- `list` - List user's trips
-- `search` - Search for places
+- `trip` / `sections` / `places` / `images` - Read-only trip views
+- `list`, `create`, `copy`, `restore`, `delete` - Trip lifecycle
+- `edit` (update-trip / add-place / remove-place / move-place / reorder-places / clear-section / delete-section / nuke-places) - Mutations
+- `login` / `logout` / `status` - Authentication management
+- `like` / `like-count` / `invite` / `collaborator` / `share-key` - Social & collaboration
+- `autofill-day` / `checklist` (add/toggle) / `export` / `trip-flights` - Trip features
+- `search` / `search-places` / `place-details` - Place lookup (Google + Wanderlog)
+- `travel` (airlines / airports / flight-stops / hotels / hotel-rates) - Travel search helpers
+- `user` (profile / notifications / mark-read / settings / settings-set / kv-get / kv-set / utc-offset / following / search / by-email / block / username-taken / emails / server-logout) - User management
+- `feed` (home / recent / friends / history / legacy / v2 / guides) - Discovery
+- `config` (global / session / session-set / preferences) - Server configuration & session store
+- `journal` / `expenses` / `register-view` / `update-required` / `distinction` / `create-guide` / `get-if-edited` - Journal & advanced trip ops
+- `api` - Raw /api/... passthrough for endpoints without typed wrappers
 - `mcp` - Model Context Protocol server for LLM integration
+
+**Client-layer organization (`pkg/wanderlog/`):**
+- `client.go` - `Client` struct, base HTTP client, plus read APIs (trip, places, airlines, lodging, etc.)
+- `request.go` - shared `doJSON` / `doRaw` helpers for authenticated JSON endpoints
+- `write_ops.go` - mutations using ShareDB `applyOps`
+- `user_ops.go`, `feed_ops.go`, `journal_ops.go`, `config_ops.go` - the four new endpoint groups
+- `auth.go`, `auth_helper.go`, `keychain.go` - credential plumbing
 
 **Output Formats**:
 - Pretty (default) - Colorized terminal output with emojis using Lipgloss
