@@ -82,6 +82,86 @@ func TestBrowseGuidesNoGeoID(t *testing.T) {
 	}
 }
 
+func TestGetFeed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tripPlans/feed" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"tripPlans":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetFeed()
+	if err != nil {
+		t.Fatalf("GetFeed: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestGetFeedV2(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tripPlans/feed/v2" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"tripPlans":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetFeedV2()
+	if err != nil {
+		t.Fatalf("GetFeedV2: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestGetFeedMostRecent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tripPlans/feed/mostRecentlyEdited" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"tripPlan":null}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetFeedMostRecent()
+	if err != nil {
+		t.Fatalf("GetFeedMostRecent: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestGetFriendsPlans(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tripPlans/friendsPlans" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"tripPlans":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetFriendsPlans()
+	if err != nil {
+		t.Fatalf("GetFriendsPlans: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
 func TestGetIfEditedFillsSchemaVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tripPlans/getIfEdited" {
