@@ -344,14 +344,16 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		mcp.WithDescription("Create a new trip plan"),
 		mcp.WithString("title", mcp.Required(),
 			mcp.Description("Trip title")),
+		mcp.WithNumber("geo_id", mcp.Required(),
+			mcp.Description("Wanderlog destination geo ID")),
 		mcp.WithString("start_date",
 			mcp.Description("Start date in YYYY-MM-DD format (optional)")),
 		mcp.WithString("end_date",
 			mcp.Description("End date in YYYY-MM-DD format (optional)")),
 		mcp.WithString("privacy",
-			mcp.Description("Privacy setting: public, private, or unlisted"),
+			mcp.Description("Privacy setting: public, private, or friends"),
 			mcp.DefaultString("private"),
-			mcp.Enum("public", "private", "unlisted")),
+			mcp.Enum("public", "private", "friends")),
 	)
 	s.AddTool(createTripTool, handleCreateTrip)
 
@@ -435,6 +437,9 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		mcp.WithMIMEType("application/json"),
 	)
 	s.AddResource(tripResource, handleTripResource)
+
+	// Register extended tools (user, feed, journal, config) from mcp_tools.go.
+	registerExtendedTools(s, readOnly)
 
 	// Add trip analysis prompt
 	analyzeTripsPrompt := mcp.NewPrompt("analyze_trip",
@@ -1303,6 +1308,10 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	startDate := request.GetString("start_date", "")
 	endDate := request.GetString("end_date", "")
 	privacy := request.GetString("privacy", "private")
+	geoID := int(request.GetFloat("geo_id", 0))
+	if geoID == 0 {
+		return mcp.NewToolResultError("geo_id is required"), nil
+	}
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
@@ -1312,10 +1321,13 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	}
 
 	req := wanderlog.CreateTripRequest{
-		Title:     title,
-		StartDate: startDate,
-		EndDate:   endDate,
-		Privacy:   privacy,
+		Title:               title,
+		GeoIDs:              []int{geoID},
+		InitialMapsPlaceIDs: []int{},
+		Type:                "plan",
+		StartDate:           startDate,
+		EndDate:             endDate,
+		Privacy:             privacy,
 	}
 
 	resp, err := client.CreateTrip(req)
