@@ -12,13 +12,15 @@ import (
 
 // TestIntegration_GetTripSections tests the GetTripSections endpoint
 func TestIntegration_GetTripSections(t *testing.T) {
+	requireProductionIntegrationOptIn(t)
+
 	// Initialize config to load credentials
 	if err := InitConfig(); err != nil {
 		t.Logf("Warning: Failed to initialize config: %v", err)
 	}
 
 	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 
 	client := NewClient()
 	client.SetLogger(logger)
@@ -97,13 +99,15 @@ func TestIntegration_GetTripSections(t *testing.T) {
 
 // TestIntegration_UpdateTrip tests the UpdateTrip endpoint
 func TestIntegration_UpdateTrip(t *testing.T) {
+	requireProductionIntegrationOptIn(t)
+
 	// Initialize config to load credentials
 	if err := InitConfig(); err != nil {
 		t.Logf("Warning: Failed to initialize config: %v", err)
 	}
 
 	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 
 	client := NewClient()
 	client.SetLogger(logger)

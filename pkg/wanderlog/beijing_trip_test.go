@@ -16,15 +16,17 @@ import (
 )
 
 // TestBeijingTripCreation creates a complete week-long trip to Beijing using search
-// Run with: go test -v -tags=integration -run TestBeijingTripCreation -timeout 30m ./pkg/wanderlog
+// Run with: WANDERLOG_RUN_PROD_INTEGRATION=1 go test -v -tags=integration -run TestBeijingTripCreation -timeout 30m ./pkg/wanderlog
 func TestBeijingTripCreation(t *testing.T) {
+	requireProductionIntegrationOptIn(t)
+
 	// Initialize config to load credentials from config file
 	if err := InitConfig(); err != nil {
 		t.Logf("Warning: Failed to initialize config: %v", err)
 	}
 
 	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 
 	client := NewClient()
 	client.SetLogger(logger)
@@ -36,34 +38,29 @@ func TestBeijingTripCreation(t *testing.T) {
 
 	t.Log("=== Creating Beijing Week-Long Trip ===")
 
-	// WORKAROUND: CreateTrip has a server bug, so we copy an existing trip instead
-	// TODO: Fix CreateTrip endpoint once server issue is resolved
-	t.Log("Copying trip from template (CreateTrip endpoint has server issues)")
-	copyResp, err := client.CopyTrip("vetyiadvqjgikbvx") // Copy the test trip
-	if err != nil {
-		t.Fatalf("Failed to copy trip: %v", err)
-	}
-
-	tripKey := copyResp.TripPlan.Key
-	t.Logf("✅ Copied trip: %s (Key: %s)", copyResp.TripPlan.Title, tripKey)
-
 	// Set trip dates for a week-long Beijing trip
 	now := time.Now()
 	startDate := now.AddDate(0, 1, 0)     // Start next month
 	endDate := startDate.AddDate(0, 0, 7) // 7-day trip
 
-	t.Logf("Setting trip dates: %s to %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	updateReq := UpdateTripRequest{
-		Title:     fmt.Sprintf("Week in Beijing - %s", now.Format("Jan 2006")),
-		StartDate: startDate.Format("2006-01-02"),
-		EndDate:   endDate.Format("2006-01-02"),
-		Privacy:   "private",
+	t.Logf("Creating direct trip with dates: %s to %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	createReq := CreateTripRequest{
+		Title:               fmt.Sprintf("Week in Beijing - %s", now.Format("Jan 2006")),
+		GeoIDs:              []int{1078},
+		InitialMapsPlaceIDs: []int{},
+		Type:                "plan",
+		StartDate:           startDate.Format("2006-01-02"),
+		EndDate:             endDate.Format("2006-01-02"),
+		Privacy:             "private",
+	}
+	createResp, err := client.CreateTrip(createReq)
+	if err != nil {
+		t.Fatalf("Failed to create trip: %v", err)
 	}
 
-	if err := client.UpdateTrip(tripKey, updateReq); err != nil {
-		t.Fatalf("Failed to update trip dates: %v", err)
-	}
-	t.Log("✅ Updated trip with dates")
+	tripKey := createResp.TripPlan.Key
+	t.Logf("✅ Created trip: %s (Key: %s)", createResp.TripPlan.Title, tripKey)
+	defer func() { _ = client.DeleteTrip(tripKey) }()
 
 	// Wait for server to process the update
 	time.Sleep(2 * time.Second)

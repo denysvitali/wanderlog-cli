@@ -18,6 +18,8 @@ import (
 // TestSnapshotTrip creates a trip, performs various operations, and captures
 // snapshots of the raw server response after each step to show the differences
 func TestSnapshotTrip(t *testing.T) {
+	requireProductionIntegrationOptIn(t)
+
 	// Initialize config to load credentials from config file
 	if err := InitConfig(); err != nil {
 		t.Logf("Warning: Failed to initialize config: %v", err)
@@ -37,10 +39,13 @@ func TestSnapshotTrip(t *testing.T) {
 	// Step 1: Create a new trip
 	t.Log("📸 STEP 1: Creating new trip")
 	createReq := CreateTripRequest{
-		Title:     fmt.Sprintf("Snapshot Test Trip - %d", time.Now().Unix()),
-		StartDate: "2025-12-01",
-		EndDate:   "2025-12-03",
-		Privacy:   "private",
+		Title:               fmt.Sprintf("Snapshot Test Trip - %d", time.Now().Unix()),
+		GeoIDs:              []int{1},
+		InitialMapsPlaceIDs: []int{},
+		Type:                "plan",
+		StartDate:           "2025-12-01",
+		EndDate:             "2025-12-03",
+		Privacy:             "private",
 	}
 
 	createResp, err := client.CreateTrip(createReq)

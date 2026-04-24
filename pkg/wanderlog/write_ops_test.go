@@ -24,10 +24,13 @@ func TestCreateTrip(t *testing.T) {
 		{
 			name: "successful create",
 			req: CreateTripRequest{
-				Title:     "Test Trip",
-				StartDate: "2025-01-01",
-				EndDate:   "2025-01-10",
-				Privacy:   "private",
+				Title:               "Test Trip",
+				GeoIDs:              []int{1},
+				InitialMapsPlaceIDs: []int{},
+				Type:                "plan",
+				StartDate:           "2025-01-01",
+				EndDate:             "2025-01-10",
+				Privacy:             "private",
 			},
 			serverResponse: `{
 				"success": true,
@@ -53,18 +56,20 @@ func TestCreateTrip(t *testing.T) {
 			},
 		},
 		{
-			name: "server error on createExample",
+			name: "server error",
 			req: CreateTripRequest{
-				Title: "Test Trip",
+				Title:  "Test Trip",
+				GeoIDs: []int{1},
 			},
 			serverResponse: `{"error": "internal server error"}`,
 			serverStatus:   http.StatusInternalServerError,
 			expectError:    true,
 		},
 		{
-			name: "api returns success false on createExample",
+			name: "api returns success false",
 			req: CreateTripRequest{
-				Title: "Test Trip",
+				Title:  "Test Trip",
+				GeoIDs: []int{1},
 			},
 			serverResponse: `{"success": false}`,
 			serverStatus:   http.StatusOK,
@@ -74,48 +79,42 @@ func TestCreateTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test server that handles multiple endpoints
-			requestCount := 0
+			// Create test server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requestCount++
-				path := r.URL.Path
-
-				// Handle createExampleTripPlan endpoint (first request)
-				if strings.Contains(path, "/tripPlans/createExampleTripPlan") {
-					if r.Method != "POST" {
-						t.Errorf("Expected POST request, got %s", r.Method)
-					}
-					w.WriteHeader(tt.serverStatus)
-					w.Write([]byte(tt.serverResponse))
-					return
+				if r.Method != "POST" {
+					t.Errorf("Expected POST request, got %s", r.Method)
+				}
+				if !strings.HasSuffix(r.URL.Path, "/tripPlans") {
+					t.Errorf("Expected path to end with /tripPlans, got %s", r.URL.Path)
+				}
+				if strings.Contains(r.URL.Path, "createExampleTripPlan") {
+					t.Errorf("CreateTrip must not call createExampleTripPlan")
 				}
 
-				// Handle GetTrip endpoint (second request)
-				if strings.Contains(path, "/tripPlans/") && !strings.Contains(path, "/applyOps") && r.Method == "GET" {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{
-						"success": true,
-						"tripPlan": {
-							"id": 123,
-							"key": "test-trip-key",
-							"editKey": "edit-key-123",
-							"title": "` + tt.req.Title + `",
-							"startDate": "` + tt.req.StartDate + `",
-							"endDate": "` + tt.req.EndDate + `",
-							"privacy": "` + tt.req.Privacy + `"
-						}
-					}`))
-					return
+				if r.Header.Get("Content-Type") != "application/json" {
+					t.Error("Expected Content-Type: application/json")
+				}
+				if r.Header.Get("Cookie") == "" {
+					t.Error("Expected Cookie header")
+				}
+				if r.Header.Get("X-XSRF-TOKEN") == "" {
+					t.Error("Expected X-XSRF-TOKEN header")
 				}
 
-				// Handle applyOps endpoint (third request - if needed)
-				if strings.Contains(path, "/applyOps") && r.Method == "POST" {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"success": true}`))
-					return
+				body, _ := io.ReadAll(r.Body)
+				var reqData CreateTripRequest
+				if err := json.Unmarshal(body, &reqData); err != nil {
+					t.Errorf("Failed to parse request body: %v", err)
+				}
+				if reqData.Title != tt.req.Title {
+					t.Errorf("Expected title '%s', got '%s'", tt.req.Title, reqData.Title)
+				}
+				if len(reqData.GeoIDs) != len(tt.req.GeoIDs) {
+					t.Errorf("Expected %d geo IDs, got %d", len(tt.req.GeoIDs), len(reqData.GeoIDs))
 				}
 
-				t.Errorf("Unexpected request: %s %s", r.Method, path)
+				w.WriteHeader(tt.serverStatus)
+				w.Write([]byte(tt.serverResponse))
 			}))
 			defer server.Close()
 
