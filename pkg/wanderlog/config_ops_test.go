@@ -41,6 +41,26 @@ func TestSetSessionStoreValue(t *testing.T) {
 	}
 }
 
+func TestGetSessionStore(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/sessionStore" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"store":{}}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetSessionStore()
+	if err != nil {
+		t.Fatalf("GetSessionStore: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
 func TestGetSessionPreferences(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/sessionStore/preferences/en" {

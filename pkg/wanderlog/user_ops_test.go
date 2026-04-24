@@ -145,6 +145,265 @@ func TestIsUsernameTaken(t *testing.T) {
 	}
 }
 
+func TestUpdateMe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/user" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":1,"username":"me","name":"Updated"}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	profile, err := client.UpdateMe(UpdateUserRequest{Name: "Updated"})
+	if err != nil {
+		t.Fatalf("UpdateMe: %v", err)
+	}
+	if profile.Name != "Updated" {
+		t.Errorf("unexpected name: %s", profile.Name)
+	}
+}
+
+func TestServerLogout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/user/logout" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	if err := client.ServerLogout(); err != nil {
+		t.Fatalf("ServerLogout: %v", err)
+	}
+}
+
+func TestGetNotifications(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" || r.URL.Path != "/user/notifications" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"notifications":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetNotifications(0)
+	if err != nil {
+		t.Fatalf("GetNotifications: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestGetNotificationsWithOffset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("offset") != "10" {
+			t.Errorf("expected offset=10, got %q", r.URL.Query().Get("offset"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"notifications":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	_, err := client.GetNotifications(10)
+	if err != nil {
+		t.Fatalf("GetNotifications(10): %v", err)
+	}
+}
+
+func TestGetNotificationSettings(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user/notification/settings" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"notify":true,"email":false}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetNotificationSettings()
+	if err != nil {
+		t.Fatalf("GetNotificationSettings: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestUpdateNotificationSettings(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/user/notification/settings" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"notify":false}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	_, err := client.UpdateNotificationSettings(json.RawMessage(`{"notify":false}`))
+	if err != nil {
+		t.Fatalf("UpdateNotificationSettings: %v", err)
+	}
+}
+
+func TestSetKeyValue(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || !strings.HasPrefix(r.URL.Path, "/user/keyValue/") {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	if err := client.SetKeyValue("mykey", "myvalue"); err != nil {
+		t.Fatalf("SetKeyValue: %v", err)
+	}
+}
+
+func TestListFollowing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/user/following/list" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"following":{"123":true}}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.ListFollowing([]string{"123", "456"})
+	if err != nil {
+		t.Fatalf("ListFollowing: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestAutocompleteUsers(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user/autocomplete/al" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"users":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.AutocompleteUsers("al")
+	if err != nil {
+		t.Fatalf("AutocompleteUsers: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestFindUserByEmail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("email") != "a@b.com" {
+			t.Errorf("expected email=a@b.com, got %q", r.URL.Query().Get("email"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":42,"username":"alice"}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	profile, err := client.FindUserByEmail("a@b.com")
+	if err != nil {
+		t.Fatalf("FindUserByEmail: %v", err)
+	}
+	if profile.ID != 42 {
+		t.Errorf("unexpected id: %d", profile.ID)
+	}
+}
+
+func TestBlockUser(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/user/block" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	if err := client.BlockUser("999"); err != nil {
+		t.Fatalf("BlockUser: %v", err)
+	}
+}
+
+func TestGetUserEmails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user/emails" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"emails":[{"email":"a@b.com","primary":true}]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetUserEmails()
+	if err != nil {
+		t.Fatalf("GetUserEmails: %v", err)
+	}
+	if len(resp.Emails) == 0 || resp.Emails[0].Email != "a@b.com" {
+		t.Errorf("unexpected emails: %+v", resp.Emails)
+	}
+}
+
+func TestGetUserProfile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tripPlans/profile/42" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"trips":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetUserProfile(42)
+	if err != nil {
+		t.Fatalf("GetUserProfile: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
+func TestGetUserProfileByUsername(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tripPlans/profile/byUsername/alice" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"trips":[]}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	resp, err := client.GetUserProfileByUsername("alice")
+	if err != nil {
+		t.Fatalf("GetUserProfileByUsername: %v", err)
+	}
+	if !resp.Success {
+		t.Error("expected success")
+	}
+}
+
 func TestGetMeRequiresAuth(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("server should not be called when unauthenticated")
