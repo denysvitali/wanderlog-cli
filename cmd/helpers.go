@@ -10,7 +10,6 @@ import (
 
 	"github.com/denysvitali/wanderlog-cli/pkg/ui"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -40,15 +39,6 @@ func newClient(requireAuth bool) *wanderlog.Client {
 		}
 	}
 	return client
-}
-
-func printData(data interface{}, format string) {
-	switch format {
-	case "json":
-		ui.PrintJSON(data)
-	default:
-		ui.PrintJSON(data)
-	}
 }
 
 func parseRequiredInt(value, name string) int {
@@ -111,13 +101,6 @@ func mustJSON(data string) []byte {
 		os.Exit(1)
 	}
 	return []byte(data)
-}
-
-func addAuthFlags(commands ...interface{ Flags() *pflag.FlagSet }) {
-	for _, command := range commands {
-		command.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
-		command.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
-	}
 }
 
 func printSuccess(format string, message string, data interface{}) {

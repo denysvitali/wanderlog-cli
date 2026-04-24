@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	userSearchQuery  string
 	userEmailLookup  string
 	userBlockID      string
 	userUsername     string

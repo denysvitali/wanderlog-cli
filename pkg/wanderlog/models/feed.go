@@ -18,10 +18,10 @@ type FeedHomeResponse struct {
 
 // FeedResponse is the shape used by /api/tripPlans/feed and /api/tripPlans/feed/v2.
 type FeedResponse struct {
-	Success              bool            `json:"success"`
-	Data                 json.RawMessage `json:"data,omitempty"`
-	MostRecentlyEdited   json.RawMessage `json:"mostRecentlyEdited,omitempty"`
-	HasSetupFlightDeals  *bool           `json:"hasSetupFlightDeals,omitempty"`
+	Success             bool            `json:"success"`
+	Data                json.RawMessage `json:"data,omitempty"`
+	MostRecentlyEdited  json.RawMessage `json:"mostRecentlyEdited,omitempty"`
+	HasSetupFlightDeals *bool           `json:"hasSetupFlightDeals,omitempty"`
 }
 
 // FeedRecentResponse is the response from /api/tripPlans/feed/mostRecentlyEdited.

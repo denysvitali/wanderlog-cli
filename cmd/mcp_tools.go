@@ -209,7 +209,8 @@ func handleGetMe(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToo
 func handleGetUserProfile(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	target, err := request.RequireString("target")
 	if err != nil {
-		return mcp.NewToolResultError("target is required"), nil
+		_ = err
+		return mcp.NewToolResultError("target is required"), nil //nolint:nilerr
 	}
 	client := optionalAuthClient()
 	if strings.HasPrefix(target, "@") {
@@ -221,7 +222,8 @@ func handleGetUserProfile(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 	id, err := strconv.Atoi(target)
 	if err != nil {
-		return mcp.NewToolResultError("target must be a numeric user ID or @username"), nil
+		_ = err
+		return mcp.NewToolResultError("target must be a numeric user ID or @username"), nil //nolint:nilerr
 	}
 	resp, err := client.GetUserProfile(id)
 	if err != nil {
@@ -270,7 +272,8 @@ func handleGetUserEmails(ctx context.Context, request mcp.CallToolRequest) (*mcp
 func handleAutocompleteUsers(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
-		return mcp.NewToolResultError("query is required"), nil
+		_ = err
+		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
 	}
 	client, err := ensuredAuthClient()
 	if err != nil {
@@ -286,7 +289,8 @@ func handleAutocompleteUsers(ctx context.Context, request mcp.CallToolRequest) (
 func handleIsUsernameTaken(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	username, err := request.RequireString("username")
 	if err != nil {
-		return mcp.NewToolResultError("username is required"), nil
+		_ = err
+		return mcp.NewToolResultError("username is required"), nil //nolint:nilerr
 	}
 	client := optionalAuthClient()
 	taken, err := client.IsUsernameTaken(username)
@@ -358,7 +362,8 @@ func handleBrowseGuides(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 func handleGetViewOnlyJournal(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	journalKey, err := request.RequireString("journal_key")
 	if err != nil {
-		return mcp.NewToolResultError("journal_key is required"), nil
+		_ = err
+		return mcp.NewToolResultError("journal_key is required"), nil //nolint:nilerr
 	}
 	client := optionalAuthClient()
 	resp, err := client.GetViewOnlyJournal(journalKey)
@@ -371,7 +376,8 @@ func handleGetViewOnlyJournal(ctx context.Context, request mcp.CallToolRequest) 
 func handleGetTripExpensesCSV(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
-		return mcp.NewToolResultError("trip_key is required"), nil
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
 	}
 	client, err := ensuredAuthClient()
 	if err != nil {
@@ -387,7 +393,8 @@ func handleGetTripExpensesCSV(ctx context.Context, request mcp.CallToolRequest) 
 func handleGetTripDistinction(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
-		return mcp.NewToolResultError("trip_key is required"), nil
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
 	}
 	client := optionalAuthClient()
 	resp, err := client.GetTripDistinction(tripKey)
@@ -409,7 +416,8 @@ func handleGetGlobalConfig(ctx context.Context, request mcp.CallToolRequest) (*m
 func handleMarkNotificationsRead(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	idsStr, err := request.RequireString("notification_ids")
 	if err != nil {
-		return mcp.NewToolResultError("notification_ids is required"), nil
+		_ = err
+		return mcp.NewToolResultError("notification_ids is required"), nil //nolint:nilerr
 	}
 	ids := []string{}
 	for _, id := range strings.Split(idsStr, ",") {
@@ -433,11 +441,13 @@ func handleMarkNotificationsRead(ctx context.Context, request mcp.CallToolReques
 func handleSetUserKV(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	key, err := request.RequireString("key")
 	if err != nil {
-		return mcp.NewToolResultError("key is required"), nil
+		_ = err
+		return mcp.NewToolResultError("key is required"), nil //nolint:nilerr
 	}
 	value, err := request.RequireString("value")
 	if err != nil {
-		return mcp.NewToolResultError("value is required"), nil
+		_ = err
+		return mcp.NewToolResultError("value is required"), nil //nolint:nilerr
 	}
 	var parsed json.RawMessage
 	if jerr := json.Unmarshal([]byte(value), &parsed); jerr != nil {
@@ -456,7 +466,8 @@ func handleSetUserKV(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 func handleRegisterTripView(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
-		return mcp.NewToolResultError("trip_key is required"), nil
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
 	}
 	client := optionalAuthClient()
 	if err := client.RegisterTripView(tripKey); err != nil {
@@ -468,7 +479,8 @@ func handleRegisterTripView(ctx context.Context, request mcp.CallToolRequest) (*
 func handleCreateGuideFromTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
-		return mcp.NewToolResultError("trip_key is required"), nil
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
 	}
 	client, err := ensuredAuthClient()
 	if err != nil {
