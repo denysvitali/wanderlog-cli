@@ -1034,7 +1034,7 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 
 // GetLikeCount gets whether we've liked a trip plan and the total number of likes
 func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
-	reqBody, err := json.Marshal(map[string][]string{"keys": []string{tripKey}})
+	reqBody, err := json.Marshal(map[string][]string{"keys": {tripKey}})
 	if err != nil {
 		return nil, fmt.Errorf("marshaling like count request: %w", err)
 	}
