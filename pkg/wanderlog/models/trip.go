@@ -2,11 +2,16 @@ package models
 
 // CreateTripRequest represents a request to create a new trip
 type CreateTripRequest struct {
-	Title     string `json:"title"`
-	StartDate string `json:"startDate,omitempty"` // YYYY-MM-DD format
-	EndDate   string `json:"endDate,omitempty"`   // YYYY-MM-DD format
-	Privacy   string `json:"privacy,omitempty"`   // "public", "private", "unlisted"
-	Language  string `json:"language,omitempty"`  // Language code (e.g., "en", "it")
+	Title               string `json:"title"`
+	GeoIDs              []int  `json:"geoIds"`
+	InitialMapsPlaceIDs []int  `json:"initialMapsPlaceIds"`
+	InitialEmailID      *int   `json:"initialEmailId"`
+	Type                string `json:"type"`                // "plan", "recommendations", or "story"
+	StartDate           string `json:"startDate,omitempty"` // YYYY-MM-DD format
+	EndDate             string `json:"endDate,omitempty"`   // YYYY-MM-DD format
+	Privacy             string `json:"privacy,omitempty"`   // "public", "private", "friends"
+	IsMapEmbed          bool   `json:"isMapEmbed"`
+	Language            string `json:"language,omitempty"` // Language code (e.g., "en", "it")
 }
 
 // CreateTripResponse represents the response from creating a trip

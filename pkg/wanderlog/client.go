@@ -1,6 +1,7 @@
 package wanderlog
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +41,63 @@ func NewClient() *Client {
 
 func (c *Client) SetLogger(logger *logrus.Logger) {
 	c.logger = logger
+}
+
+// DoAPI performs a raw request against a Wanderlog API endpoint. It is used by
+// the CLI for endpoints discovered in the web/Android bundle before they have a
+// typed Go wrapper.
+func (c *Client) DoAPI(method, path string, body []byte, headers map[string]string, authenticated bool) (int, []byte, error) {
+	apiURL := path
+	if !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
+		trimmed := strings.TrimPrefix(path, "/")
+		trimmed = strings.TrimPrefix(trimmed, "api/")
+		apiURL = fmt.Sprintf("%s/%s", BaseURL, trimmed)
+	}
+
+	var reader io.Reader
+	if len(body) > 0 {
+		reader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, apiURL, reader)
+	if err != nil {
+		return 0, nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	if len(body) > 0 && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if authenticated {
+		if err := c.addAuthHeaders(req); err != nil {
+			return 0, nil, fmt.Errorf("adding auth headers: %w", err)
+		}
+	} else if c.auth != nil {
+		if err := c.addAuthHeaders(req); err != nil {
+			return 0, nil, fmt.Errorf("adding optional auth headers: %w", err)
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp.StatusCode, respBody, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	return resp.StatusCode, respBody, nil
 }
 
 func (c *Client) GetTrip(key string) (*TripResponse, error) {

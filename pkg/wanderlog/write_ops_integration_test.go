@@ -10,19 +10,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Integration tests for write operations against the real Wanderlog API
-// Run with: go test -v -tags=integration ./pkg/wanderlog
+// Integration tests for write operations against the real Wanderlog API.
+// Run with: WANDERLOG_RUN_PROD_INTEGRATION=1 go test -v -tags=integration ./pkg/wanderlog
 
 const testTripID = "vetyiadvqjgikbvx"
 
 func setupIntegrationClient(t *testing.T) *Client {
+	requireProductionIntegrationOptIn(t)
+
 	// Initialize config to load credentials from config file
 	if err := InitConfig(); err != nil {
 		t.Logf("Warning: Failed to initialize config: %v", err)
 	}
 
 	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 
 	client := NewClient()
 	client.SetLogger(logger)
@@ -45,10 +47,13 @@ func TestIntegration_CreateAndDeleteTrip(t *testing.T) {
 	client := setupIntegrationClient(t)
 
 	createReq := CreateTripRequest{
-		Title:     "Integration Test Trip",
-		StartDate: "2025-11-01",
-		EndDate:   "2025-11-07",
-		Privacy:   "private",
+		Title:               "Integration Test Trip",
+		GeoIDs:              []int{1},
+		InitialMapsPlaceIDs: []int{},
+		Type:                "plan",
+		StartDate:           "2025-11-01",
+		EndDate:             "2025-11-07",
+		Privacy:             "private",
 	}
 
 	createResp, err := client.CreateTrip(createReq)
@@ -121,19 +126,37 @@ func TestIntegration_ExportTrip(t *testing.T) {
 
 func TestIntegration_AutofillDay(t *testing.T) {
 	client := setupIntegrationClient(t)
-	tripID := getTestTripID()
-
-	// First get the trip sections to find a valid section ID
-	sections, err := client.GetTripSections(tripID)
+	createResp, err := client.CreateTrip(CreateTripRequest{
+		Title:               "Autofill Integration Test Trip",
+		GeoIDs:              []int{1},
+		InitialMapsPlaceIDs: []int{},
+		Type:                "plan",
+		StartDate:           "2025-11-01",
+		EndDate:             "2025-11-02",
+		Privacy:             "private",
+	})
 	if err != nil {
-		t.Fatalf("Failed to get trip sections: %v", err)
+		t.Fatalf("Failed to create trip: %v", err)
+	}
+	tripID := createResp.TripPlan.Key
+	defer func() { _ = client.DeleteTrip(tripID) }()
+
+	// First get the full trip to find a dated section.
+	trip, err := client.GetTrip(tripID)
+	if err != nil {
+		t.Fatalf("Failed to get trip: %v", err)
 	}
 
-	if len(sections) == 0 {
-		t.Skip("No sections found in trip, skipping autofill test")
+	sectionID := 0
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.Date != nil && *section.Date != "" {
+			sectionID = section.ID
+			break
+		}
 	}
-
-	sectionID := sections[0].ID
+	if sectionID == 0 {
+		t.Skip("No dated sections found in trip, skipping autofill test")
+	}
 	t.Logf("Testing autofill for section ID: %d", sectionID)
 
 	autofillResp, err := client.AutofillDay(tripID, sectionID, "restaurant")
@@ -149,7 +172,20 @@ func TestIntegration_AutofillDay(t *testing.T) {
 
 func TestIntegration_AddChecklistItems(t *testing.T) {
 	client := setupIntegrationClient(t)
-	tripID := getTestTripID()
+	createResp, err := client.CreateTrip(CreateTripRequest{
+		Title:               "Checklist Integration Test Trip",
+		GeoIDs:              []int{1},
+		InitialMapsPlaceIDs: []int{},
+		Type:                "plan",
+		StartDate:           "2025-11-01",
+		EndDate:             "2025-11-02",
+		Privacy:             "private",
+	})
+	if err != nil {
+		t.Fatalf("Failed to create trip: %v", err)
+	}
+	tripID := createResp.TripPlan.Key
+	defer func() { _ = client.DeleteTrip(tripID) }()
 
 	// First get the trip sections to find a valid section ID
 	sections, err := client.GetTripSections(tripID)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
@@ -25,6 +26,8 @@ type (
 	ShareKeyPermissions      = models.ShareKeyPermissions
 	ShareKeyResponse         = models.ShareKeyResponse
 	TripFlightsResponse      = models.TripFlightsResponse
+	TripFlight               = models.TripFlight
+	FlightAirport            = models.FlightAirport
 	AutofillDayRequest       = models.AutofillDayRequest
 	AutofillDayResponse      = models.AutofillDayResponse
 	ChecklistSectionRequest  = models.ChecklistSectionRequest
@@ -59,45 +62,90 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 		return nil, fmt.Errorf("authentication required for creating trips")
 	}
 
-	// The direct POST /tripPlans endpoint has a server bug (returns
-	// "Cannot read properties of undefined (reading 'map')").
-	// Workaround: create an example trip and update it with the requested fields.
-	exampleResp, err := c.CreateExampleTrip()
+	if len(req.GeoIDs) == 0 {
+		return nil, fmt.Errorf("at least one geo id is required for creating trips")
+	}
+	if req.Type == "" {
+		req.Type = "plan"
+	}
+	if req.Privacy == "" {
+		req.Privacy = "private"
+	}
+	if req.InitialMapsPlaceIDs == nil {
+		req.InitialMapsPlaceIDs = []int{}
+	}
+
+	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create example trip: %w", err)
+		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	tripKey := exampleResp.TripPlan.Key
-
-	// Update the example trip with the requested fields
-	if req.Title != "" || req.StartDate != "" || req.EndDate != "" || req.Privacy != "" {
-		updateReq := UpdateTripRequest{
-			Title:     req.Title,
-			StartDate: req.StartDate,
-			EndDate:   req.EndDate,
-			Privacy:   req.Privacy,
-		}
-		if err := c.UpdateTrip(tripKey, updateReq); err != nil {
-			// Clean up the example trip if update fails
-			_ = c.DeleteTrip(tripKey)
-			return nil, fmt.Errorf("failed to update trip: %w", err)
-		}
-	}
-
-	// Fetch the updated trip to get the correct title
-	updatedTrip, err := c.GetTrip(tripKey)
+	httpReq, err := http.NewRequest("POST", BaseURL+"/tripPlans", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get updated trip: %w", err)
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"title":  req.Title,
+		"geoIDs": req.GeoIDs,
+		"type":   req.Type,
+	}).Debug("Creating trip")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"status": resp.StatusCode,
+		"body":   string(respBody),
+	}).Debug("CreateTrip API response")
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var createResp struct {
+		Success  bool                   `json:"success"`
+		TripPlan models.TripPlanSummary `json:"tripPlan"`
+		Data     models.TripPlanSummary `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &createResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	if !createResp.Success {
+		c.logger.WithField("response", string(respBody)).Error("Trip creation failed")
+		return nil, fmt.Errorf("failed to create trip - response: %s", string(respBody))
+	}
+
+	tripPlan := createResp.TripPlan
+	if tripPlan.Key == "" {
+		tripPlan = createResp.Data
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripID": tripPlan.ID,
+		"key":    tripPlan.Key,
+		"title":  tripPlan.Title,
+	}).Info("Successfully created trip")
 
 	return &CreateTripResponse{
-		Success: true,
-		TripPlan: models.TripPlanSummary{
-			ID:      updatedTrip.TripPlan.ID,
-			Key:     updatedTrip.TripPlan.Key,
-			EditKey: updatedTrip.TripPlan.EditKey,
-			Title:   updatedTrip.TripPlan.Title,
-		},
+		Success:  createResp.Success,
+		TripPlan: tripPlan,
 	}, nil
 }
 
@@ -986,12 +1034,18 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 
 // GetLikeCount gets whether we've liked a trip plan and the total number of likes
 func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
-	url := fmt.Sprintf("%s/tripPlans/%s/likeCount", BaseURL, tripKey)
-	httpReq, err := http.NewRequest("GET", url, nil)
+	reqBody, err := json.Marshal(map[string][]string{"keys": []string{tripKey}})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling like count request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/tripPlans/likes", BaseURL)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
 
+	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("User-Agent", c.userAgent)
 
 	// Auth is optional for this endpoint
@@ -1011,12 +1065,27 @@ func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
 	}
 
-	var likeCount LikeCount
-	if err := json.NewDecoder(resp.Body).Decode(&likeCount); err != nil {
+	var bulkResp struct {
+		Success bool `json:"success"`
+		Data    []struct {
+			Like      bool `json:"like"`
+			LikeCount int  `json:"likeCount"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&bulkResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
+	if !bulkResp.Success {
+		return nil, fmt.Errorf("failed to get like count")
+	}
+	if len(bulkResp.Data) == 0 {
+		return &LikeCount{}, nil
+	}
 
-	return &likeCount, nil
+	return &LikeCount{
+		Count:     bulkResp.Data[0].LikeCount,
+		UserLiked: bulkResp.Data[0].Like,
+	}, nil
 }
 
 // AddCollaborator adds a new collaborator to a trip plan with edit access
@@ -1171,44 +1240,42 @@ func (c *Client) GetTripFlights(tripKey string) (*TripFlightsResponse, error) {
 		return nil, fmt.Errorf("authentication required for getting trip flights")
 	}
 
-	url := fmt.Sprintf("%s/tripPlans/%s/flights", BaseURL, tripKey)
-	httpReq, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating HTTP request: %w", err)
-	}
-
-	httpReq.Header.Set("User-Agent", c.userAgent)
-
-	if err := c.addAuthHeaders(httpReq); err != nil {
-		return nil, fmt.Errorf("adding auth headers: %w", err)
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Getting trip flights")
-
-	resp, err := c.httpClient.Do(httpReq)
+	trip, err := c.GetTrip(tripKey)
 	if err != nil {
-		return nil, fmt.Errorf("making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	}
-
-	c.logger.WithFields(map[string]interface{}{
-		"tripKey": tripKey,
-		"status":  resp.StatusCode,
-		"body":    string(respBody),
-	}).Debug("GetTripFlights API response")
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+		return nil, fmt.Errorf("getting trip: %w", err)
 	}
 
 	var flightsResp TripFlightsResponse
-	if err := json.Unmarshal(respBody, &flightsResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	flightsResp.Success = true
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		for _, block := range section.Blocks {
+			if block.FlightInfo == nil {
+				continue
+			}
+
+			flight := TripFlight{
+				ID:            block.ID,
+				FlightNumber:  strconv.Itoa(block.FlightInfo.Number),
+				Airline:       block.FlightInfo.Airline.Name,
+				AirlineIATA:   block.FlightInfo.Airline.Iata,
+				DepartureTime: block.StartTime,
+				ArrivalTime:   block.EndTime,
+				Origin: FlightAirport{
+					IATA: block.Depart.Airport.Iata,
+					Name: block.Depart.Airport.Name,
+					City: block.Depart.Airport.CityName,
+				},
+			}
+			if block.Arrive != nil {
+				flight.Destination = FlightAirport{
+					IATA: block.Arrive.Airport.Iata,
+					Name: block.Arrive.Airport.Name,
+					City: block.Arrive.Airport.CityName,
+				}
+			}
+			flightsResp.Data.Flights = append(flightsResp.Data.Flights, flight)
+		}
 	}
 
 	c.logger.WithField("flightCount", len(flightsResp.Data.Flights)).Info("Successfully retrieved trip flights")
@@ -1273,9 +1340,34 @@ func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*Auto
 		return nil, fmt.Errorf("authentication required for autofilling days")
 	}
 
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return nil, fmt.Errorf("getting trip: %w", err)
+	}
+	geoID := 0
+	if len(trip.Resources.Geos) > 0 {
+		geoID = trip.Resources.Geos[0].ID
+	}
+	if geoID == 0 {
+		return nil, fmt.Errorf("trip has no geo id")
+	}
+	sectionDate := ""
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.ID == sectionID && section.Date != nil {
+			sectionDate = *section.Date
+			break
+		}
+	}
+	if sectionDate == "" {
+		return nil, fmt.Errorf("section %d has no date", sectionID)
+	}
+
 	reqBody, err := json.Marshal(AutofillDayRequest{
 		TripPlanKey: tripKey,
+		TripPlanID:  trip.TripPlan.ID,
 		SectionID:   sectionID,
+		SectionDate: sectionDate,
+		GeoID:       geoID,
 		Query:       query,
 	})
 	if err != nil {
@@ -1327,6 +1419,9 @@ func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*Auto
 	if err := json.Unmarshal(respBody, &autofillResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
+	if !autofillResp.Success {
+		return nil, fmt.Errorf("failed to autofill day - response: %s", string(respBody))
+	}
 
 	c.logger.WithField("suggestionCount", len(autofillResp.Data.Suggestions)).Info("Successfully autofilled day")
 
@@ -1339,10 +1434,21 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 		return nil, fmt.Errorf("authentication required for adding checklist items")
 	}
 
-	reqBody, err := json.Marshal(ChecklistSectionRequest{
-		Action:    "addItems",
-		SectionID: sectionID,
-		Items:     items,
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return nil, fmt.Errorf("getting trip: %w", err)
+	}
+
+	itemTexts := make([]string, 0, len(items))
+	for _, item := range items {
+		itemTexts = append(itemTexts, item.Text)
+	}
+	reqBody, err := json.Marshal(struct {
+		TripPlanID int      `json:"tripPlanId"`
+		Items      []string `json:"items"`
+	}{
+		TripPlanID: trip.TripPlan.ID,
+		Items:      itemTexts,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshaling checklist request: %w", err)
@@ -1393,6 +1499,9 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 	if err := json.Unmarshal(respBody, &checklistResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
+	if !checklistResp.Success {
+		return nil, fmt.Errorf("failed to add checklist items - response: %s", string(respBody))
+	}
 
 	c.logger.WithField("itemCount", len(checklistResp.Data.Section.Items)).Info("Successfully added checklist items")
 
@@ -1423,6 +1532,10 @@ func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, chec
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("User-Agent", c.userAgent)
+
+	if err := c.addAuthHeaders(httpReq); err != nil {
+		return nil, fmt.Errorf("adding auth headers: %w", err)
+	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,

@@ -1,5 +1,7 @@
 package models
 
+import "encoding/json"
+
 // TripFlightsResponse represents the response from getting trip flights
 type TripFlightsResponse struct {
 	Success bool `json:"success"`
@@ -41,7 +43,10 @@ type FlightAirport struct {
 // AutofillDayRequest represents a request to autofill a day with suggestions
 type AutofillDayRequest struct {
 	TripPlanKey string `json:"tripPlanKey"`
+	TripPlanID  int    `json:"tripPlanId,omitempty"`
 	SectionID   int    `json:"sectionId"`
+	SectionDate string `json:"sectionDate,omitempty"`
+	GeoID       int    `json:"geoId,omitempty"`
 	Query       string `json:"query,omitempty"`
 	Location    *struct {
 		Lat float64 `json:"lat"`
@@ -55,6 +60,59 @@ type AutofillDayResponse struct {
 	Data    struct {
 		Suggestions []AutofillSuggestion `json:"suggestions"`
 	} `json:"data"`
+}
+
+// UnmarshalJSON accepts both the older {"data":{"suggestions":[]}} shape and
+// the APK-backed {"data":[{"place":...}]} response used by autofillDay.
+func (r *AutofillDayResponse) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Success bool            `json:"success"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.Success = raw.Success
+	if len(raw.Data) == 0 || string(raw.Data) == "null" {
+		return nil
+	}
+
+	var wrapped struct {
+		Suggestions []AutofillSuggestion `json:"suggestions"`
+	}
+	if err := json.Unmarshal(raw.Data, &wrapped); err == nil && wrapped.Suggestions != nil {
+		r.Data.Suggestions = wrapped.Suggestions
+		return nil
+	}
+
+	var direct []struct {
+		Place struct {
+			PlaceID          string  `json:"place_id"`
+			Name             string  `json:"name"`
+			FormattedAddress string  `json:"formatted_address"`
+			Rating           float64 `json:"rating"`
+			Geometry         struct {
+				Location struct {
+					Lat float64 `json:"lat"`
+					Lng float64 `json:"lng"`
+				} `json:"location"`
+			} `json:"geometry"`
+		} `json:"place"`
+	}
+	if err := json.Unmarshal(raw.Data, &direct); err != nil {
+		return err
+	}
+	for _, item := range direct {
+		r.Data.Suggestions = append(r.Data.Suggestions, AutofillSuggestion{
+			PlaceID: item.Place.PlaceID,
+			Name:    item.Place.Name,
+			Address: item.Place.FormattedAddress,
+			Lat:     item.Place.Geometry.Location.Lat,
+			Lng:     item.Place.Geometry.Location.Lng,
+			Rating:  item.Place.Rating,
+		})
+	}
+	return nil
 }
 
 // AutofillSuggestion represents a single autofill suggestion
@@ -72,11 +130,12 @@ type AutofillSuggestion struct {
 
 // ChecklistSectionRequest represents a request to manage checklist sections
 type ChecklistSectionRequest struct {
-	Action    string          `json:"action"` // "addItems", "removeItems", "toggleItem"
-	SectionID int             `json:"sectionId"`
-	Items     []ChecklistItem `json:"items,omitempty"`
-	ItemID    int             `json:"itemId,omitempty"`
-	Checked   bool            `json:"checked,omitempty"`
+	Action     string          `json:"action,omitempty"` // legacy local action name
+	TripPlanID int             `json:"tripPlanId,omitempty"`
+	SectionID  int             `json:"sectionId,omitempty"`
+	Items      []ChecklistItem `json:"items,omitempty"`
+	ItemID     int             `json:"itemId,omitempty"`
+	Checked    bool            `json:"checked,omitempty"`
 }
 
 // ChecklistItem represents a single checklist item
