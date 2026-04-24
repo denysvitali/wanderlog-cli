@@ -33,6 +33,7 @@ jobs:
       - run: go test -race -coverprofile=coverage.out ./...
       - uses: actions/upload-artifact@v4
         if: success()
+        continue-on-error: true
         with:
           name: coverage
           path: coverage.out
@@ -56,6 +57,7 @@ jobs:
             go build -ldflags "-s -w" -o wanderlog-${{ matrix.goos }}-${{ matrix.goarch }} .
       - uses: actions/upload-artifact@v4
         if: success()
+        continue-on-error: true
         with:
           name: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
           path: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
