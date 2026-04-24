@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -31,7 +30,7 @@ Examples:
 		}
 
 		fmt.Print("Password: ")
-		passwordBytes, err := term.ReadPassword(syscall.Stdin)
+		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			logger.WithError(err).Error("Failed to read password")
 			os.Exit(1)
