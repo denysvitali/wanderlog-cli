@@ -269,7 +269,7 @@ func init() {
 	removePlaceCmd.Flags().IntVar(&sectionIDFlag, "section", 0, "Section ID")
 
 	// Auth flags for all edit commands
-	for _, cmd := range []*cobra.Command{addPlaceCmd, removePlaceCmd} {
+	for _, cmd := range []*cobra.Command{addPlaceCmd, removePlaceCmd, clearSectionCmd, deleteSectionCmd, nukeTrippPlacesCmd} {
 		cmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		cmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}
