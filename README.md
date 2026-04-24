@@ -124,6 +124,75 @@ wanderlog create --title "New Trip" --session "cookie" --xsrf "token"
 - 🗑️ **Easy Logout**: Clear stored credentials with `wanderlog logout`
 - ✅ **Status Check**: Verify authentication status with `wanderlog status`
 
+### Discovery, Feed, and Profile
+
+```bash
+# Your current profile
+wanderlog user profile
+
+# Another user's profile by id or @username
+wanderlog user profile 12345
+wanderlog user profile @some-user
+
+# Inbox
+wanderlog user notifications
+wanderlog user mark-read --id n-123 --id n-456
+
+# Per-user key-value store
+wanderlog user kv-get userPrefs
+wanderlog user kv-set userPrefs --value '{"theme":"dark"}'
+
+# Notification settings (GET / replace)
+wanderlog user settings
+wanderlog user settings-set --body '{"notify":true}'
+
+# Search users & relationships
+wanderlog user search "alice"
+wanderlog user by-email --email someone@example.com
+wanderlog user following --user-id 123 --user-id 456
+wanderlog user username-taken --username cool-name
+
+# Home feed, history, friends, guides
+wanderlog feed home
+wanderlog feed recent
+wanderlog feed history --offset 20
+wanderlog feed friends
+wanderlog feed guides --geo-id 1
+```
+
+### Journal & advanced trip ops
+
+```bash
+# Read a published journal by share key
+wanderlog journal <journal-key>
+
+# Download expenses for a trip
+wanderlog expenses <trip-key> > expenses.csv
+
+# Register a view, check whether the client needs an upgrade
+wanderlog register-view <trip-key>
+wanderlog update-required <trip-key>
+
+# Get / set distinction (badges)
+wanderlog distinction <trip-key>
+wanderlog distinction <trip-key> --set community-pick
+
+# Promote a trip into a published guide
+wanderlog create-guide <trip-key>
+```
+
+### Server configuration
+
+```bash
+# Pretty-prints /api/config/globalConfig
+wanderlog config global
+
+# Authenticated session store
+wanderlog config session
+wanderlog config session-set somekey --value '"somevalue"'
+wanderlog config preferences --locale en
+```
+
 ### Finding Trip IDs
 
 Trip IDs can be found in Wanderlog URLs:
@@ -167,8 +236,12 @@ func main() {
     // Create a new trip
     newTrip, err := client.CreateTrip(wanderlog.CreateTripRequest{
         Title: "My New Trip",
+        GeoIDs: []int{1},
+        InitialMapsPlaceIDs: []int{},
+        Type: "plan",
         StartDate: "2024-06-01",
         EndDate: "2024-06-07",
+        Privacy: "private",
     })
     if err != nil {
         log.Fatal(err)

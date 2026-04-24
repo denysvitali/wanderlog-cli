@@ -1,6 +1,14 @@
 # Wanderlog API Endpoints Documentation
 
-This document provides a comprehensive list of all API endpoints discovered in the Wanderlog web application (from `dist_public_compiled_mainjs.js`) and their implementation status in the CLI.
+This document provides a comprehensive list of all API endpoints discovered in the Wanderlog web/Android bundle (`wanderlog_main/res/raw/dist_public_compiled_mainjs.asset`) and their implementation status in the CLI.
+
+The APK-derived bundle currently exposes 85 quoted `/api/...` endpoint constants via:
+
+```sh
+rg -o "['\"](/api/[^'\"]+)['\"]" wanderlog_main/res/raw/dist_public_compiled_mainjs.asset
+```
+
+Strongly typed wrappers cover the core trip, search, flight, lodging, collaboration, sharing, checklist, and export flows. For endpoints that are discovered but not modeled yet, the CLI now includes `wanderlog api`, which can call any `/api/...` path with optional authentication and JSON bodies.
 
 ## API Coverage Summary
 
@@ -33,46 +41,95 @@ This document provides a comprehensive list of all API endpoints discovered in t
 | `POST /api/tripPlans/autofillDay` | `AutofillDay()` | `write_ops.go:1201` | `TestIntegration_AutofillDay` |
 | `POST /api/tripPlans/checklistSection` | `AddChecklistItems()` | `write_ops.go:1257` | `TestIntegration_AddChecklistItems` |
 
-### Partially Covered
+### Covered Helper APIs
 
-| Endpoint | Status | MCP Tool |
-|----------|--------|----------|
-| `GET /api/flights/allAirlines` | `GetAllAirlines()` | - |
-| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `search_flights` |
-| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `search_flights` |
-| `GET /api/flights/flightStopsLista` | `GetFlightStops()` | - |
-| `POST /api/lodging/searchLodgings` | `SearchLodgings()` | `search_hotels` |
-| `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | - |
-| `GET /api/placesAPI/getPlaceDetailsAndCardData` | `GetPlaceDetails()` | `get_place_details` |
-| `GET /api/placesAPI/autocomplete/v2` | `SearchPlacesWithWanderllog()` | `search_places` |
+| Endpoint | Go Implementation | CLI Command | MCP Tool |
+|----------|-------------------|-------------|----------|
+| `GET /api/flights/allAirlines` | `GetAllAirlines()` | `wanderlog travel airlines` | - |
+| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `wanderlog travel airports` | `search_flights` |
+| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `wanderlog travel airports --lat --lng` | `search_flights` |
+| `GET /api/flights/flightStopsLista` | `GetFlightStops()` | `wanderlog travel flight-stops` | - |
+| `POST /api/lodging/searchLodgings` | `SearchLodgings()` | `wanderlog travel hotels` | `search_hotels` |
+| `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | `wanderlog travel hotel-rates` | - |
+| `GET /api/placesAPI/getPlaceDetailsAndCardData` | `GetPlaceDetails()` | `wanderlog place-details` | `get_place_details` |
+| `GET /api/placesAPI/autocomplete/v2` | `SearchPlacesWithWanderllog()` | `wanderlog search-places` | `search_places` |
 
-### Not Covered (Significant Gaps)
+### Raw API Coverage
 
-**User/Auth (social login missing):**
-- `/api/user/loginFacebookAccessToken` - Facebook OAuth login
-- `/api/user/loginGoogleAuthCode/v2` - Google OAuth login v2
-- `/api/user/loginGoogleIdToken` - Google ID token login
-- `/api/user/loginAppleAuthCode` - Apple OAuth login
-- `/api/user/register` - User registration
-- `/api/user/resetPassword` - Password reset
-- `/api/user/isValidPasswordResetToken` - Validate reset token
-- `/api/user/profilePicture` - Profile picture upload
-- `/api/user/following/*` - Following users
-- `/api/user/block` - Block users
-- `/api/user/byEmail` - Find user by email
+Any APK-discovered endpoint can be exercised through:
 
-**Social/Feed:**
-- `/api/tripPlans/feed` - Trip feed
-- `/api/tripPlans/home` - Home feed
-- `/api/tripPlans/friendsPlans` - Friends' trips
-- `/api/user/leaderboard` - Leaderboard
+```sh
+wanderlog api /api/config/globalConfig
+wanderlog api /api/user/notification/settings --auth
+wanderlog api /api/sessionStore --method POST --auth --body '{"key":"value"}'
+```
 
-**Payments (not applicable for CLI):**
-- All `/api/payments/*` endpoints (subscription management via Stripe)
+Use the typed commands where available; use `wanderlog api` for admin, payments, analytics, social feed, notification, profile, session-store, and other less stable endpoints.
 
-**Trip Features:**
-- `/api/tripPlans/browse/guides` - Browse guides
-- `/api/tripPlans/landingPage/*` - Landing page content
+### Not Strongly Typed Yet
+
+**User (Recently Added):**
+
+| Endpoint | Go Implementation | CLI Command | MCP Tool |
+|----------|-------------------|-------------|----------|
+| `GET /api/user` | `GetMe()` | `wanderlog user profile` | `get_me` |
+| `POST /api/user` | `UpdateMe()` | - | - |
+| `POST /api/user/logout` | `ServerLogout()` | `wanderlog user server-logout` | - |
+| `GET /api/user/notifications` | `GetNotifications()` | `wanderlog user notifications` | `get_notifications` |
+| `POST /api/user/notifications/markRead` | `MarkNotificationsRead()` | `wanderlog user mark-read` | `mark_notifications_read` (write) |
+| `GET/POST /api/user/notification/settings` | `GetNotificationSettings()`, `UpdateNotificationSettings()` | `wanderlog user settings`, `settings-set` | `get_notification_settings` |
+| `GET/POST /api/user/keyValue/:key` | `GetKeyValue()`, `SetKeyValue()` | `wanderlog user kv-get/kv-set` | `set_user_kv` (write) |
+| `POST /api/user/utcOffset` | `SetUTCOffset()` | `wanderlog user utc-offset` | - |
+| `POST /api/user/following/list` | `ListFollowing()` | `wanderlog user following` | - |
+| `GET /api/user/autocomplete/:search` | `AutocompleteUsers()` | `wanderlog user search` | `autocomplete_users` |
+| `GET /api/user/byEmail` | `FindUserByEmail()` | `wanderlog user by-email` | - |
+| `POST /api/user/block` | `BlockUser()` | `wanderlog user block` | - |
+| `GET /api/user/isUsernameTaken/:username` | `IsUsernameTaken()` | `wanderlog user username-taken` | `is_username_taken` |
+| `GET /api/user/emails` | `GetUserEmails()` | `wanderlog user emails` | `get_user_emails` |
+| `GET /api/tripPlans/profile/:userId` | `GetUserProfile()` | `wanderlog user profile <id>` | `get_user_profile` |
+| `GET /api/tripPlans/profile/byUsername/:username` | `GetUserProfileByUsername()` | `wanderlog user profile @<name>` | `get_user_profile` |
+
+**Feed & Discovery (Recently Added):**
+
+| Endpoint | Go Implementation | CLI Command | MCP Tool |
+|----------|-------------------|-------------|----------|
+| `GET /api/tripPlans/home` | `GetFeedHome()` | `wanderlog feed home` | `get_feed_home` |
+| `GET /api/tripPlans/feed` | `GetFeed()` | `wanderlog feed legacy` | - |
+| `GET /api/tripPlans/feed/v2` | `GetFeedV2()` | `wanderlog feed v2` | - |
+| `GET /api/tripPlans/feed/mostRecentlyEdited` | `GetFeedMostRecent()` | `wanderlog feed recent` | `get_feed_recent` |
+| `GET /api/tripPlans/friendsPlans` | `GetFriendsPlans()` | `wanderlog feed friends` | `get_feed_friends` |
+| `GET /api/tripPlans/history` | `GetTripHistory()` | `wanderlog feed history` | `get_trip_history` |
+| `POST /api/tripPlans/getIfEdited` | `GetIfEdited()` | `wanderlog get-if-edited` | - |
+| `GET /api/tripPlans/browse/guides[/:geoId]` | `BrowseGuides()` | `wanderlog feed guides` | `browse_guides` |
+
+**Journal & Advanced Trip Ops (Recently Added):**
+
+| Endpoint | Go Implementation | CLI Command | MCP Tool |
+|----------|-------------------|-------------|----------|
+| `GET /api/tripPlans/viewOnlyJournal/:journalKey` | `GetViewOnlyJournal()` | `wanderlog journal <key>` | `get_view_only_journal` |
+| `POST /api/tripPlans/journalStopPolylines` | `GetJournalStopPolylines()` | - | - |
+| `GET /api/tripPlans/:key/expensesAsCSV` | `GetTripExpensesCSV()` | `wanderlog expenses` | `get_trip_expenses_csv` |
+| `POST /api/tripPlans/:key/registerView` | `RegisterTripView()` | `wanderlog register-view` | `register_trip_view` (write) |
+| `GET /api/tripPlans/:key/updateRequired` | `GetTripUpdateRequired()` | `wanderlog update-required` | - |
+| `GET/POST /api/tripPlans/:key/distinction` | `GetTripDistinction()`, `SetTripDistinction()` | `wanderlog distinction` | `get_trip_distinction` |
+| `POST /api/tripPlans/:key/createGuideFromTripPlan` | `CreateGuideFromTripPlan()` | `wanderlog create-guide` | `create_guide_from_trip` (write) |
+
+**Config & Session (Recently Added):**
+
+| Endpoint | Go Implementation | CLI Command | MCP Tool |
+|----------|-------------------|-------------|----------|
+| `GET /api/config/globalConfig` | `GetGlobalConfig()` | `wanderlog config global` | `get_global_config` |
+| `GET/POST /api/sessionStore` | `GetSessionStore()`, `SetSessionStoreValue()` | `wanderlog config session`, `session-set` | - |
+| `GET /api/sessionStore/preferences/:locale` | `GetSessionPreferences()` | `wanderlog config preferences` | - |
+
+**Still Out of Scope (intentionally):**
+- OAuth login variants (`/api/user/loginFacebookAccessToken`, `/api/user/loginGoogleAuthCode/v2`, `/api/user/loginGoogleIdToken`, `/api/user/loginAppleAuthCode`) — require browser handshake; email login covers CLI needs
+- `/api/user/register`, `/api/user/resetPassword`, `/api/user/startResetPassword`, `/api/user/isValidPasswordResetToken`, `/api/user/activate/*`, `/api/user/changeEmail/*` — account-lifecycle flows better handled in the web UI
+- `/api/user/leaderboard`, `/api/user/following/*` (beyond `list`), `/api/user/mutuallyFollowing`, `/api/user/followingMultiple`, `/api/user/profilePicture`, `/api/user/fcmToken`, `/api/user/saveFlightDealSettings` — low-value for CLI/LLM workflows
+- `/api/tripPlans/landingPage/*` — marketing surface
+- `/api/tripPlans/admin/*` — require admin tokens
+- `/api/payments/*` — Stripe browser flows
+- `/api/analytics/*` — client telemetry, irrelevant for a CLI
 
 ---
 
@@ -81,6 +138,12 @@ This document provides a comprehensive list of all API endpoints discovered in t
 - ✅ **Fully Implemented** - Complete implementation with tests
 - ✅ **Partial** - Basic implementation exists but may lack full features
 - ❌ **Not Implemented** - Endpoint exists in web app but not in CLI
+- 🧰 **Raw API Covered** - Endpoint can be called with `wanderlog api`, but no typed wrapper exists yet
+
+> **Note**: The tables below are a historical inventory of every discovered
+> endpoint. For the current coverage summary (user, feed, journal, config
+> groups), see the *Recently Added* sections at the top of this file. Some
+> rows below are marked ❌ but are now fully typed — the groups above win.
 
 ## Complete API Endpoint Catalog
 
