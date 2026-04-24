@@ -15,8 +15,10 @@ var (
 	tripStartDate string
 	tripEndDate   string
 	tripPrivacy   string
+	tripGeoIDs    []int
 	sessionCookie string
 	xsrfToken     string
+	createExample bool
 )
 
 var createCmd = &cobra.Command{
@@ -27,12 +29,17 @@ var createCmd = &cobra.Command{
 Requires authentication via 'wanderlog login' or environment variables.
 
 Examples:
-  wanderlog create --title "Trip to Japan" 
-  wanderlog create --title "Europe 2024" --start 2024-06-01 --end 2024-06-15
-  wanderlog create --title "Private Trip" --privacy private`,
+  wanderlog create --title "Trip to Japan" --geo-id 1
+  wanderlog create --title "Europe 2024" --geo-id 7 --start 2024-06-01 --end 2024-06-15
+  wanderlog create --title "Private Trip" --geo-id 1 --privacy private
+  wanderlog create --example`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if tripTitle == "" {
+		if tripTitle == "" && !createExample {
 			logger.Error("Trip title is required")
+			os.Exit(1)
+		}
+		if len(tripGeoIDs) == 0 && !createExample {
+			logger.Error("At least one --geo-id is required")
 			os.Exit(1)
 		}
 
@@ -59,15 +66,24 @@ Examples:
 			os.Exit(1)
 		}
 
-		req := wanderlog.CreateTripRequest{
-			Title:     tripTitle,
-			StartDate: tripStartDate,
-			EndDate:   tripEndDate,
-			Privacy:   tripPrivacy,
-			Language:  "en",
+		var resp *wanderlog.CreateTripResponse
+		var err error
+		if createExample {
+			resp, err = client.CreateExampleTrip()
+		} else {
+			req := wanderlog.CreateTripRequest{
+				Title:               tripTitle,
+				GeoIDs:              tripGeoIDs,
+				InitialMapsPlaceIDs: []int{},
+				Type:                "plan",
+				StartDate:           tripStartDate,
+				EndDate:             tripEndDate,
+				Privacy:             tripPrivacy,
+				IsMapEmbed:          false,
+				Language:            "en",
+			}
+			resp, err = client.CreateTrip(req)
 		}
-
-		resp, err := client.CreateTrip(req)
 		if err != nil {
 			logger.WithError(err).Error("Failed to create trip")
 			os.Exit(1)
@@ -171,7 +187,9 @@ func init() {
 	createCmd.Flags().StringVarP(&tripTitle, "title", "t", "", "Trip title (required)")
 	createCmd.Flags().StringVar(&tripStartDate, "start", "", "Start date (YYYY-MM-DD)")
 	createCmd.Flags().StringVar(&tripEndDate, "end", "", "End date (YYYY-MM-DD)")
-	createCmd.Flags().StringVar(&tripPrivacy, "privacy", "public", "Trip privacy (public, private, unlisted)")
+	createCmd.Flags().StringVar(&tripPrivacy, "privacy", "private", "Trip privacy (public, private, friends)")
+	createCmd.Flags().IntSliceVar(&tripGeoIDs, "geo-id", nil, "Wanderlog destination geo ID (repeatable)")
+	createCmd.Flags().BoolVar(&createExample, "example", false, "Create Wanderlog's pre-filled example trip")
 
 	// Auth flags for all commands
 	for _, cmd := range []*cobra.Command{createCmd, deleteCmd, copyCmd} {
