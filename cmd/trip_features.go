@@ -10,27 +10,27 @@ import (
 )
 
 var (
-	updateTitle       string
-	updateStartDate   string
-	updateEndDate     string
-	updatePrivacy     string
-	likeValue         bool
-	shareCanEdit      bool
-	shareCanView      bool
-	autofillQuery     string
-	inviteEmails      []string
-	collaboratorID    int
-	moveFromSectionID int
-	moveToSectionID   int
-	movePosition      int
-	reorderPlaceIDs   string
-	checklistItems    []string
-	checklistChecked  bool
-	hotelCheckIn      string
-	hotelCheckOut     string
-	hotelGuests       int
-	locationLat       float64
-	locationLng       float64
+	updateTitle        string
+	updateStartDate    string
+	updateEndDate      string
+	updatePrivacy      string
+	likeValue          bool
+	shareCanEdit       bool
+	shareCanView       bool
+	autofillQuery      string
+	inviteEmails       []string
+	collaboratorID     int
+	moveFromSectionID  int
+	moveToSectionID    int
+	movePosition       int
+	reorderPlaceIDs    string
+	checklistItems     []string
+	checklistChecked   bool
+	hotelCheckIn       string
+	hotelCheckOut      string
+	hotelGuests        int
+	locationLat        float64
+	locationLng        float64
 	flightStopsAirline string
 	flightStopsDate    string
 )
