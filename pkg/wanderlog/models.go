@@ -520,10 +520,9 @@ type AirportAutocompleteResponse struct {
 
 // AirportSuggestion represents a single airport suggestion
 type AirportSuggestion struct {
-	Code    string `json:"code"`
-	Name    string `json:"name"`
-	City    string `json:"city"`
-	Country string `json:"country"`
+	IATA     string `json:"iata"`
+	Name     string `json:"name"`
+	CityName string `json:"cityName"`
 }
 
 // FlightStopsResponse represents the response from the flight stops API

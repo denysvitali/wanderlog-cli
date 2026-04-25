@@ -560,9 +560,9 @@ func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
 	return &result, nil
 }
 
-// AutocompleteAirport searches for airports by query
+// AutocompleteAirport searches for airports by query (path-based)
 func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse, error) {
-	url := fmt.Sprintf("%s/flights/autocompleteAirport?query=%s", BaseURL, url.QueryEscape(query))
+	url := fmt.Sprintf("%s/flights/autocompleteAirport/%s", BaseURL, url.PathEscape(query))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -592,10 +592,10 @@ func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse
 	return &result, nil
 }
 
-// AutocompleteAirportWithLocation searches for airports by query with location bias
+// AutocompleteAirportWithLocation searches for airports by query with location bias (query is path-based)
 func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64) (*AirportAutocompleteResponse, error) {
-	url := fmt.Sprintf("%s/flights/autocompleteAirportWithLocation?query=%s&latitude=%f&longitude=%f",
-		BaseURL, url.QueryEscape(query), lat, lng)
+	url := fmt.Sprintf("%s/flights/autocompleteAirportWithLocation/%s?latitude=%f&longitude=%f",
+		BaseURL, url.PathEscape(query), lat, lng)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
