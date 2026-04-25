@@ -626,9 +626,9 @@ func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64)
 }
 
 // GetFlightStops retrieves flight stops for a given flight.
-// The Wanderlog API requires flightNumber (integer), airline IATA code, and departureDate.
+// The API requires flightNumber (integer string), airline IATA code (airlineIata), and departure date (departDate).
 func (c *Client) GetFlightStops(flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
-	url := fmt.Sprintf("%s/flights/flightStops?flightNumber=%s&iata=%s&departureDate=%s",
+	url := fmt.Sprintf("%s/flights/flightStops?flightNumber=%s&airlineIata=%s&departDate=%s",
 		BaseURL, url.QueryEscape(flightNumber), url.QueryEscape(airlineIata), url.QueryEscape(departureDate))
 
 	req, err := http.NewRequest("GET", url, nil)
