@@ -736,15 +736,17 @@ func (c *Client) SearchPlacesWithWanderllog(query string, lat, lng float64) (*Wa
 	return &result, nil
 }
 
-// SearchLodgings searches for hotels/lodgings for given dates and guest count
+// SearchLodgings searches for hotels/lodgings for given dates and guest count.
+// The API uses startDate/endDate (not checkIn/checkOut) and aduldCount/roomCount/childrenAges.
 func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*LodgingSearchResponse, error) {
 	apiURL := fmt.Sprintf("%s/lodging/searchLodgings", BaseURL)
 
 	requestBody := map[string]interface{}{
-		"query":          query,
-		"checkIn":        checkIn,
-		"checkOut":       checkOut,
-		"numberOfGuests": guests,
+		"query":       query,
+		"startDate":   checkIn,
+		"endDate":     checkOut,
+		"adultCount":  guests,
+		"roomCount":   1,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
