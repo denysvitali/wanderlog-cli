@@ -57,10 +57,23 @@ var travelFlightStopsCmd = &cobra.Command{
 	Short: "Show stops for a flight number",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		flightNum := args[0]
+		airline := flightStopsAirline
+		date := flightStopsDate
+
+		if airline == "" {
+			logger.Error("--airline is required (e.g., UA, BA, LH)")
+			return
+		}
+		if date == "" {
+			logger.Error("--date is required (YYYY-MM-DD)")
+			return
+		}
+
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
-		resp, err := client.GetFlightStops(args[0])
+		resp, err := client.GetFlightStops(flightNum, airline, date)
 		if err != nil {
 			logger.WithError(err).Error("Failed to get flight stops")
 			return
@@ -123,6 +136,8 @@ func init() {
 	travelHotelsCmd.Flags().StringVar(&travelHotelCheckIn, "check-in", "", "Check-in date (YYYY-MM-DD)")
 	travelHotelsCmd.Flags().StringVar(&travelHotelCheckOut, "check-out", "", "Check-out date (YYYY-MM-DD)")
 	travelHotelsCmd.Flags().IntVar(&travelHotelGuests, "guests", 1, "Number of guests")
+	travelFlightStopsCmd.Flags().StringVar(&flightStopsAirline, "airline", "", "Airline IATA code (e.g., UA, BA)")
+	travelFlightStopsCmd.Flags().StringVar(&flightStopsDate, "date", "", "Departure date (YYYY-MM-DD)")
 
 	for _, c := range []*cobra.Command{travelAirlinesCmd, travelAirportsCmd, travelFlightStopsCmd, travelHotelsCmd, travelHotelRatesCmd} {
 		c.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")

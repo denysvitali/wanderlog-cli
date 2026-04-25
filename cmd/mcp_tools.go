@@ -101,6 +101,17 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		),
 		handleBrowseGuides,
 	)
+	s.AddTool(
+		mcp.NewTool("search_geos",
+			mcp.WithDescription("Search Wanderlog destination geo IDs for create_trip. Use this before creating trips instead of guessing geo_id values."),
+			mcp.WithString("query", mcp.Required(),
+				mcp.Description("Destination name, e.g. Japan, Tokyo, Kyoto")),
+			mcp.WithNumber("limit",
+				mcp.Description("Maximum number of geos to return"),
+				mcp.DefaultNumber(10)),
+		),
+		handleSearchGeos,
+	)
 
 	// journal / advanced trip ops (read-only)
 	s.AddTool(
@@ -357,6 +368,65 @@ func handleBrowseGuides(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+type geoGuideCount struct {
+	Name       string `json:"name"`
+	GeoID      int    `json:"geoId"`
+	GuideCount int    `json:"guideCount"`
+}
+
+func filterGeoGuideCounts(data json.RawMessage, query string, limit int) ([]geoGuideCount, error) {
+	var payload struct {
+		GeoGuideCounts []geoGuideCount `json:"geoGuideCounts"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+
+	query = strings.ToLower(strings.TrimSpace(query))
+	if limit <= 0 {
+		limit = 10
+	}
+
+	matches := make([]geoGuideCount, 0, limit)
+	for _, geo := range payload.GeoGuideCounts {
+		if query != "" && !strings.Contains(strings.ToLower(geo.Name), query) {
+			continue
+		}
+		matches = append(matches, geo)
+		if len(matches) >= limit {
+			break
+		}
+	}
+
+	return matches, nil
+}
+
+func handleSearchGeos(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	query, err := request.RequireString("query")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
+	}
+
+	client := optionalAuthClient()
+	resp, err := client.BrowseGuides(0)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+
+	matches, err := filterGeoGuideCounts(resp.Data, query, request.GetInt("limit", 10))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to parse geos: %v", err)), nil
+	}
+
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"success": true,
+		"data": map[string]any{
+			"geos": matches,
+		},
+	}), nil
 }
 
 func handleGetViewOnlyJournal(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

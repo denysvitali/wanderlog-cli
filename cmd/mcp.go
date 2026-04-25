@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -76,7 +77,7 @@ func init() {
 	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.Flags().String("http", "", "HTTP address to serve MCP on (e.g., :8080)")
 	mcpCmd.Flags().Bool("enable-write", false, "Enable write operations (add/remove places, etc.)")
-	mcpCmd.Flags().String("trip-id", "", "Default trip ID to use for all operations (makes trip_id parameter optional in tools)")
+	mcpCmd.Flags().String("trip-id", "", "Default trip key to use for all operations (makes trip_id/trip_key parameters optional in tools)")
 }
 
 func createMCPServer(readOnly bool) *server.MCPServer {
@@ -105,7 +106,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	getTripTool := mcp.NewTool("get_trip",
 		mcp.WithDescription("Get detailed information about a specific trip"),
 		mcp.WithString("trip_id",
-			mcp.Description("The ID of the trip to retrieve (optional if default trip ID is set)"),
+			mcp.Description("The trip key to retrieve, not the numeric database ID (optional if default trip key is set)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -119,7 +120,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	listPlacesTool := mcp.NewTool("list_places",
 		mcp.WithDescription("List all places for a specific trip"),
 		mcp.WithString("trip_id",
-			mcp.Description("The ID of the trip to get places for (optional if default trip ID is set)"),
+			mcp.Description("The trip key to get places for, not the numeric database ID (optional if default trip key is set)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -133,7 +134,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	listSectionsTool := mcp.NewTool("list_sections",
 		mcp.WithDescription("List all sections/days for a specific trip with their IDs and dates"),
 		mcp.WithString("trip_id",
-			mcp.Description("The ID of the trip to get sections for (optional if default trip ID is set)"),
+			mcp.Description("The trip key to get sections for, not the numeric database ID (optional if default trip key is set)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -156,7 +157,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	if !readOnly {
 		// Add place to trip tool
 		addPlaceTool := mcp.NewTool("add_place",
-			mcp.WithDescription("Add a place to a trip. If place_id is provided without coordinates, they will be automatically fetched from the Wanderlog API to prevent corrupt place data."),
+			mcp.WithDescription("Add a place to a trip. Use section_date or a positive section_id from list_sections to place it on the itinerary. Pass unscheduled=true only for the general Places to visit list. If place_id is provided without coordinates, they will be automatically fetched from the Wanderlog API to prevent corrupt place data."),
 			mcp.WithString("trip_key",
 				mcp.Description("The key/ID of the trip to add the place to (optional if default trip ID is set)"),
 			),
@@ -174,14 +175,128 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 				mcp.Description("Longitude of the place (optional - will be auto-fetched if place_id is provided)"),
 			),
 			mcp.WithNumber("section_id",
-				mcp.Required(),
-				mcp.Description("Section ID to add the place to (use list_sections tool to get available section IDs)"),
+				mcp.Description("Positive itinerary section ID from list_sections. Do not pass 0 unless unscheduled=true."),
+			),
+			mcp.WithString("section_date",
+				mcp.Description("Itinerary date (YYYY-MM-DD). The tool resolves it to that day's section ID."),
+			),
+			mcp.WithBoolean("unscheduled",
+				mcp.Description("Set true to add to the general Places to visit list instead of a dated itinerary section."),
+				mcp.DefaultBool(false),
 			),
 			mcp.WithString("text",
 				mcp.Description("Additional text/notes for the place (optional)"),
 			),
 		)
 		s.AddTool(addPlaceTool, handleAddPlace)
+
+		addFlightTool := mcp.NewTool("add_flight",
+			mcp.WithDescription("Add a flight reservation block to a dated itinerary section. Requires departure_date. Use section_date or a positive section_id from list_sections; section_date defaults to departure_date."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key to add the flight to (optional if default trip key is set)"),
+			),
+			mcp.WithString("section_date",
+				mcp.Description("Itinerary date (YYYY-MM-DD). Defaults to departure_date when omitted."),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Positive itinerary section ID from list_sections."),
+			),
+			mcp.WithString("flight_number",
+				mcp.Required(),
+				mcp.Description("Flight number, e.g. MU244"),
+			),
+			mcp.WithString("departure_date",
+				mcp.Required(),
+				mcp.Description("Departure date (YYYY-MM-DD)"),
+			),
+			mcp.WithString("departure_time",
+				mcp.Description("Departure time"),
+			),
+			mcp.WithString("arrival_date",
+				mcp.Description("Arrival date (YYYY-MM-DD)"),
+			),
+			mcp.WithString("arrival_time",
+				mcp.Description("Arrival time"),
+			),
+			mcp.WithString("departure_airport_iata",
+				mcp.Description("Departure airport IATA code"),
+			),
+			mcp.WithString("departure_airport_name",
+				mcp.Description("Departure airport name"),
+			),
+			mcp.WithString("departure_city",
+				mcp.Description("Departure city"),
+			),
+			mcp.WithString("arrival_airport_iata",
+				mcp.Description("Arrival airport IATA code"),
+			),
+			mcp.WithString("arrival_airport_name",
+				mcp.Description("Arrival airport name"),
+			),
+			mcp.WithString("arrival_city",
+				mcp.Description("Arrival city"),
+			),
+			mcp.WithString("airline_name",
+				mcp.Description("Airline name"),
+			),
+			mcp.WithString("airline_iata",
+				mcp.Description("Airline IATA code"),
+			),
+			mcp.WithString("airline_icao",
+				mcp.Description("Airline ICAO code"),
+			),
+			mcp.WithString("confirmation_number",
+				mcp.Description("Confirmation number"),
+			),
+			mcp.WithString("notes",
+				mcp.Description("Additional notes"),
+			),
+		)
+		s.AddTool(addFlightTool, handleAddFlight)
+
+		addLodgingTool := mcp.NewTool("add_lodging",
+			mcp.WithDescription("Disabled: app-compatible lodging writes are not implemented safely yet. Use search_hotels to find lodging, but do not write hotel blocks until this tool is re-enabled."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key to add lodging to (optional if default trip key is set)"),
+			),
+			mcp.WithString("section_date",
+				mcp.Description("Itinerary date (YYYY-MM-DD). Defaults to check_in when omitted."),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Positive itinerary section ID from list_sections."),
+			),
+			mcp.WithString("name",
+				mcp.Required(),
+				mcp.Description("Hotel/lodging name"),
+			),
+			mcp.WithString("check_in",
+				mcp.Required(),
+				mcp.Description("Check-in date (YYYY-MM-DD)"),
+			),
+			mcp.WithString("check_out",
+				mcp.Required(),
+				mcp.Description("Check-out date (YYYY-MM-DD)"),
+			),
+			mcp.WithString("confirmation_number",
+				mcp.Description("Confirmation number"),
+			),
+			mcp.WithString("address",
+				mcp.Description("Lodging address"),
+			),
+			mcp.WithString("place_id",
+				mcp.Description("Google Place ID"),
+			),
+			mcp.WithNumber("latitude",
+				mcp.Description("Latitude"),
+			),
+			mcp.WithNumber("longitude",
+				mcp.Description("Longitude"),
+			),
+			mcp.WithString("notes",
+				mcp.Description("Additional notes"),
+			),
+		)
+		s.AddTool(addLodgingTool, handleAddLodging)
 
 		// Remove place from trip tool
 		removePlaceTool := mcp.NewTool("remove_place",
@@ -301,7 +416,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 
 	// Add search flights tool
 	searchFlightsTool := mcp.NewTool("search_flights",
-		mcp.WithDescription("Search for flights between airports"),
+		mcp.WithDescription("Search for flights between airports. Route/date flight search is not implemented by the Wanderlog API client; this tool returns a clear unsupported error instead of airport autocomplete results."),
 		mcp.WithString("origin",
 			mcp.Required(),
 			mcp.Description("Origin airport code (e.g., 'SFO')"),
@@ -315,7 +430,24 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.Description("Departure date (YYYY-MM-DD)"),
 		),
 	)
-	s.AddTool(searchFlightsTool, handleAutocompleteAirport)
+	s.AddTool(searchFlightsTool, handleSearchFlights)
+
+	getFlightStopsTool := mcp.NewTool("get_flight_stops",
+		mcp.WithDescription("Get airport stops for a known flight number"),
+		mcp.WithString("flight_number",
+			mcp.Required(),
+			mcp.Description("Flight number, e.g. 875"),
+		),
+		mcp.WithString("airline",
+			mcp.Required(),
+			mcp.Description("Airline IATA code, e.g. UA"),
+		),
+		mcp.WithString("date",
+			mcp.Required(),
+			mcp.Description("Departure date (YYYY-MM-DD)"),
+		),
+	)
+	s.AddTool(getFlightStopsTool, handleGetFlightStops)
 
 	// Add search hotels tool
 	searchHotelsTool := mcp.NewTool("search_hotels",
@@ -345,11 +477,13 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		mcp.WithString("title", mcp.Required(),
 			mcp.Description("Trip title")),
 		mcp.WithNumber("geo_id", mcp.Required(),
-			mcp.Description("Wanderlog destination geo ID")),
+			mcp.Description("Wanderlog destination geo ID. Use search_geos or browse_guides geoGuideCounts first; do not guess this value or use a Google Place ID.")),
 		mcp.WithString("start_date",
-			mcp.Description("Start date in YYYY-MM-DD format (optional)")),
+			mcp.Required(),
+			mcp.Description("Start date in YYYY-MM-DD format")),
 		mcp.WithString("end_date",
-			mcp.Description("End date in YYYY-MM-DD format (optional)")),
+			mcp.Required(),
+			mcp.Description("End date in YYYY-MM-DD format")),
 		mcp.WithString("privacy",
 			mcp.Description("Privacy setting: public, private, or friends"),
 			mcp.DefaultString("private"),
@@ -773,6 +907,269 @@ func handleGetTripSections(ctx context.Context, request mcp.CallToolRequest) (*m
 	return mcp.NewToolResultStructuredOnly(sections), nil
 }
 
+func optionalIntArgument(request mcp.CallToolRequest, key string) (int, bool) {
+	args := request.GetArguments()
+	if args == nil {
+		return 0, false
+	}
+	if _, ok := args[key]; !ok {
+		return 0, false
+	}
+	return request.GetInt(key, 0), true
+}
+
+func validateDateArgument(name, value string, required bool) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		if required {
+			return "", fmt.Errorf("%s is required in YYYY-MM-DD format", name)
+		}
+		return "", nil
+	}
+	if _, err := time.Parse("2006-01-02", value); err != nil {
+		return "", fmt.Errorf("%s must be in YYYY-MM-DD format", name)
+	}
+	return value, nil
+}
+
+func validateDateRange(startName, startValue, endName, endValue string, required bool) (string, string, error) {
+	startValue, err := validateDateArgument(startName, startValue, required)
+	if err != nil {
+		return "", "", err
+	}
+	endValue, err = validateDateArgument(endName, endValue, required)
+	if err != nil {
+		return "", "", err
+	}
+	if startValue == "" || endValue == "" {
+		return startValue, endValue, nil
+	}
+	start, _ := time.Parse("2006-01-02", startValue)
+	end, _ := time.Parse("2006-01-02", endValue)
+	if end.Before(start) {
+		return "", "", fmt.Errorf("%s must be on or after %s", endName, startName)
+	}
+	return startValue, endValue, nil
+}
+
+func resolveTripKey(ctx context.Context, request mcp.CallToolRequest, argName string) (string, error) {
+	tripKey := request.GetString(argName, "")
+	if tripKey != "" {
+		return tripKey, nil
+	}
+	if defaultTripID, ok := tripIDFromContext(ctx); ok {
+		return defaultTripID, nil
+	}
+	return "", fmt.Errorf("%s is required (either as parameter or default trip key must be set)", argName)
+}
+
+func availableSectionDates(sections []wanderlog.ItSections) string {
+	dates := make([]string, 0, len(sections))
+	for _, section := range sections {
+		if section.Date != nil && strings.TrimSpace(*section.Date) != "" {
+			dates = append(dates, fmt.Sprintf("%s:%d", strings.TrimSpace(*section.Date), section.ID))
+		}
+	}
+	if len(dates) == 0 {
+		return "none"
+	}
+	return strings.Join(dates, ", ")
+}
+
+func loadSectionsForResolution(client *wanderlog.Client, tripKey string) ([]wanderlog.ItSections, error) {
+	trip, err := client.GetTrip(tripKey)
+	if err == nil && len(trip.TripPlan.Itinerary.Sections) > 0 {
+		return trip.TripPlan.Itinerary.Sections, nil
+	}
+
+	sections, err := client.GetTripSections(tripKey)
+	if err == nil && len(sections) > 0 {
+		return sections, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("full trip lookup failed and sections endpoint failed: %w", err)
+	}
+	return nil, fmt.Errorf("full trip lookup returned no itinerary sections")
+}
+
+func resolveSectionFromList(sections []wanderlog.ItSections, sectionID int, hasSectionID bool, sectionDate string, requireDated bool) (int, string, error) {
+	if hasSectionID {
+		for _, section := range sections {
+			if section.ID != sectionID {
+				continue
+			}
+			if requireDated && (section.Date == nil || strings.TrimSpace(*section.Date) == "") {
+				return 0, "", fmt.Errorf("section_id %d is not a dated itinerary section; use list_sections and choose a section with a date", sectionID)
+			}
+			if section.Date != nil && strings.TrimSpace(*section.Date) != "" {
+				return section.ID, fmt.Sprintf("%s section ID %d", strings.TrimSpace(*section.Date), section.ID), nil
+			}
+			return section.ID, fmt.Sprintf("section ID %d", section.ID), nil
+		}
+		return 0, "", fmt.Errorf("section_id %d was not found in this trip; available dated sections: %s", sectionID, availableSectionDates(sections))
+	}
+
+	for _, section := range sections {
+		if section.Date != nil && strings.TrimSpace(*section.Date) == sectionDate {
+			return section.ID, fmt.Sprintf("%s section ID %d", sectionDate, section.ID), nil
+		}
+	}
+
+	return 0, "", fmt.Errorf("no itinerary section found for date %s; available dated sections: %s", sectionDate, availableSectionDates(sections))
+}
+
+func resolveAddPlaceSectionID(client *wanderlog.Client, tripKey string, request mcp.CallToolRequest) (int, string, error) {
+	unscheduled := request.GetBool("unscheduled", false)
+	sectionDate, err := validateDateArgument("section_date", request.GetString("section_date", ""), false)
+	if err != nil {
+		return 0, "", err
+	}
+	sectionID, hasSectionID := optionalIntArgument(request, "section_id")
+
+	if unscheduled {
+		if sectionDate != "" || (hasSectionID && sectionID > 0) {
+			return 0, "", fmt.Errorf("use either unscheduled=true or a dated section, not both")
+		}
+		return 0, "general Places to visit list", nil
+	}
+
+	if hasSectionID {
+		if sectionDate != "" {
+			return 0, "", fmt.Errorf("use either section_id or section_date, not both")
+		}
+		if sectionID <= 0 {
+			return 0, "", fmt.Errorf("section_id must be a positive itinerary section ID. Use list_sections or section_date; pass unscheduled=true to add to the general Places to visit list")
+		}
+	} else if sectionDate == "" {
+		return 0, "", fmt.Errorf("section_id or section_date is required. Use list_sections to find dated sections, or pass unscheduled=true to add to the general Places to visit list")
+	}
+
+	sections, err := loadSectionsForResolution(client, tripKey)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to resolve section: %w", err)
+	}
+	return resolveSectionFromList(sections, sectionID, hasSectionID, sectionDate, false)
+}
+
+func resolveDatedSectionID(client *wanderlog.Client, tripKey string, request mcp.CallToolRequest, defaultDate string) (int, string, error) {
+	sectionDate, err := validateDateArgument("section_date", request.GetString("section_date", ""), false)
+	if err != nil {
+		return 0, "", err
+	}
+	sectionID, hasSectionID := optionalIntArgument(request, "section_id")
+
+	if sectionDate == "" {
+		sectionDate = strings.TrimSpace(defaultDate)
+	}
+
+	if hasSectionID {
+		if request.GetString("section_date", "") != "" {
+			return 0, "", fmt.Errorf("use either section_id or section_date, not both")
+		}
+		if sectionID <= 0 {
+			return 0, "", fmt.Errorf("section_id must be a positive itinerary section ID")
+		}
+	} else if sectionDate == "" {
+		return 0, "", fmt.Errorf("section_id or section_date is required")
+	}
+
+	sections, err := loadSectionsForResolution(client, tripKey)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to resolve section date: %w", err)
+	}
+	return resolveSectionFromList(sections, sectionID, hasSectionID, sectionDate, true)
+}
+
+func currentUserID() int {
+	auth, err := wanderlog.LoadCredentials()
+	if err != nil || auth.UserID == "" {
+		return 0
+	}
+	userID, err := strconv.Atoi(auth.UserID)
+	if err != nil {
+		return 0
+	}
+	return userID
+}
+
+func appendItineraryBlock(client *wanderlog.Client, tripKey string, sectionID int, block map[string]any) error {
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+
+	sectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+	if sectionIdx < 0 {
+		return fmt.Errorf("section %d not found", sectionID)
+	}
+
+	maxBlockID := 0
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		for _, block := range section.Blocks {
+			if block.ID > maxBlockID {
+				maxBlockID = block.ID
+			}
+		}
+	}
+	if _, ok := block["id"]; !ok {
+		block["id"] = maxBlockID + 1
+	}
+
+	if _, ok := block["addedBy"]; !ok {
+		addedBy := map[string]any{"type": "user"}
+		if userID := currentUserID(); userID > 0 {
+			addedBy["userId"] = userID
+		}
+		block["addedBy"] = addedBy
+	}
+	if _, ok := block["attachments"]; !ok {
+		block["attachments"] = []any{}
+	}
+	if _, ok := block["upvotedBy"]; !ok {
+		block["upvotedBy"] = []any{}
+	}
+
+	position := len(trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks)
+	op := wanderlog.InsertInList(
+		[]interface{}{"itinerary", "sections", sectionIdx, "blocks"},
+		position,
+		block,
+	)
+	return client.ApplyOperations(tripKey, []wanderlog.Operation{op})
+}
+
+func splitFlightNumber(flightNumber string) (string, int) {
+	flightNumber = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(flightNumber), " ", ""))
+	prefixEnd := 0
+	for prefixEnd < len(flightNumber) && (flightNumber[prefixEnd] < '0' || flightNumber[prefixEnd] > '9') {
+		prefixEnd++
+	}
+	number, _ := strconv.Atoi(flightNumber[prefixEnd:])
+	return flightNumber[:prefixEnd], number
+}
+
+func validateFlightNumber(flightNumber string) (string, int, error) {
+	airline, number := splitFlightNumber(flightNumber)
+	if airline == "" || number <= 0 {
+		return "", 0, fmt.Errorf("flight_number must include an airline code and number, e.g. MU244")
+	}
+	return airline, number, nil
+}
+
+func airportStation(iata, name, city, date, time string) map[string]any {
+	return map[string]any{
+		"type": "airport",
+		"date": date,
+		"time": time,
+		"airport": map[string]any{
+			"iata":        strings.ToUpper(strings.TrimSpace(iata)),
+			"name":        name,
+			"cityName":    city,
+			"googlePlace": map[string]any{},
+		},
+	}
+}
+
 func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey := request.GetString("trip_key", "")
 	if tripKey == "" {
@@ -790,12 +1187,6 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError("name is required"), nil //nolint:nilerr
 	}
 
-	sectionID, err := request.RequireInt("section_id")
-	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("section_id is required (use list_sections tool to get available section IDs)"), nil //nolint:nilerr
-	}
-
 	placeID := request.GetString("place_id", "")
 	latitude := request.GetFloat("latitude", 0)
 	longitude := request.GetFloat("longitude", 0)
@@ -807,6 +1198,11 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	// Ensure authentication
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	sectionID, sectionLabel, err := resolveAddPlaceSectionID(client, tripKey, request)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	// CRITICAL FIX: If place_id is provided but coordinates are missing, fetch them first
@@ -877,12 +1273,101 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place: %v", err)), nil
 	}
 
-	result := fmt.Sprintf("📍 Successfully added place '%s' to trip %s", name, tripKey)
-	if sectionID > 0 {
-		result += fmt.Sprintf(" (Section ID: %d)", sectionID)
-	}
+	result := fmt.Sprintf("📍 Successfully added place '%s' to trip %s (%s)", name, tripKey, sectionLabel)
 
 	return mcp.NewToolResultText(result), nil
+}
+
+func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	flightNumber, err := request.RequireString("flight_number")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("flight_number is required"), nil //nolint:nilerr
+	}
+
+	departureDate, err := validateDateArgument("departure_date", request.GetString("departure_date", ""), true)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	departureTime := request.GetString("departure_time", "")
+	arrivalDate, err := validateDateArgument("arrival_date", request.GetString("arrival_date", ""), false)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	if arrivalDate == "" {
+		arrivalDate = departureDate
+	}
+	arrivalTime := request.GetString("arrival_time", "")
+	confirmationNumber := request.GetString("confirmation_number", "")
+	notes := request.GetString("notes", "")
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	sectionID, sectionLabel, err := resolveDatedSectionID(client, tripKey, request, departureDate)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	airlineIATA, flightNum, err := validateFlightNumber(flightNumber)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	if request.GetString("airline_iata", "") != "" {
+		airlineIATA = strings.ToUpper(request.GetString("airline_iata", ""))
+	}
+	airlineName := request.GetString("airline_name", airlineIATA)
+
+	block := map[string]any{
+		"type":               "flight",
+		"confirmationNumber": confirmationNumber,
+		"startTime":          departureTime,
+		"endTime":            arrivalTime,
+		"depart": airportStation(
+			request.GetString("departure_airport_iata", ""),
+			request.GetString("departure_airport_name", ""),
+			request.GetString("departure_city", ""),
+			departureDate,
+			departureTime,
+		),
+		"arrive": airportStation(
+			request.GetString("arrival_airport_iata", ""),
+			request.GetString("arrival_airport_name", ""),
+			request.GetString("arrival_city", ""),
+			arrivalDate,
+			arrivalTime,
+		),
+		"flightInfo": map[string]any{
+			"airline": map[string]any{
+				"iata":          airlineIATA,
+				"icao":          strings.ToUpper(request.GetString("airline_icao", "")),
+				"name":          airlineName,
+				"localizedName": airlineName,
+			},
+			"number": flightNum,
+		},
+		"text":          notes,
+		"travelMode":    nil,
+		"travelerNames": []any{},
+	}
+
+	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add flight: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("✈️ Successfully added flight %s to trip %s (%s)", flightNumber, tripKey, sectionLabel)), nil
+}
+
+func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return mcp.NewToolResultError("add_lodging is disabled because the previous hotel block schema is not compatible with the mobile app. Use search_hotels for discovery only until an app-compatible lodging write path is implemented."), nil
 }
 
 func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -1305,12 +1790,17 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError("title is required"), nil
 	}
 
-	startDate := request.GetString("start_date", "")
-	endDate := request.GetString("end_date", "")
+	startDate, endDate, err := validateDateRange("start_date", request.GetString("start_date", ""), "end_date", request.GetString("end_date", ""), true)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	privacy := request.GetString("privacy", "private")
 	geoID := int(request.GetFloat("geo_id", 0))
 	if geoID == 0 {
 		return mcp.NewToolResultError("geo_id is required"), nil
+	}
+	if geoID < 0 {
+		return mcp.NewToolResultError("geo_id must be a positive Wanderlog geo ID from search_geos"), nil
 	}
 
 	client := wanderlog.NewClient()
@@ -1422,6 +1912,13 @@ func handleUpdateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	// Validate privacy if provided
 	if privacy != "" && privacy != "public" && privacy != "private" && privacy != "unlisted" {
 		return mcp.NewToolResultError("privacy must be one of: public, private, unlisted"), nil
+	}
+	if startDate != "" || endDate != "" {
+		var err error
+		startDate, endDate, err = validateDateRange("start_date", startDate, "end_date", endDate, false)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 	}
 
 	client := wanderlog.NewClient()
@@ -1689,18 +2186,44 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	return mcp.NewToolResultText(result), nil
 }
 
-// handleAutocompleteAirport searches for flights between airports
-func handleAutocompleteAirport(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	origin, err := request.RequireString("origin")
+// handleSearchFlights reports unsupported route/date flight search explicitly.
+func handleSearchFlights(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	_, err := request.RequireString("origin")
 	if err != nil {
 		_ = err
 		return mcp.NewToolResultError("origin is required"), nil
 	}
 
-	destination, err := request.RequireString("destination")
+	_, err = request.RequireString("destination")
 	if err != nil {
 		_ = err
 		return mcp.NewToolResultError("destination is required"), nil
+	}
+
+	_, err = request.RequireString("date")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("date is required"), nil
+	}
+
+	return mcp.NewToolResultError("Flight route/date search is not implemented by the Wanderlog API client. This tool cannot find or add flights to a trip; use get_flight_stops only when you already know the flight number."), nil
+}
+
+func handleGetFlightStops(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	flightNumber, err := request.RequireString("flight_number")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("flight_number is required"), nil
+	}
+	airline, err := request.RequireString("airline")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("airline is required"), nil
+	}
+	date, err := request.RequireString("date")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("date is required"), nil
 	}
 
 	client := wanderlog.NewClient()
@@ -1712,9 +2235,9 @@ func handleAutocompleteAirport(ctx context.Context, request mcp.CallToolRequest)
 		client.SetAuth(auth)
 	}
 
-	results, err := client.AutocompleteAirport(origin + " " + destination)
+	results, err := client.GetFlightStops(flightNumber, airline, date)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Error searching flights: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Error getting flight stops: %v", err)), nil
 	}
 
 	return mcp.NewToolResultStructuredOnly(results), nil
