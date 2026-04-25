@@ -534,10 +534,23 @@ type FlightStopsResponse struct {
 
 // FlightStop represents a single flight stop (leg)
 type FlightStop struct {
-	DepartureAirport string `json:"departureAirport"`
-	ArrivalAirport   string `json:"arrivalAirport"`
-	DepartureTime    string `json:"departureTime"`
-	ArrivalTime      string `json:"arrivalTime"`
+	Depart FlightStopEndpoint `json:"depart"`
+	Arrive FlightStopEndpoint `json:"arrive"`
+}
+
+// FlightStopEndpoint represents the departure or arrival of a flight stop
+type FlightStopEndpoint struct {
+	Type   string            `json:"type"`
+	Date   string            `json:"date"`
+	Time   string            `json:"time"`
+	Airport FlightStopAirport `json:"airport"`
+}
+
+// FlightStopAirport represents airport info in a flight stop
+type FlightStopAirport struct {
+	IATA     string `json:"iata"`
+	Name     string `json:"name"`
+	CityName string `json:"cityName"`
 }
 
 // LodgingSearchResponse represents the response from the lodging search API
