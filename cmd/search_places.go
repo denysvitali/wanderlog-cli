@@ -97,5 +97,6 @@ func init() {
 	searchPlacesCmd.Flags().String("format", "human", "Output format (human, json)")
 	searchPlacesCmd.Flags().String("lat", "", "Latitude for location context")
 	searchPlacesCmd.Flags().String("lng", "", "Longitude for location context")
-	rootCmd.AddCommand(searchPlacesCmd)
+	// root registration disabled - command moved under `search wanderlog`
+	// rootCmd.AddCommand(searchPlacesCmd)
 }

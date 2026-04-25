@@ -411,7 +411,8 @@ var hotelRatesCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(restoreCmd, sectionsCmd, tripFlightsCmd, exportTripCmd, likeCmd, likeCountCmd, inviteCmd, collaboratorCmd, shareKeyCmd, autofillCmd, checklistCmd, travelCmd)
+	// root registrations disabled - commands moved under `trips` or `travel`
+	// rootCmd.AddCommand(restoreCmd, sectionsCmd, tripFlightsCmd, exportTripCmd, likeCmd, likeCountCmd, inviteCmd, collaboratorCmd, shareKeyCmd, autofillCmd, checklistCmd, travelCmd)
 	editCmd.AddCommand(updateTripCmd, movePlaceCmd, reorderPlacesCmd)
 
 	updateTripCmd.Flags().StringVarP(&updateTitle, "title", "t", "", "Trip title")

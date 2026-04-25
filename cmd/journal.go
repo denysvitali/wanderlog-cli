@@ -140,7 +140,8 @@ var getIfEditedCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(journalCmd, expensesCmd, registerViewCmd, updateRequiredCmd, distinctionCmd, createGuideCmd, getIfEditedCmd)
+	// root registrations disabled - commands moved under `trips`
+	// rootCmd.AddCommand(journalCmd, expensesCmd, registerViewCmd, updateRequiredCmd, distinctionCmd, createGuideCmd, getIfEditedCmd)
 
 	distinctionCmd.Flags().StringVar(&distinctionValue, "set", "", "Set the distinction to this value (otherwise get)")
 	getIfEditedCmd.Flags().StringVar(&getIfEditedBody, "body", "", "JSON request body")

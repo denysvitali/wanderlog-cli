@@ -92,5 +92,6 @@ func runPlaceDetails(cmd *cobra.Command, args []string) {
 
 func init() {
 	placeDetailsCmd.Flags().String("format", "human", "Output format (human, json)")
-	rootCmd.AddCommand(placeDetailsCmd)
+	// root registration disabled - command moved under `search place-details`
+	// rootCmd.AddCommand(placeDetailsCmd)
 }

@@ -15,7 +15,7 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate with Wanderlog",
 	Long: `Login to Wanderlog to enable trip editing and creation features.
 
-Your credentials are used to obtain a session token which is securely stored 
+Your credentials are used to obtain a session token which is securely stored
 in the system keychain for future use.
 
 Examples:
@@ -108,15 +108,39 @@ var statusCmd = &cobra.Command{
 Examples:
   wanderlog status`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var creds *wanderlog.AuthCredentials
+		var source string
+
 		if wanderlog.HasStoredCredentials() {
-			creds, err := wanderlog.LoadCredentials()
+			c, err := wanderlog.LoadCredentials()
 			if err != nil {
-				logger.WithError(err).Error("Failed to load credentials")
-				os.Exit(1)
+				logger.WithError(err).Error("Failed to load credentials from keychain")
+			} else {
+				creds = c
+				source = "keychain"
 			}
-			fmt.Printf("✅ Authenticated\n")
-			fmt.Printf("Session: %s...\n", creds.SessionCookie[:20])
-			fmt.Printf("User ID: %s\n", creds.UserID)
+		}
+
+		if creds == nil && wanderlog.HasConfigCredentials() {
+			c, err := wanderlog.LoadCredentialsFromConfig()
+			if err != nil {
+				logger.WithError(err).Error("Failed to load credentials from config file")
+			} else {
+				creds = c
+				source = "config file"
+			}
+		}
+
+		if creds != nil {
+			fmt.Printf("✅ Authenticated (via %s)\n", source)
+			sessionDisplay := creds.SessionCookie
+			if len(sessionDisplay) > 20 {
+				sessionDisplay = sessionDisplay[:20]
+			}
+			fmt.Printf("Session: %s...\n", sessionDisplay)
+			if creds.UserID != "" {
+				fmt.Printf("User ID: %s\n", creds.UserID)
+			}
 		} else {
 			fmt.Printf("❌ Not authenticated\n")
 			fmt.Printf("Run 'wanderlog login' to authenticate\n")
