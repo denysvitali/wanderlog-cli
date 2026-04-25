@@ -539,9 +539,9 @@ type FlightStop struct {
 
 // FlightStopEndpoint represents the departure or arrival of a flight stop
 type FlightStopEndpoint struct {
-	Type   string            `json:"type"`
-	Date   string            `json:"date"`
-	Time   string            `json:"time"`
+	Type    string            `json:"type"`
+	Date    string            `json:"date"`
+	Time    string            `json:"time"`
 	Airport FlightStopAirport `json:"airport"`
 }
 
