@@ -107,8 +107,8 @@ var travelHotelRatesCmd = &cobra.Command{
 }
 
 var (
-	travelLat        float64
-	travelLng        float64
+	travelLat           float64
+	travelLng           float64
 	travelHotelCheckIn  string
 	travelHotelCheckOut string
 	travelHotelGuests   int

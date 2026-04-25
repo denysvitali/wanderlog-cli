@@ -286,12 +286,12 @@ Examples:
 }
 
 var (
-	tripsEditPlaceName     string
-	tripsEditPlaceID       string
-	tripsEditLatitude      float64
-	tripsEditLongitude     float64
-	tripsEditSectionID     int
-	tripsEditPlaceText     string
+	tripsEditPlaceName       string
+	tripsEditPlaceID         string
+	tripsEditLatitude        float64
+	tripsEditLongitude       float64
+	tripsEditSectionID       int
+	tripsEditPlaceText       string
 	tripsEditMoveFromSection int
 	tripsEditMoveToSection   int
 	tripsEditMovePosition    int

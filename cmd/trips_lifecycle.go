@@ -11,12 +11,12 @@ import (
 )
 
 var (
-	tripsCreateTitle    string
-	tripsCreateStart    string
-	tripsCreateEnd      string
-	tripsCreatePrivacy  string
-	tripsCreateGeoIDs   []int
-	tripsCreateExample  bool
+	tripsCreateTitle   string
+	tripsCreateStart   string
+	tripsCreateEnd     string
+	tripsCreatePrivacy string
+	tripsCreateGeoIDs  []int
+	tripsCreateExample bool
 )
 
 var tripsCreateCmd = &cobra.Command{
