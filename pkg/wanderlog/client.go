@@ -742,11 +742,11 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 	apiURL := fmt.Sprintf("%s/lodging/searchLodgings", BaseURL)
 
 	requestBody := map[string]interface{}{
-		"query":       query,
-		"startDate":   checkIn,
-		"endDate":     checkOut,
-		"adultCount":  guests,
-		"roomCount":   1,
+		"query":      query,
+		"startDate":  checkIn,
+		"endDate":    checkOut,
+		"adultCount": guests,
+		"roomCount":  1,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
