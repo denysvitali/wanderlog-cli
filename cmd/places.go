@@ -66,7 +66,8 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(placesCmd)
+	// root registration disabled - command moved under `trips places`
+	// rootCmd.AddCommand(placesCmd)
 
 	placesCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
 	placesCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")

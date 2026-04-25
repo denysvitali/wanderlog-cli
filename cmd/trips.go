@@ -12,7 +12,13 @@ import (
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
-var listCmd = &cobra.Command{
+var tripsCmd = &cobra.Command{
+	Use:   "trips",
+	Short: "Manage your trips",
+	Long:  `List, create, edit, and manage your Wanderlog trips.`,
+}
+
+var tripsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List your trips",
 	Long: `List all trips for the authenticated user.
@@ -20,13 +26,12 @@ var listCmd = &cobra.Command{
 Requires authentication via 'wanderlog login'.
 
 Examples:
-  wanderlog list
-  wanderlog list --format json`,
+  wanderlog trips list
+  wanderlog trips list --format json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
-		// Ensure authentication (from flags, env vars, or keychain)
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
 			logger.WithError(err).Error("Authentication required")
 			os.Exit(1)
@@ -42,46 +47,84 @@ Examples:
 		case "json":
 			ui.PrintJSON(trips)
 		case "markdown", "md":
-			printTripsMarkdown(trips)
+			tripsListMarkdown(trips)
 		default:
-			printTripsList(trips)
+			tripsListPretty(trips)
 		}
 	},
 }
 
-var imagesCmd = &cobra.Command{
-	Use:   "images [trip-id]",
-	Short: "Show trip images",
-	Long: `Display images for a trip.
+var tripsShowCmd = &cobra.Command{
+	Use:   "show [trip-id]",
+	Short: "Show a trip's details",
+	Long: `Fetch and display trip information from Wanderlog.
+
+The trip ID can be found in the Wanderlog URL:
+https://wanderlog.com/view/TRIP_ID/trip-name
 
 Examples:
-  wanderlog images abc123xyz
-  wanderlog images abc123xyz --format json`,
-	Args: cobra.ExactArgs(1),
+  wanderlog trips show abc123xyz
+  wanderlog trips show abc123xyz --format json
+  wanderlog trips show abc123xyz --format markdown --details
+  wanderlog trips show --file trips/trip1.json`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if fromFile != "" && len(args) > 0 {
+			return fmt.Errorf("cannot specify both trip ID and --file flag")
+		}
+		if fromFile == "" && len(args) != 1 {
+			return fmt.Errorf("requires exactly one trip ID argument when not using --file")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-		tripID := args[0]
+		var trip *wanderlog.TripResponse
+		var err error
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
+		if fromFile != "" {
+			trip, err = wanderlog.LoadTripFromFile(fromFile)
+			if err != nil {
+				logger.WithError(err).Error("Failed to load trip from file")
+				os.Exit(1)
+			}
+		} else {
+			tripID := args[0]
+			client := wanderlog.NewClient()
+			client.SetLogger(logger)
 
-		images, err := client.GetTripImages(tripID)
-		if err != nil {
-			logger.WithError(err).Error("Failed to fetch trip images")
-			os.Exit(1)
+			trip, err = client.GetTrip(tripID)
+			if err != nil {
+				logger.WithError(err).Error("Failed to fetch trip")
+				os.Exit(1)
+			}
 		}
 
 		switch outputFormat {
 		case "json":
-			ui.PrintJSON(images)
+			ui.PrintJSON(trip)
 		case "markdown", "md":
-			printImagesMarkdown(images, tripID)
+			ui.PrintTripMarkdown(trip, showDetails)
 		default:
-			printImagesList(images, tripID)
+			ui.PrintTrip(trip, showDetails)
 		}
 	},
 }
 
-func printTripsList(trips *wanderlog.UserTripsResponse) {
+func init() {
+	rootCmd.AddCommand(tripsCmd)
+	tripsCmd.AddCommand(tripsListCmd, tripsShowCmd)
+
+	// trips list flags
+	tripsListCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripsListCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
+	tripsListCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
+
+	// trips show flags
+	tripsShowCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripsShowCmd.Flags().BoolVarP(&showDetails, "details", "d", false, "Show detailed information")
+	tripsShowCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
+}
+
+func tripsListPretty(trips *wanderlog.UserTripsResponse) {
 	if len(trips.Data) == 0 {
 		fmt.Println("📭 No trips found")
 		return
@@ -90,16 +133,14 @@ func printTripsList(trips *wanderlog.UserTripsResponse) {
 	fmt.Printf("📚 Your Trips (%d total)\n\n", len(trips.Data))
 
 	for _, trip := range trips.Data {
-		// Trip title with privacy indicator (default to public since privacy field not in response)
-		privacy := "🌍" // Default to public
+		privacy := "🌍"
 		if trip.IsPrimary {
-			privacy = "⭐" // Star for primary trips
+			privacy = "⭐"
 		}
 
 		fmt.Printf("%s %s\n", privacy, trip.Title)
 		fmt.Printf("   Key: %s\n", trip.Key)
 
-		// Dates
 		if trip.StartDate != "" && trip.EndDate != "" {
 			startDate, _ := time.Parse("2006-01-02", trip.StartDate)
 			endDate, _ := time.Parse("2006-01-02", trip.EndDate)
@@ -110,7 +151,6 @@ func printTripsList(trips *wanderlog.UserTripsResponse) {
 				days)
 		}
 
-		// Stats
 		stats := []string{
 			fmt.Sprintf("📍 %d places", trip.PlaceCount),
 			fmt.Sprintf("👀 %d views", trip.ViewCount),
@@ -121,7 +161,6 @@ func printTripsList(trips *wanderlog.UserTripsResponse) {
 
 		fmt.Printf("   %s\n", strings.Join(stats, "  •  "))
 
-		// Additional indicators
 		if trip.IsPrimary {
 			fmt.Printf("   ⭐ Primary Trip\n")
 		}
@@ -133,32 +172,7 @@ func printTripsList(trips *wanderlog.UserTripsResponse) {
 	}
 }
 
-func printImagesList(images *wanderlog.TripImagesResponse, tripID string) {
-	if len(images.Images) == 0 {
-		fmt.Printf("📷 No images found for trip %s\n", tripID)
-		return
-	}
-
-	fmt.Printf("📷 Trip Images (%d total)\n\n", len(images.Images))
-
-	for i, img := range images.Images {
-		fmt.Printf("%d. %s\n", i+1, img.Key)
-		fmt.Printf("   Size: %dx%d\n", img.Width, img.Height)
-		if img.Caption != "" {
-			fmt.Printf("   Caption: %s\n", img.Caption)
-		}
-		if img.PlaceID != "" {
-			fmt.Printf("   Place ID: %s\n", img.PlaceID)
-		}
-		fmt.Printf("   URL: %s\n", img.URL)
-		if img.ThumbnailURL != "" {
-			fmt.Printf("   Thumbnail: %s\n", img.ThumbnailURL)
-		}
-		fmt.Println()
-	}
-}
-
-func printTripsMarkdown(trips *wanderlog.UserTripsResponse) {
+func tripsListMarkdown(trips *wanderlog.UserTripsResponse) {
 	fmt.Printf("# Your Trips\n\n")
 	fmt.Printf("Total trips: %d\n\n", len(trips.Data))
 
@@ -192,40 +206,5 @@ func printTripsMarkdown(trips *wanderlog.UserTripsResponse) {
 		fmt.Printf("- **Last Edited:** %s\n", editedAt.Format("January 2, 2006"))
 
 		fmt.Println()
-	}
-}
-
-func printImagesMarkdown(images *wanderlog.TripImagesResponse, tripID string) {
-	fmt.Printf("# Trip Images\n\n")
-	fmt.Printf("Trip ID: %s\n", tripID)
-	fmt.Printf("Total images: %d\n\n", len(images.Images))
-
-	for i, img := range images.Images {
-		fmt.Printf("## Image %d\n\n", i+1)
-		fmt.Printf("- **Key:** %s\n", img.Key)
-		fmt.Printf("- **Size:** %dx%d\n", img.Width, img.Height)
-		if img.Caption != "" {
-			fmt.Printf("- **Caption:** %s\n", img.Caption)
-		}
-		if img.PlaceID != "" {
-			fmt.Printf("- **Place ID:** %s\n", img.PlaceID)
-		}
-		fmt.Printf("- **URL:** %s\n", img.URL)
-		if img.ThumbnailURL != "" {
-			fmt.Printf("- **Thumbnail:** %s\n", img.ThumbnailURL)
-		}
-		fmt.Println()
-	}
-}
-
-func init() {
-	// root registrations disabled - commands moved under `trips`
-	// rootCmd.AddCommand(listCmd)
-	// rootCmd.AddCommand(imagesCmd)
-
-	for _, cmd := range []*cobra.Command{listCmd, imagesCmd} {
-		cmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
-		cmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
-		cmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}
 }

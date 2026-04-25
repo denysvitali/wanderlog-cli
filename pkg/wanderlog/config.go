@@ -114,6 +114,28 @@ func SaveCredentialsToConfig(creds *AuthCredentials, email, password string) err
 	return nil
 }
 
+// HasConfigCredentials checks if credentials are stored in the config file
+func HasConfigCredentials() bool {
+	return viper.GetString("auth.session.cookie") != ""
+}
+
+// LoadCredentialsFromConfig loads credentials from the config file
+func LoadCredentialsFromConfig() (*AuthCredentials, error) {
+	sessionCookie := viper.GetString("auth.session.cookie")
+	xsrfToken := viper.GetString("auth.session.xsrf_token")
+	userID := viper.GetString("auth.session.user_id")
+
+	if sessionCookie == "" {
+		return nil, fmt.Errorf("no session cookie found in config file")
+	}
+
+	return &AuthCredentials{
+		SessionCookie: sessionCookie,
+		XSRFToken:     xsrfToken,
+		UserID:        userID,
+	}, nil
+}
+
 // ClearCredentialsFromConfig removes credentials from the config file
 func ClearCredentialsFromConfig() error {
 	configPath := viper.ConfigFileUsed()

@@ -74,7 +74,8 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(tripCmd)
+	// root registration disabled - command moved under `trips show`
+	// rootCmd.AddCommand(tripCmd)
 
 	tripCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
 	tripCmd.Flags().BoolVarP(&showDetails, "details", "d", false, "Show detailed information")

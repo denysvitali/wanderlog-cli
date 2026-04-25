@@ -250,7 +250,8 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(editCmd)
+	// root registration disabled - command moved under `trips edit`
+	// rootCmd.AddCommand(editCmd)
 	editCmd.AddCommand(addPlaceCmd)
 	editCmd.AddCommand(removePlaceCmd)
 	editCmd.AddCommand(clearSectionCmd)
