@@ -31,6 +31,8 @@ var (
 	hotelGuests       int
 	locationLat       float64
 	locationLng       float64
+	flightStopsAirline string
+	flightStopsDate    string
 )
 
 var updateTripCmd = &cobra.Command{
@@ -368,8 +370,16 @@ var flightStopsCmd = &cobra.Command{
 	Short: "Show stops for a flight number",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if flightStopsAirline == "" {
+			logger.Error("--airline is required (e.g., UA, BA, LH)")
+			os.Exit(1)
+		}
+		if flightStopsDate == "" {
+			logger.Error("--date is required (YYYY-MM-DD)")
+			os.Exit(1)
+		}
 		client := newClient(false)
-		resp, err := client.GetFlightStops(args[0])
+		resp, err := client.GetFlightStops(args[0], flightStopsAirline, flightStopsDate)
 		if err != nil {
 			logger.WithError(err).Error("Failed to get flight stops")
 			os.Exit(1)
@@ -448,6 +458,8 @@ func init() {
 	travelCmd.AddCommand(airlinesCmd, airportsCmd, flightStopsCmd, hotelsCmd, hotelRatesCmd)
 	airportsCmd.Flags().Float64Var(&locationLat, "lat", 0, "Latitude for location bias")
 	airportsCmd.Flags().Float64Var(&locationLng, "lng", 0, "Longitude for location bias")
+	flightStopsCmd.Flags().StringVar(&flightStopsAirline, "airline", "", "Airline IATA code (e.g., UA, BA)")
+	flightStopsCmd.Flags().StringVar(&flightStopsDate, "date", "", "Departure date (YYYY-MM-DD)")
 	hotelsCmd.Flags().StringVar(&hotelCheckIn, "check-in", "", "Check-in date (YYYY-MM-DD)")
 	hotelsCmd.Flags().StringVar(&hotelCheckOut, "check-out", "", "Check-out date (YYYY-MM-DD)")
 	hotelsCmd.Flags().IntVar(&hotelGuests, "guests", 1, "Number of guests")

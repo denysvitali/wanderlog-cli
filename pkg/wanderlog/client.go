@@ -625,9 +625,11 @@ func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64)
 	return &result, nil
 }
 
-// GetFlightStops retrieves flight stops for a given flight number
-func (c *Client) GetFlightStops(flightNumber string) (*FlightStopsResponse, error) {
-	url := fmt.Sprintf("%s/flights/flightStopsLista?flightNumber=%s", BaseURL, url.QueryEscape(flightNumber))
+// GetFlightStops retrieves flight stops for a given flight.
+// The Wanderlog API requires flightNumber (integer), airline IATA code, and departureDate.
+func (c *Client) GetFlightStops(flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
+	url := fmt.Sprintf("%s/flights/flightStops?flightNumber=%s&iata=%s&departureDate=%s",
+		BaseURL, url.QueryEscape(flightNumber), url.QueryEscape(airlineIata), url.QueryEscape(departureDate))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -645,12 +647,21 @@ func (c *Client) GetFlightStops(flightNumber string) (*FlightStopsResponse, erro
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(body) > 0 && body[0] == '<' {
+		return nil, fmt.Errorf("API returned HTML instead of JSON (endpoint may be unavailable)")
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
 	}
 
 	var result FlightStopsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 
