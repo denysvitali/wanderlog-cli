@@ -46,8 +46,8 @@ Strongly typed wrappers cover the core trip, search, flight, lodging, collaborat
 | Endpoint | Go Implementation | CLI Command | MCP Tool |
 |----------|-------------------|-------------|----------|
 | `GET /api/flights/allAirlines` | `GetAllAirlines()` | `wanderlog travel airlines` | - |
-| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `wanderlog travel airports` | `search_flights` |
-| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `wanderlog travel airports --lat --lng` | `search_flights` |
+| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `wanderlog travel airports` | - |
+| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `wanderlog travel airports --lat --lng` | - |
 | `GET /api/flights/flightStopsLista` | `GetFlightStops()` | `wanderlog travel flight-stops` | - |
 | `POST /api/lodging/searchLodgings` | `SearchLodgings()` | `wanderlog travel hotels` | `search_hotels` |
 | `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | `wanderlog travel hotel-rates` | - |
@@ -191,14 +191,14 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Method | Implementation | Location | MCP Tool |
 |----------|--------|----------------|----------|----------|
 | `/api/flights/allAirlines` | GET | ✅ `GetAllAirlines()` | `client.go:474` | - |
-| `/api/flights/autocompleteAirport` | GET | ✅ `AutocompleteAirport()` | `client.go:506` | `search_flights` |
-| `/api/flights/autocompleteAirportWithLocation` | GET | ✅ `AutocompleteAirportWithLocation()` | `client.go:538` | `search_flights` |
+| `/api/flights/autocompleteAirport` | GET | ✅ `AutocompleteAirport()` | `client.go:506` | - |
+| `/api/flights/autocompleteAirportWithLocation` | GET | ✅ `AutocompleteAirportWithLocation()` | `client.go:538` | - |
 | `/api/flights/flightStopsLista` | GET | ✅ `GetFlightStops()` | `client.go:571` | - |
 | `/api/tripPlans/flights` | GET | ❌ Not Implemented | - | - |
 | `/api/lodging/searchLodgings` | POST | ✅ `SearchLodgings()` | `client.go:671` | `search_hotels` |
 | `/api/lodging/getGooglePriceRates` | POST | ✅ `GetGooglePriceRates()` | `client.go:721` | - |
 
-> **Note:** The MCP tools `search_flights` and `search_hotels` (added in commit `f25b96d`) use the airport autocomplete and lodging search methods respectively. However, the `/api/tripPlans/flights` endpoint for retrieving flights attached to a trip is not yet implemented in the Go client.
+> **Note:** The MCP tool `search_hotels` uses the lodging search method. The `search_flights` tool was removed because it was not implemented (returned "not implemented" errors). The `/api/tripPlans/flights` endpoint for retrieving flights attached to a trip is not yet implemented in the Go client.
 
 ### Collaboration
 
