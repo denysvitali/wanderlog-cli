@@ -512,17 +512,22 @@ func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) 
 	}
 	defer resp.Body.Close()
 
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncateForLog(string(respBody), 500))
 	}
 
 	var result PlaceDetailsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w (body: %s)", err, truncateForLog(string(respBody), 200))
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("API request was not successful")
+		return nil, fmt.Errorf("API request was not successful: %s", truncateForLog(string(respBody), 500))
 	}
 
 	return &result, nil
