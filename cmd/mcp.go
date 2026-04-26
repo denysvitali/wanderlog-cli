@@ -1232,12 +1232,10 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		"startTime":          departureTime,
 		"endTime":            arrivalTime,
 		"depart": map[string]any{
-			"type": "airport",
 			"date": departureDate,
 			"time": departureTime,
 		},
 		"arrive": map[string]any{
-			"type": "airport",
 			"date": arrivalDate,
 			"time": arrivalTime,
 		},
