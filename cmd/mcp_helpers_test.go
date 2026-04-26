@@ -114,3 +114,75 @@ func TestResolveSectionFromListRejectsUndatedExplicitSection(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a dated itinerary section")
 }
+
+func TestValidateBlockSchemaRejectsPartialAirportStation(t *testing.T) {
+	block := map[string]any{
+		"type": "flight",
+		"depart": map[string]any{
+			"type": "airport",
+			"date": "2026-05-11",
+			"time": "10:00",
+		},
+		"arrive": map[string]any{
+			"date": "2026-05-11",
+			"time": "14:00",
+		},
+	}
+	err := validateBlockSchema(block)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "type=airport but no airport sub-object")
+}
+
+func TestValidateBlockSchemaRejectsAirportWithoutGooglePlace(t *testing.T) {
+	block := map[string]any{
+		"type": "flight",
+		"depart": map[string]any{
+			"type": "airport",
+			"airport": map[string]any{
+				"iata": "SFO",
+			},
+			"date": "2026-05-11",
+			"time": "10:00",
+		},
+	}
+	err := validateBlockSchema(block)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "airport.googlePlace is missing")
+}
+
+func TestValidateBlockSchemaAllowsNoTypeAirport(t *testing.T) {
+	block := map[string]any{
+		"type": "flight",
+		"depart": map[string]any{
+			"date": "2026-05-11",
+			"time": "10:00",
+		},
+		"arrive": map[string]any{
+			"date": "2026-05-11",
+			"time": "14:00",
+		},
+	}
+	err := validateBlockSchema(block)
+	require.NoError(t, err)
+}
+
+func TestValidateBlockSchemaAllowsCompleteAirportStation(t *testing.T) {
+	block := map[string]any{
+		"type": "flight",
+		"depart": map[string]any{
+			"type": "airport",
+			"airport": map[string]any{
+				"googlePlace": map[string]any{
+					"placeId": "ChIJE9SXBBhAjYARl8i Luij4BHk",
+					"lat":     37.7749,
+					"lng":     -122.4194,
+				},
+				"iata": "SFO",
+			},
+			"date": "2026-05-11",
+			"time": "10:00",
+		},
+	}
+	err := validateBlockSchema(block)
+	require.NoError(t, err)
+}

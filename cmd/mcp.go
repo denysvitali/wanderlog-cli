@@ -1011,6 +1011,9 @@ func currentUserID() int {
 }
 
 func appendItineraryBlock(client *wanderlog.Client, tripKey string, sectionID int, block map[string]any) error {
+	if err := validateBlockSchema(block); err != nil {
+		return fmt.Errorf("invalid block schema: %w", err)
+	}
 	trip, err := client.GetTrip(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
@@ -1072,6 +1075,46 @@ func validateFlightNumber(flightNumber string) (string, int, error) {
 		return "", 0, fmt.Errorf("flight_number must include an airline code and number, e.g. MU244")
 	}
 	return airline, number, nil
+}
+
+// validateBlockSchema ensures block structures are compatible with the web/mobile app.
+// Flight blocks must not set depart.type="airport" or arrive.type="airport" without
+// providing a fully populated airport sub-object (with googlePlace), otherwise the
+// web app's station parser will crash trying to access undefined fields.
+func validateBlockSchema(block map[string]any) error {
+	if block["type"] != "flight" {
+		return nil
+	}
+
+	depart, hasDepart := block["depart"].(map[string]any)
+	arrive, hasArrive := block["arrive"].(map[string]any)
+
+	validateStation := func(name string, station map[string]any) error {
+		stationType, hasType := station["type"].(string)
+		if !hasType || stationType != "airport" {
+			return nil // no airport type, no validation needed
+		}
+		airport, hasAirport := station["airport"].(map[string]any)
+		if !hasAirport {
+			return fmt.Errorf("flight block %s has type=airport but no airport sub-object; set type=airport only when providing a complete airport object with googlePlace", name)
+		}
+		if _, hasGooglePlace := airport["googlePlace"]; !hasGooglePlace {
+			return fmt.Errorf("flight block %s has type=airport but airport.googlePlace is missing; either provide the complete airport object with googlePlace or omit type=airport entirely", name)
+		}
+		return nil
+	}
+
+	if hasDepart {
+		if err := validateStation("depart", depart); err != nil {
+			return err
+		}
+	}
+	if hasArrive {
+		if err := validateStation("arrive", arrive); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
