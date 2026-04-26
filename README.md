@@ -253,6 +253,81 @@ func main() {
 }
 ```
 
+## MCP Server (LLM Integration)
+
+Wanderlog CLI includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for LLM integration:
+
+```bash
+# Start MCP server on stdio (default, for LLM hosts like Claude Code)
+wanderlog mcp
+
+# Start MCP server on HTTP
+wanderlog mcp --http
+
+# Enable write operations (read-only by default)
+wanderlog mcp --enable-write
+
+# Set default trip ID for all operations
+wanderlog mcp --trip-id abc123xyz
+```
+
+**Available MCP tools (34 total):**
+- **Read-only (23):** `list_trips`, `get_trip`, `list_places`, `list_sections`, `search_places`, `search_restaurants`, `search_places_wanderlog`, `search_hotels`, `get_place_details`, `get_flight_stops`, `like_trip`, `get_like_count`, `send_trip_invites`, `list_trip_invites`, `get_me`, `get_user_profile`, `get_notifications`, `autocomplete_users`, `get_feed_home`, `browse_guides`, `search_geos`, `get_view_only_journal`, `get_global_config`
+- **Write-gated (11, need `--enable-write`):** `add_place`, `add_flight`, `remove_place`, `move_place`, `reorder_places`, `create_trip`, `delete_trip`, `restore_trip`, `copy_trip`, `update_trip`, `create_guide_from_trip`
+
+### Using with Claude Code
+
+Add to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "wanderlog": {
+      "command": "wanderlog",
+      "args": ["mcp", "--enable-write", "--trip-id", "abc123xyz"]
+    }
+  }
+}
+```
+
+## Travel Search
+
+```bash
+# List all airlines
+wanderlog travel airlines
+
+# Autocomplete airports
+wanderlog travel airports "New York"
+
+# Get flight stops for a specific flight
+wanderlog travel flight-stops --flight-number 244 --airline MU --date 2026-05-11
+
+# Search hotels
+wanderlog travel hotels --location Tokyo --check-in 2026-06-01 --check-out 2026-06-07
+
+# Get hotel price rates
+wanderlog travel hotel-rates --property-id some-prop-id
+```
+
+## Raw API Passthrough
+
+For API endpoints that don't have a typed wrapper yet:
+
+```bash
+# Call any Wanderlog endpoint directly
+wanderlog api /tripPlans/abc123xyz?clientSchemaVersion=2
+
+# POST with JSON body
+wanderlog api /user/notifications/markRead -X POST \
+  --body '{"notificationIds":["n1"]}'
+
+# With authentication
+wanderlog api /user --auth
+
+# Raw output (no formatting)
+wanderlog api /config/globalConfig --format raw
+```
+
 ## Configuration
 
 The CLI supports configuration via:
@@ -356,13 +431,17 @@ This format allows you to easily:
 - ✅ **Beautiful formatting** - colorized terminal output with emojis
 
 **Coming Soon:**
-- 🔄 **Collaboration** - share trips, invite collaborators
-- 🔄 **Budget tracking** - expenses and costs management 
-- 🔄 **Batch operations** - bulk editing with operational transforms
 - 🔄 **Interactive mode** - explore trips interactively with TUI
-- 🔄 **Export features** - PDF, HTML, calendar formats
-- 🔄 **Search and filtering** - find specific places or dates
 - 🔄 **Trip analytics** - distance, duration, cost analysis
+
+**Partially implemented:**
+- 🔄 **Budget tracking** - CSV expense export via `wanderlog expenses <trip-key>`
+- 🔄 **Export features** - Google Maps export via `wanderlog export <trip-key>`
+
+**Already implemented:**
+- ✅ **Collaboration** - invite collaborators, manage share keys
+- ✅ **Batch operations** - operational transforms for bulk edits
+- ✅ **Search and filtering** - Google Places and Wanderlog search APIs
 
 ## Security
 
@@ -393,20 +472,46 @@ go build -o wanderlog
 ## Project Structure
 
 ```
-├── cmd/                 # CLI commands (Cobra)
-│   ├── root.go         # Root command setup
-│   └── trip.go         # Trip command implementation
+├── cmd/                    # CLI commands (Cobra)
+│   ├── root.go            # Root command setup
+│   ├── mcp.go             # MCP server (LLM integration)
+│   ├── mcp_tools.go       # MCP tool definitions
+│   ├── helpers.go         # Shared command helpers
+│   ├── auth.go            # login/logout/status
+│   ├── api.go             # Raw API passthrough
+│   ├── trips*.go          # Trip subcommand tree (~10 files)
+│   ├── user.go            # User management commands
+│   ├── feed.go            # Feed & discovery commands
+│   ├── config_cmd.go      # Config & session commands
+│   ├── journal.go         # Journal & advanced ops
+│   ├── travel.go          # Travel search commands
+│   ├── search*.go         # Place search commands
+│   └── ...                # Additional command files
 ├── pkg/
-│   ├── wanderlog/      # Core API client package
-│   │   ├── client.go   # HTTP client for Wanderlog API
-│   │   ├── models.go   # Generated Go structs from JSON
-│   │   └── wanderlog.go # Package documentation
-│   └── ui/             # Terminal UI formatting
-│       └── trip.go     # Beautiful trip output formatting
-├── trips/              # Example trip data
-│   └── trip1.json     # Sample trip for development
-├── main.go            # CLI entry point
-└── go.mod            # Go module definition
+│   ├── wanderlog/         # Core API client
+│   │   ├── client.go      # HTTP client & read APIs
+│   │   ├── request.go     # Shared request helpers
+│   │   ├── auth.go        # Authentication logic
+│   │   ├── auth_helper.go # Credential management
+│   │   ├── write_ops.go   # Trip write operations
+│   │   ├── user_ops.go    # User management APIs
+│   │   ├── feed_ops.go    # Feed & discovery APIs
+│   │   ├── journal_ops.go # Journal & advanced APIs
+│   │   ├── config_ops.go  # Config & session APIs
+│   │   ├── visualization.go # Image & stats APIs
+│   │   └── models.go      # Generated Go structs
+│   └── ui/                # Terminal output formatting
+│       ├── trip.go        # Pretty trip output
+│       ├── places.go      # Pretty places output
+│       ├── markdown.go    # Markdown output
+│       └── search.go      # Search results output
+├── trips/                 # Example trip data
+│   └── trip1.json        # Sample trip for development
+├── main.go               # Entry point
+├── go.mod                # Go module definition
+├── API_ENDPOINTS.md      # API endpoint catalog
+├── TESTING.md            # Test documentation
+└── CLAUDE.md             # Development guidance
 ```
 
 ## Dependencies

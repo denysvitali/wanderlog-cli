@@ -1,6 +1,7 @@
 package wanderlog
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -214,6 +215,92 @@ func TestNewClient(t *testing.T) {
 	if client.httpClient.Timeout == 0 {
 		t.Error("Expected timeout to be set")
 	}
+}
+
+func TestDoAPI(t *testing.T) {
+	t.Run("get request", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "GET" {
+				t.Errorf("expected GET, got %s", r.Method)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"message":"ok"}`))
+		}))
+		defer server.Close()
+
+		oldBaseURL := BaseURL
+		BaseURL = server.URL
+		defer func() { BaseURL = oldBaseURL }()
+
+		client := NewClient()
+		logger := logrus.New()
+		logger.SetLevel(logrus.ErrorLevel)
+		client.SetLogger(logger)
+
+		status, body, err := client.DoAPI("GET", "/api/test", nil, nil, false)
+		if err != nil {
+			t.Fatalf("DoAPI: %v", err)
+		}
+		if status != http.StatusOK {
+			t.Errorf("expected status 200, got %d", status)
+		}
+		if !strings.Contains(string(body), "ok") {
+			t.Errorf("unexpected body: %s", string(body))
+		}
+	})
+
+	t.Run("post with body", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "POST" {
+				t.Errorf("expected POST, got %s", r.Method)
+			}
+			body, _ := io.ReadAll(r.Body)
+			if !strings.Contains(string(body), "key") {
+				t.Errorf("unexpected body: %s", string(body))
+			}
+			w.WriteHeader(http.StatusCreated)
+		}))
+		defer server.Close()
+
+		oldBaseURL := BaseURL
+		BaseURL = server.URL
+		defer func() { BaseURL = oldBaseURL }()
+
+		client := NewClient()
+		logger := logrus.New()
+		logger.SetLevel(logrus.ErrorLevel)
+		client.SetLogger(logger)
+
+		status, _, err := client.DoAPI("POST", "/api/test", []byte(`{"key":"value"}`), nil, false)
+		if err != nil {
+			t.Fatalf("DoAPI: %v", err)
+		}
+		if status != http.StatusCreated {
+			t.Errorf("expected status 201, got %d", status)
+		}
+	})
+
+	t.Run("non-200 status returns error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`not found`))
+		}))
+		defer server.Close()
+
+		oldBaseURL := BaseURL
+		BaseURL = server.URL
+		defer func() { BaseURL = oldBaseURL }()
+
+		client := NewClient()
+		logger := logrus.New()
+		logger.SetLevel(logrus.ErrorLevel)
+		client.SetLogger(logger)
+
+		_, _, err := client.DoAPI("GET", "/api/test", nil, nil, false)
+		if err == nil {
+			t.Fatal("expected error for non-200")
+		}
+	})
 }
 
 func TestSetLogger(t *testing.T) {
