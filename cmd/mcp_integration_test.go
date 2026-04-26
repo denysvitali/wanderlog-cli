@@ -1313,9 +1313,9 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_flight",
 				Arguments: map[string]interface{}{
-					"trip_key":      tripKey,
-					"section_id":    sectionID,
-					"flight_number": "MU244",
+					"trip_key":       tripKey,
+					"section_id":     sectionID,
+					"flight_number":  "MU244",
 					"departure_date": "2026-06-02",
 				},
 			},
