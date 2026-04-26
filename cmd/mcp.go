@@ -382,8 +382,9 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	)
 	s.AddTool(searchHotelsTool, handleSearchHotels)
 
-	// Trip management tools
-	createTripTool := mcp.NewTool("create_trip",
+	if !readOnly {
+		// Trip management tools
+		createTripTool := mcp.NewTool("create_trip",
 		mcp.WithDescription("Create a new trip plan"),
 		mcp.WithString("title", mcp.Required(),
 			mcp.Description("Trip title")),
@@ -444,6 +445,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.Description("Privacy setting: 'public', 'private', or 'unlisted'")),
 	)
 	s.AddTool(updateTripTool, handleUpdateTrip)
+	}
 
 	// Social features
 	likeTripTool := mcp.NewTool("like_trip",
