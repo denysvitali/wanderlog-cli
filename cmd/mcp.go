@@ -1271,6 +1271,34 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	// Fetch flight stops to get airport information for proper UI display
+	var departAirport, arriveAirport map[string]any
+	flightStops, err := client.GetFlightStops(strconv.Itoa(flightNum), airlineIATA, departureDate)
+	if err == nil && len(flightStops.Data) > 0 {
+		firstLeg := flightStops.Data[0]
+		if firstLeg.Depart.Airport.IATA != "" {
+			departAirport = map[string]any{
+				"cityName": firstLeg.Depart.Airport.CityName,
+				"iata":     firstLeg.Depart.Airport.IATA,
+				"name":     firstLeg.Depart.Airport.Name,
+			}
+		}
+		if firstLeg.Arrive.Airport.IATA != "" {
+			arriveAirport = map[string]any{
+				"cityName": firstLeg.Arrive.Airport.CityName,
+				"iata":     firstLeg.Arrive.Airport.IATA,
+				"name":     firstLeg.Arrive.Airport.Name,
+			}
+		}
+		// Override arrival date/time from API if not explicitly provided
+		if arrivalDate == departureDate && firstLeg.Arrive.Date != "" {
+			arrivalDate = firstLeg.Arrive.Date
+		}
+		if arrivalTime == "" && firstLeg.Arrive.Time != "" {
+			arrivalTime = firstLeg.Arrive.Time
+		}
+	}
+
 	block := map[string]any{
 		"type":               "flight",
 		"confirmationNumber": confirmationNumber,
@@ -1293,6 +1321,14 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		"text":          notes,
 		"travelMode":    nil,
 		"travelerNames": []any{},
+	}
+
+	// Add airport info if we fetched it from the API
+	if departAirport != nil {
+		block["depart"].(map[string]any)["airport"] = departAirport
+	}
+	if arriveAirport != nil {
+		block["arrive"].(map[string]any)["airport"] = arriveAirport
 	}
 
 	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
