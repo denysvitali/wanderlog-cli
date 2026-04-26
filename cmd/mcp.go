@@ -1217,7 +1217,7 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	err = client.AddPlace(tripKey, sectionID, req)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place '%s' to trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 	}
 
 	result := fmt.Sprintf("📍 Successfully added place '%s' to trip %s (%s)", name, tripKey, sectionLabel)
@@ -1294,7 +1294,7 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to add flight: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add flight %s to trip %s (%s): %v", flightNumber, tripKey, sectionLabel, err)), nil
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("✈️ Successfully added flight %s to trip %s (%s)", flightNumber, tripKey, sectionLabel)), nil
@@ -1329,7 +1329,7 @@ func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 
 	err = client.RemovePlace(tripKey, sectionID, placeID)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to remove place: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to remove place %d from trip %s (section %d): %v", placeID, tripKey, sectionID, err)), nil
 	}
 
 	result := fmt.Sprintf("🗑️ Successfully removed place %d from trip %s", placeID, tripKey)
@@ -1763,7 +1763,7 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 
 	resp, err := client.CreateTrip(req)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to create trip: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to create trip '%s' (geo_id=%d, dates %s to %s): %v", title, geoID, startDate, endDate, err)), nil
 	}
 
 	result := fmt.Sprintf("✅ Created trip '%s' (Key: %s, ID: %d)", resp.TripPlan.Title, resp.TripPlan.Key, resp.TripPlan.ID)
@@ -1785,7 +1785,7 @@ func handleDeleteTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 
 	err := client.DeleteTrip(tripKey)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete trip: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete trip %s: %v", tripKey, err)), nil
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("🗑️ Deleted trip %s", tripKey)), nil
@@ -1822,14 +1822,14 @@ func handleDeleteTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	for _, tripKey := range tripKeys {
 		err := client.DeleteTrip(tripKey)
 		if err != nil {
-			failed = append(failed, fmt.Sprintf("%s (%v)", tripKey, err))
+			failed = append(failed, fmt.Sprintf("%s: %v", tripKey, err))
 		} else {
 			deleted = append(deleted, tripKey)
 		}
 	}
 
 	if len(failed) > 0 {
-		return mcp.NewToolResultError(fmt.Sprintf("Deleted %d trips, but failed to delete: %s", len(deleted), strings.Join(failed, ", "))), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Deleted %d/%d trips. Failed to delete: %s", len(deleted), len(tripKeys), strings.Join(failed, "; "))), nil
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("🗑️ Deleted %d trips: %s", len(deleted), strings.Join(deleted, ", "))), nil
@@ -1921,7 +1921,7 @@ func handleUpdateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	}
 
 	if err := client.UpdateTrip(tripKey, updateReq); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to update trip: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update trip %s: %v", tripKey, err)), nil
 	}
 
 	// Build result message showing what was updated
@@ -2105,7 +2105,7 @@ func handleMovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 
 	err = client.MovePlace(tripKey, placeID, fromSectionID, toSectionID, position)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to move place: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to move place %d from section %d to section %d in trip %s: %v", placeID, fromSectionID, toSectionID, tripKey, err)), nil
 	}
 
 	result := fmt.Sprintf("🔀 Successfully moved place %d from section %d to section %d at position %d",
@@ -2163,7 +2163,7 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	err = client.ReorderPlaces(tripKey, sectionID, placeIDs)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to reorder places: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to reorder %d places in section %d for trip %s: %v", len(placeIDs), sectionID, tripKey, err)), nil
 	}
 
 	result := fmt.Sprintf("📋 Successfully reordered %d places in section %d", len(placeIDs), sectionID)
