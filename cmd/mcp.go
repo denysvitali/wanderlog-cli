@@ -1643,10 +1643,10 @@ func handleSearchPlacesWanderlog(ctx context.Context, request mcp.CallToolReques
 		return mcp.NewToolResultStructuredOnly(results), nil
 	}
 
-	// Filter out junk rows (empty descriptions or placeholder types like just "search")
+	// Filter out junk rows: need a place_id AND a real description (non-empty, not just a type label)
 	validCount := 0
 	for _, place := range results.Data {
-		if place.Description != "" && place.Description != place.Type {
+		if place.PlaceID != "" && place.Description != "" && place.Description != place.Type {
 			validCount++
 		}
 	}
@@ -1659,18 +1659,16 @@ func handleSearchPlacesWanderlog(ctx context.Context, request mcp.CallToolReques
 
 	validIndex := 0
 	for _, place := range results.Data {
-		if place.Description == "" || place.Description == place.Type {
+		if place.PlaceID == "" || place.Description == "" || place.Description == place.Type {
 			continue
 		}
 		validIndex++
 		result += fmt.Sprintf("**%d. %s**\n", validIndex, place.Description)
-		if place.PlaceID != "" {
-			result += fmt.Sprintf("   📍 Place ID: %s\n", place.PlaceID)
-		}
+		result += fmt.Sprintf("   📍 Place ID: %s\n", place.PlaceID)
 		if len(place.Types) > 0 {
 			result += fmt.Sprintf("   🏷️ Types: %v\n", place.Types)
 		}
-		if place.Type != "" {
+		if place.Type != "" && place.Type != place.Description {
 			result += fmt.Sprintf("   🏷️ Type: %s\n", place.Type)
 		}
 		if validIndex < validCount {
