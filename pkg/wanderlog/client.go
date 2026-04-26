@@ -366,8 +366,8 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, a
 	baseURL := "https://places.googleapis.com/v1/places:searchText"
 
 	requestBody := map[string]interface{}{
-		"textQuery":       query,
-		"includedType":    "restaurant",
+		"textQuery":    query,
+		"includedType": "restaurant",
 	}
 
 	if latitude != nil && longitude != nil {
@@ -423,9 +423,9 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, a
 				Latitude  float64 `json:"latitude"`
 				Longitude float64 `json:"longitude"`
 			} `json:"location"`
-			Rating           float64 `json:"rating"`
-			Types            []string `json:"types"`
-			PriceLevel       int     `json:"priceLevel"`
+			Rating              float64  `json:"rating"`
+			Types               []string `json:"types"`
+			PriceLevel          int      `json:"priceLevel"`
 			RegularOpeningHours struct {
 				WeekdayDescriptions []string `json:"weekdayDescriptions"`
 			} `json:"regularOpeningHours"`
@@ -442,13 +442,13 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, a
 	var results []SearchResult
 	for _, place := range googleResp.Places {
 		result := SearchResult{
-			ID:       place.ID,
-			Name:     place.DisplayName.Text,
-			Address:  place.FormattedAddress,
-			PlaceID:  place.ID,
-			Latitude: place.Location.Latitude,
-			Longitude: place.Location.Longitude,
-			Rating:   place.Rating,
+			ID:         place.ID,
+			Name:       place.DisplayName.Text,
+			Address:    place.FormattedAddress,
+			PlaceID:    place.ID,
+			Latitude:   place.Location.Latitude,
+			Longitude:  place.Location.Longitude,
+			Rating:     place.Rating,
 			Categories: place.Types,
 		}
 		results = append(results, result)
