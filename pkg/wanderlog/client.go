@@ -348,6 +348,123 @@ func (c *Client) SearchPlaces(query string, latitude, longitude *float64, apiKey
 	}, nil
 }
 
+// SearchRestaurants searches for restaurants using Google Places API with restaurant type filter
+func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, apiKey string) (*PlaceSearchResponse, error) {
+	c.logger.WithFields(logrus.Fields{
+		"query":     query,
+		"latitude":  latitude,
+		"longitude": longitude,
+	}).Info("Searching restaurants via Google Places API")
+
+	if apiKey == "" {
+		return &PlaceSearchResponse{
+			Success: false,
+			Places:  []SearchResult{},
+		}, fmt.Errorf("Google Places API key is required. Please provide an API key using --api-key flag")
+	}
+
+	baseURL := "https://places.googleapis.com/v1/places:searchText"
+
+	requestBody := map[string]interface{}{
+		"textQuery":       query,
+		"includedType":    "restaurant",
+	}
+
+	if latitude != nil && longitude != nil {
+		requestBody["locationBias"] = map[string]interface{}{
+			"circle": map[string]interface{}{
+				"center": map[string]interface{}{
+					"latitude":  *latitude,
+					"longitude": *longitude,
+				},
+				"radius": 50000.0,
+			},
+		}
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", baseURL, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", apiKey)
+	req.Header.Set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types,places.priceLevel,places.regularOpeningHours,places.photos")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request to Google Places API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Google Places API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var googleResp struct {
+		Places []struct {
+			ID          string `json:"id"`
+			DisplayName struct {
+				Text string `json:"text"`
+			} `json:"displayName"`
+			FormattedAddress string `json:"formattedAddress"`
+			Location         struct {
+				Latitude  float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+			} `json:"location"`
+			Rating           float64 `json:"rating"`
+			Types            []string `json:"types"`
+			PriceLevel       int     `json:"priceLevel"`
+			RegularOpeningHours struct {
+				WeekdayDescriptions []string `json:"weekdayDescriptions"`
+			} `json:"regularOpeningHours"`
+			Photos []struct {
+				Name string `json:"name"`
+			} `json:"photos"`
+		} `json:"places"`
+	}
+
+	if err := json.Unmarshal(body, &googleResp); err != nil {
+		return nil, fmt.Errorf("failed to decode Google Places API response: %w", err)
+	}
+
+	var results []SearchResult
+	for _, place := range googleResp.Places {
+		result := SearchResult{
+			ID:       place.ID,
+			Name:     place.DisplayName.Text,
+			Address:  place.FormattedAddress,
+			PlaceID:  place.ID,
+			Latitude: place.Location.Latitude,
+			Longitude: place.Location.Longitude,
+			Rating:   place.Rating,
+			Categories: place.Types,
+		}
+		results = append(results, result)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"query":       query,
+		"resultCount": len(results),
+	}).Info("Successfully searched restaurants via Google Places API")
+
+	return &PlaceSearchResponse{
+		Success: true,
+		Places:  results,
+	}, nil
+}
+
 // SearchPlacesInTrips searches for places within the user's trips by query
 func (c *Client) SearchPlacesInTrips(query string) (*PlaceSearchResponse, error) {
 	c.logger.WithField("query", query).Debug("Searching places in user trips")

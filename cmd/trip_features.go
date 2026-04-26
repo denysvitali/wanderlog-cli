@@ -398,7 +398,11 @@ var hotelsCmd = &cobra.Command{
 		client := newClient(false)
 		resp, err := client.SearchLodgings(args[0], hotelCheckIn, hotelCheckOut, hotelGuests)
 		if err != nil {
-			logger.WithError(err).Error("Failed to search hotels")
+			fmt.Fprintf(os.Stderr, "Hotel search failed: %v\n", err)
+			os.Exit(1)
+		}
+		if !resp.Success || resp.Data == nil {
+			fmt.Fprintf(os.Stderr, "Hotel search returned no results for %q. The lodging API may be unavailable or your session may have expired.\n", args[0])
 			os.Exit(1)
 		}
 		ui.PrintJSON(resp)

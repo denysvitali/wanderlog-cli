@@ -307,6 +307,27 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	)
 	s.AddTool(searchPlacesTool, handleSearchPlaces)
 
+	// Add search restaurants tool
+	searchRestaurantsTool := mcp.NewTool("search_restaurants",
+		mcp.WithDescription("Search for restaurants using Google Places API with restaurant type filter (requires GOOGLE_PLACES_API_KEY). Great for finding ramen shops, sushi places, izakayas, and other food venues."),
+		mcp.WithString("query",
+			mcp.Required(),
+			mcp.Description("Restaurant search query (e.g., 'ramen shop Tokyo', 'sushi Kyoto', 'izakaya Osaka')"),
+		),
+		mcp.WithNumber("latitude",
+			mcp.Description("Latitude for location-based search (optional)"),
+		),
+		mcp.WithNumber("longitude",
+			mcp.Description("Longitude for location-based search (optional)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format (default, json, markdown)"),
+			mcp.DefaultString("default"),
+			mcp.Enum("default", "json", "markdown"),
+		),
+	)
+	s.AddTool(searchRestaurantsTool, handleSearchRestaurants)
+
 	// Add place details tool using Wanderlog's API
 	placeDetailsTool := mcp.NewTool("get_place_details",
 		mcp.WithDescription("Get detailed information about a place using Wanderlog's place details API"),
@@ -1566,6 +1587,154 @@ func handleSearchPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 			}
 
 			// Place ID
+			if place.PlaceID != "" {
+				result += fmt.Sprintf("   🆔 %s\n", place.PlaceID)
+			}
+
+			if i < len(results.Places)-1 {
+				result += "\n"
+			}
+		}
+		return mcp.NewToolResultText(result), nil
+	}
+}
+
+// handleSearchRestaurants searches for restaurants using Google Places API with restaurant type filter
+func handleSearchRestaurants(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	query, err := request.RequireString("query")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("query is required"), nil
+	}
+
+	apiKey := os.Getenv("GOOGLE_PLACES_API_KEY")
+	if apiKey == "" {
+		return mcp.NewToolResultError("GOOGLE_PLACES_API_KEY environment variable is required. Set it with: export GOOGLE_PLACES_API_KEY=your_key_here"), nil
+	}
+
+	format := request.GetString("format", "default")
+
+	var lat, lng *float64
+	if latStr := request.GetString("latitude", ""); latStr != "" {
+		if latNum, err := strconv.ParseFloat(latStr, 64); err == nil {
+			lat = &latNum
+		}
+	}
+	if lngStr := request.GetString("longitude", ""); lngStr != "" {
+		if lngNum, err := strconv.ParseFloat(lngStr, 64); err == nil {
+			lng = &lngNum
+		}
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	results, err := client.SearchRestaurants(query, lat, lng, apiKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Restaurant search failed: %v", err)), nil
+	}
+
+	switch format {
+	case "json":
+		jsonData, err := json.Marshal(results)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal JSON: %v", err)), nil
+		}
+		return mcp.NewToolResultText(string(jsonData)), nil
+
+	case "markdown":
+		if len(results.Places) == 0 {
+			return mcp.NewToolResultText("# Restaurant Search Results\n\nNo restaurants found."), nil
+		}
+
+		result := "# Restaurant Search Results\n\n"
+		for i, place := range results.Places {
+			result += fmt.Sprintf("## %d. %s\n\n", i+1, place.Name)
+
+			if place.Rating > 0 {
+				result += fmt.Sprintf("**Rating:** %.1f/5 ⭐\n\n", place.Rating)
+			}
+
+			if place.Address != "" {
+				result += fmt.Sprintf("**Address:** %s\n\n", place.Address)
+			}
+
+			if len(place.Categories) > 0 {
+				categories := ""
+				for j, cat := range place.Categories {
+					categories += cat
+					if j < len(place.Categories)-1 {
+						categories += ", "
+					}
+				}
+				result += fmt.Sprintf("**Categories:** %s\n\n", categories)
+			}
+
+			if place.Description != "" {
+				result += fmt.Sprintf("**Description:** %s\n\n", place.Description)
+			}
+
+			if place.Website != "" {
+				result += fmt.Sprintf("**Website:** %s\n\n", place.Website)
+			}
+
+			if place.Latitude != 0 && place.Longitude != 0 {
+				result += fmt.Sprintf("**Location:** %.4f, %.4f\n\n", place.Latitude, place.Longitude)
+			}
+
+			if place.PlaceID != "" {
+				result += fmt.Sprintf("**Place ID:** %s\n\n", place.PlaceID)
+			}
+
+			result += "---\n\n"
+		}
+		return mcp.NewToolResultText(result), nil
+
+	default:
+		if len(results.Places) == 0 {
+			return mcp.NewToolResultText("🍽️ No restaurants found"), nil
+		}
+
+		result := "🍽️ Restaurant Search Results\n\n"
+		for i, place := range results.Places {
+			name := place.Name
+			if place.Rating > 0 {
+				stars := ""
+				for j := 0; j < int(place.Rating) && j < 5; j++ {
+					stars += "⭐"
+				}
+				name += fmt.Sprintf(" %s (%.1f)", stars, place.Rating)
+			}
+
+			result += fmt.Sprintf("📍 %s\n", name)
+
+			if place.Address != "" {
+				result += fmt.Sprintf("   🏠 %s\n", place.Address)
+			}
+
+			if len(place.Categories) > 0 {
+				categories := ""
+				for j, cat := range place.Categories {
+					categories += cat
+					if j < len(place.Categories)-1 {
+						categories += ", "
+					}
+				}
+				result += fmt.Sprintf("   🏷️  %s\n", categories)
+			}
+
+			if place.Description != "" {
+				result += fmt.Sprintf("   📝 %s\n", place.Description)
+			}
+
+			if place.Website != "" {
+				result += fmt.Sprintf("   🌐 %s\n", place.Website)
+			}
+
+			if place.Latitude != 0 && place.Longitude != 0 {
+				result += fmt.Sprintf("   🗺️  %.4f, %.4f\n", place.Latitude, place.Longitude)
+			}
+
 			if place.PlaceID != "" {
 				result += fmt.Sprintf("   🆔 %s\n", place.PlaceID)
 			}
