@@ -202,7 +202,8 @@ func (c *Client) GetTripPlaces(tripKey string) (*TripResponse, error) {
 	return &placesResponse, nil
 }
 
-// LikeTrip likes or unlikes a trip
+// LikeTrip likes or unlikes a trip.
+// Deprecated: Use SetLike in write_ops.go instead.
 func (c *Client) LikeTrip(tripKey string, liked bool) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for liking trips")
@@ -259,7 +260,8 @@ func (c *Client) LikeTrip(tripKey string, liked bool) error {
 	return nil
 }
 
-// RegisterView registers a view for analytics
+// RegisterView registers a view for analytics.
+// Deprecated: Use RegisterTripView in journal_ops.go instead.
 func (c *Client) RegisterView(tripKey string) error {
 	url := fmt.Sprintf("%s/tripPlans/%s/registerView", BaseURL, tripKey)
 
