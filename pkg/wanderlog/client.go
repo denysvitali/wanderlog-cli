@@ -785,6 +785,10 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	if !result.Success {
+		return nil, fmt.Errorf("lodging search API returned success=false for query %q; response: %s", query, string(respBody))
+	}
+
 	return &result, nil
 }
 
