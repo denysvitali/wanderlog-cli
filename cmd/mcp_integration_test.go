@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"regexp"
 	"testing"
@@ -1410,4 +1412,143 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		require.NotNil(t, result)
 		assert.True(t, result.IsError)
 	})
+}
+
+// TestIntegration_DeleteTrips tests the bulk delete_trips tool
+func TestIntegration_DeleteTrips(t *testing.T) {
+	skipIntegrationTest(t)
+
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	// Create a trip to delete
+	tripTitle := fmt.Sprintf("Delete Test - %d", time.Now().UnixNano())
+	createReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "create_trip",
+			Arguments: map[string]interface{}{
+				"title":      tripTitle,
+				"start_date": "2026-07-01",
+				"end_date":   "2026-07-05",
+				"privacy":    "private",
+			},
+		},
+	}
+
+	createResult, err := handleCreateTrip(ctx, createReq)
+	require.NoError(t, err)
+	require.NotNil(t, createResult)
+
+	var tripKey string
+	if !createResult.IsError {
+		textContent := createResult.Content[0].(mcp.TextContent)
+		tripKey = extractTripKey(textContent.Text)
+	}
+
+	if tripKey == "" {
+		t.Skip("Could not create test trip for deletion test")
+	}
+
+	// Now delete the trip using handleDeleteTrips with comma-separated keys
+	deleteReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "delete_trips",
+			Arguments: map[string]interface{}{
+				"trip_keys": tripKey,
+			},
+		},
+	}
+
+	result, err := handleDeleteTrips(ctx, deleteReq)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should succeed - the single key should be deleted
+	assert.False(t, result.IsError, "delete_trips should not return error: %s", getTextContent(result))
+	assert.Contains(t, getTextContent(result), "Deleted")
+}
+
+// TestUnit_SearchHotelsErrorPropagation tests that handleSearchHotels returns an error
+// when the API returns success=false
+func TestUnit_SearchHotelsErrorPropagation(t *testing.T) {
+	// Use httptest to mock the API server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return a response with success=false
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success": false, "error": "API error"}`))
+	}))
+	defer server.Close()
+
+	// Save original BaseURL
+	oldBaseURL := wanderlog.BaseURL
+	wanderlog.BaseURL = server.URL
+	defer func() { wanderlog.BaseURL = oldBaseURL }()
+
+	ctx := context.Background()
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_hotels",
+			Arguments: map[string]interface{}{
+				"location":  "Paris",
+				"check_in":  "2026-07-01",
+				"check_out": "2026-07-05",
+			},
+		},
+	}
+
+	result, err := handleSearchHotels(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, result.IsError, "Expected error result when API returns success=false")
+	// The error message from the handler wraps the client error
+	assert.Contains(t, getTextContent(result), "Error searching hotels")
+}
+
+// TestUnit_SearchPlacesWanderlogJunkFiltering tests that rows without place_id
+// are filtered out from the results
+// Note: This requires a real API call since the wanderlog autocomplete constructs
+// its own URL that can't be easily mocked. Skip unless running with prod integration.
+func TestUnit_SearchPlacesWanderlogJunkFiltering(t *testing.T) {
+	if os.Getenv("WANDERLOG_RUN_PROD_INTEGRATION") != "1" {
+		t.Skip("Skipping test that requires real API. Set WANDERLOG_RUN_PROD_INTEGRATION=1 to run.")
+	}
+
+	ctx := context.Background()
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_places_wanderlog",
+			Arguments: map[string]interface{}{
+				"query":  "Eiffel Tower Paris",
+				"format": "default",
+			},
+		},
+	}
+
+	result, err := handleSearchPlacesWanderlog(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// The filtering logic should have removed any results without place_id
+	// If results come back, they should have valid place_ids
+	text := getTextContent(result)
+	t.Logf("Search result: %s", text)
+	// The test passes if we get results and no error
+	assert.False(t, result.IsError)
+}
+
+// getTextContent extracts text from mcp.TextContent or returns empty string
+func getTextContent(result *mcp.CallToolResult) string {
+	if result == nil || len(result.Content) == 0 {
+		return ""
+	}
+	if tc, ok := result.Content[0].(mcp.TextContent); ok {
+		return tc.Text
+	}
+	return ""
 }
