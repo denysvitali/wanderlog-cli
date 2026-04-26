@@ -123,6 +123,25 @@ The `mcp` command (`cmd/mcp.go`) implements a Model Context Protocol server:
 - Error handling returns detailed errors to user
 - Write operations in `pkg/wanderlog/write_ops.go` use operational transforms for complex edits
 
+### Trip Verification During Testing
+
+When testing trip operations, always verify the trip contents using the raw API endpoint:
+```
+https://wanderlog.com/api/tripPlans/{trip_id}?clientSchemaVersion=2
+```
+
+Example trip IDs from recent testing:
+- yxjmjivtfxlkaqcp
+- jkgwzqyoagrqrrot
+- mqznvsvtrwqqeuhx
+
+You can use the `api` command to fetch raw JSON:
+```bash
+./wanderlog api get /tripPlans/yxjmjivtfxlkaqcp?clientSchemaVersion=2
+```
+
+Or use the MCP tool `get_trip` to fetch trip data.
+
 ### API Integration Notes
 
 **Authentication Flow**:
