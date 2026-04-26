@@ -385,66 +385,66 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	if !readOnly {
 		// Trip management tools
 		createTripTool := mcp.NewTool("create_trip",
-		mcp.WithDescription("Create a new trip plan"),
-		mcp.WithString("title", mcp.Required(),
-			mcp.Description("Trip title")),
-		mcp.WithNumber("geo_id", mcp.Required(),
-			mcp.Description("Wanderlog destination geo ID. Use search_geos or browse_guides geoGuideCounts first; do not guess this value or use a Google Place ID.")),
-		mcp.WithString("start_date",
-			mcp.Required(),
-			mcp.Description("Start date in YYYY-MM-DD format")),
-		mcp.WithString("end_date",
-			mcp.Required(),
-			mcp.Description("End date in YYYY-MM-DD format")),
-		mcp.WithString("privacy",
-			mcp.Description("Privacy setting: public, private, or friends"),
-			mcp.DefaultString("private"),
-			mcp.Enum("public", "private", "friends")),
-	)
-	s.AddTool(createTripTool, handleCreateTrip)
+			mcp.WithDescription("Create a new trip plan"),
+			mcp.WithString("title", mcp.Required(),
+				mcp.Description("Trip title")),
+			mcp.WithNumber("geo_id", mcp.Required(),
+				mcp.Description("Wanderlog destination geo ID. Use search_geos or browse_guides geoGuideCounts first; do not guess this value or use a Google Place ID.")),
+			mcp.WithString("start_date",
+				mcp.Required(),
+				mcp.Description("Start date in YYYY-MM-DD format")),
+			mcp.WithString("end_date",
+				mcp.Required(),
+				mcp.Description("End date in YYYY-MM-DD format")),
+			mcp.WithString("privacy",
+				mcp.Description("Privacy setting: public, private, or friends"),
+				mcp.DefaultString("private"),
+				mcp.Enum("public", "private", "friends")),
+		)
+		s.AddTool(createTripTool, handleCreateTrip)
 
-	deleteTripTool := mcp.NewTool("delete_trip",
-		mcp.WithDescription("Delete a trip plan"),
-		mcp.WithString("trip_key", mcp.Required(),
-			mcp.Description("Trip key to delete")),
-	)
-	s.AddTool(deleteTripTool, handleDeleteTrip)
+		deleteTripTool := mcp.NewTool("delete_trip",
+			mcp.WithDescription("Delete a trip plan"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key to delete")),
+		)
+		s.AddTool(deleteTripTool, handleDeleteTrip)
 
-	deleteTripsTool := mcp.NewTool("delete_trips",
-		mcp.WithDescription("Delete multiple trip plans in a single request"),
-		mcp.WithString("trip_keys", mcp.Required(),
-			mcp.Description("Comma-separated list of trip keys to delete")),
-	)
-	s.AddTool(deleteTripsTool, handleDeleteTrips)
+		deleteTripsTool := mcp.NewTool("delete_trips",
+			mcp.WithDescription("Delete multiple trip plans in a single request"),
+			mcp.WithString("trip_keys", mcp.Required(),
+				mcp.Description("Comma-separated list of trip keys to delete")),
+		)
+		s.AddTool(deleteTripsTool, handleDeleteTrips)
 
-	restoreTripTool := mcp.NewTool("restore_trip",
-		mcp.WithDescription("Restore a soft-deleted trip plan"),
-		mcp.WithString("trip_key", mcp.Required(),
-			mcp.Description("Trip key to restore")),
-	)
-	s.AddTool(restoreTripTool, handleRestoreTrip)
+		restoreTripTool := mcp.NewTool("restore_trip",
+			mcp.WithDescription("Restore a soft-deleted trip plan"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key to restore")),
+		)
+		s.AddTool(restoreTripTool, handleRestoreTrip)
 
-	copyTripTool := mcp.NewTool("copy_trip",
-		mcp.WithDescription("Create a copy of an existing trip"),
-		mcp.WithString("trip_key", mcp.Required(),
-			mcp.Description("Trip key to copy")),
-	)
-	s.AddTool(copyTripTool, handleCopyTrip)
+		copyTripTool := mcp.NewTool("copy_trip",
+			mcp.WithDescription("Create a copy of an existing trip"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key to copy")),
+		)
+		s.AddTool(copyTripTool, handleCopyTrip)
 
-	updateTripTool := mcp.NewTool("update_trip",
-		mcp.WithDescription("Update trip metadata (title, dates, privacy). At least one field must be provided."),
-		mcp.WithString("trip_key", mcp.Required(),
-			mcp.Description("Trip key to update")),
-		mcp.WithString("title",
-			mcp.Description("New trip title")),
-		mcp.WithString("start_date",
-			mcp.Description("New start date (YYYY-MM-DD format)")),
-		mcp.WithString("end_date",
-			mcp.Description("New end date (YYYY-MM-DD format)")),
-		mcp.WithString("privacy",
-			mcp.Description("Privacy setting: 'public', 'private', or 'unlisted'")),
-	)
-	s.AddTool(updateTripTool, handleUpdateTrip)
+		updateTripTool := mcp.NewTool("update_trip",
+			mcp.WithDescription("Update trip metadata (title, dates, privacy). At least one field must be provided."),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key to update")),
+			mcp.WithString("title",
+				mcp.Description("New trip title")),
+			mcp.WithString("start_date",
+				mcp.Description("New start date (YYYY-MM-DD format)")),
+			mcp.WithString("end_date",
+				mcp.Description("New end date (YYYY-MM-DD format)")),
+			mcp.WithString("privacy",
+				mcp.Description("Privacy setting: 'public', 'private', or 'unlisted'")),
+		)
+		s.AddTool(updateTripTool, handleUpdateTrip)
 	}
 
 	// Social features
