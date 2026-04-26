@@ -203,7 +203,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			),
 			mcp.WithString("flight_number",
 				mcp.Required(),
-				mcp.Description("Flight number including airline code, e.g. MU244 or UA875"),
+				mcp.Description("Flight number including airline code (e.g. MU244). The airline code will be extracted automatically."),
 			),
 			mcp.WithString("departure_date",
 				mcp.Required(),
@@ -344,7 +344,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	s.AddTool(wanderlogSearchTool, handleSearchPlacesWanderlog)
 
 	getFlightStopsTool := mcp.NewTool("get_flight_stops",
-		mcp.WithDescription("Get airport stops for a known flight number. Note: flight_number is the numeric portion only (e.g., 244), not the full flight code like MU244. Use the separate airline parameter for the airline code."),
+		mcp.WithDescription("Get airport stops for a known flight number. Pass the numeric portion of the flight number (e.g. 244 for flight MU244) plus the airline IATA code separately."),
 		mcp.WithString("flight_number",
 			mcp.Required(),
 			mcp.Description("Flight number (numeric portion only, e.g., 244 for flight MU244)"),
