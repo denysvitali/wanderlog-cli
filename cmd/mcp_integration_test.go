@@ -1301,6 +1301,50 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		assert.False(t, result.IsError)
 	})
 
+	// Test add_flight
+	t.Run("add_flight_to_new_trip", func(t *testing.T) {
+		// Get a dated section for the flight
+		sectionID := getDatedItinerarySectionID(t, tripKey)
+		if sectionID == 0 {
+			t.Skip("No dated itinerary sections found in trip")
+		}
+
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_flight",
+				Arguments: map[string]interface{}{
+					"trip_key":      tripKey,
+					"section_id":    sectionID,
+					"flight_number": "MU244",
+					"departure_date": "2026-06-02",
+				},
+			},
+		}
+
+		flightResult, err := handleAddFlight(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, flightResult)
+		assert.False(t, flightResult.IsError, "add_flight should not return error: %s", flightResult.Content[0].(mcp.TextContent).Text)
+
+		// Verify the trip can still be fetched with the flight
+		getRequest := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_trip",
+				Arguments: map[string]interface{}{
+					"trip_id": tripKey,
+					"format":  "json",
+				},
+			},
+		}
+
+		getResult, err := handleGetTrip(ctx, getRequest)
+		require.NoError(t, err)
+		require.NotNil(t, getResult)
+		assert.False(t, getResult.IsError, "get_trip after add_flight should not return error")
+
+		t.Logf("✓ Successfully added flight and verified trip can be fetched")
+	})
+
 	// 6. TEST ERROR CASES
 	t.Run("create_trip_missing_title", func(t *testing.T) {
 		request := mcp.CallToolRequest{
