@@ -13,7 +13,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    if: github.actor != 'denvit-gh-proxy[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -26,7 +25,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    if: github.actor != 'denvit-gh-proxy[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -44,7 +42,6 @@ jobs:
   openapi-spec-sync:
     name: OpenAPI Spec Sync
     runs-on: ubuntu-latest
-    if: github.actor != 'denvit-gh-proxy[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -60,7 +57,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    if: github.actor != 'denvit-gh-proxy[bot]'
     needs: [lint, test, openapi-spec-sync]
     strategy:
       matrix:
@@ -87,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only run on master/main branch pushes, not pull requests
     # because secrets are not available to PRs from forks
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.actor != 'denvit-gh-proxy[bot]'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
