@@ -3,12 +3,15 @@ MODULE := github.com/denysvitali/wanderlog-cli
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build test lint vet fmt clean install run help
+.PHONY: all build generate test lint vet fmt clean install run help
 
 all: lint test build ## Run lint, test, and build
 
 build: ## Build the binary
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) .
+
+generate: ## Generate Go OpenAPI client/types from API.openapi.yaml
+	go generate ./pkg/wanderlog/openapi
 
 install: ## Install the binary
 	go install -ldflags "$(LDFLAGS)" .

@@ -41,11 +41,27 @@ jobs:
           path: coverage.out
           retention-days: 3
 
+  openapi-spec-sync:
+    name: OpenAPI Spec Sync
+    runs-on: ubuntu-latest
+    if: github.actor != 'denvit-gh-proxy[bot]'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Regenerate OpenAPI client
+        run: make generate
+      - name: Verify generated files are committed
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
   build:
     name: Build
     runs-on: ubuntu-latest
     if: github.actor != 'denvit-gh-proxy[bot]'
-    needs: [lint, test]
+    needs: [lint, test, openapi-spec-sync]
     strategy:
       matrix:
         goos: [linux, darwin, windows]
