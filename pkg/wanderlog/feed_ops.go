@@ -195,15 +195,27 @@ func (c *Client) BrowseGuides(geoID int) (*BrowseGuidesResponse, error) {
 	return &result, nil
 }
 
-// geoIDName represents a geo entry with ID and name, returned by various geo list endpoints.
-type geoIDName struct {
+// GeoIDName represents a geo entry with ID and name, returned by various geo list endpoints.
+type GeoIDName struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
+// GeoSearchResult holds combined country and city geo entries.
+type GeoSearchResult struct {
+	Countries []GeoIDName
+	Cities    []GeoIDName
+}
+
+// geoListResponse is the JSON response envelope for geo list endpoints.
+type geoListResponse struct {
+	Data    []GeoIDName `json:"data"`
+	Success bool        `json:"success"`
+}
+
 // SearchGeos returns all geographic destinations (countries and cities) from Wanderlog.
 // The caller can client-side filter by name since the full list is relatively small.
-func (c *Client) SearchGeos() (*BrowseGuidesResponse, error) {
+func (c *Client) SearchGeos() (*GeoSearchResult, error) {
 	api, err := c.openAPI()
 	if err != nil {
 		return nil, err
@@ -231,40 +243,16 @@ func (c *Client) SearchGeos() (*BrowseGuidesResponse, error) {
 		return nil, fmt.Errorf("SearchGeos: reading cities response: %w", err)
 	}
 
-	var countries []geoIDName
-	var cities []geoIDName
-
-	if err := json.Unmarshal(countriesBody, &countries); err != nil {
+	var parsedCountries geoListResponse
+	if err := json.Unmarshal(countriesBody, &parsedCountries); err != nil {
 		return nil, fmt.Errorf("SearchGeos: parsing countries: %w", err)
 	}
-	if err := json.Unmarshal(citiesBody, &cities); err != nil {
+	var parsedCities geoListResponse
+	if err := json.Unmarshal(citiesBody, &parsedCities); err != nil {
 		return nil, fmt.Errorf("SearchGeos: parsing cities: %w", err)
 	}
 
-	// Transform to geoGuideCounts format and combine
-	type geoGuideCount struct {
-		Name       string `json:"name"`
-		GeoID      int    `json:"geoId"`
-		GuideCount int    `json:"guideCount"`
-	}
-
-	allGeos := make([]geoGuideCount, 0, len(countries)+len(cities))
-	for _, c := range countries {
-		allGeos = append(allGeos, geoGuideCount{Name: c.Name, GeoID: c.ID})
-	}
-	for _, c := range cities {
-		allGeos = append(allGeos, geoGuideCount{Name: c.Name, GeoID: c.ID})
-	}
-
-	combinedData, err := json.Marshal(map[string][]geoGuideCount{"geoGuideCounts": allGeos})
-	if err != nil {
-		return nil, fmt.Errorf("SearchGeos: marshaling combined geos: %w", err)
-	}
-
-	return &BrowseGuidesResponse{
-		Success: true,
-		Data:    combinedData,
-	}, nil
+	return &GeoSearchResult{Countries: parsedCountries.Data, Cities: parsedCities.Data}, nil
 }
 
 func clientSchemaVersionInt() (int, error) {
