@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -11,24 +12,93 @@ import (
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
+// loadAuthFromEnvOrKeychain loads authentication credentials from environment
+// variables first, falling back to the system keychain or config file.
+// Priority: env vars > keychain > config file
+func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
+	// Try environment variables first
+	sessionCookie := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE")
+	xsrfToken := os.Getenv("WANDERLOG_AUTH_XSRF_TOKEN")
+
+	if sessionCookie != "" && xsrfToken != "" {
+		return &wanderlog.AuthCredentials{
+			SessionCookie: sessionCookie,
+			XSRFToken:     xsrfToken,
+			UserID:        os.Getenv("WANDERLOG_AUTH_USER_ID"),
+		}, nil
+	}
+
+	// Fall back to keychain
+	creds, err := wanderlog.LoadCredentials()
+	if err != nil {
+		return nil, err
+	}
+	if creds != nil {
+		return creds, nil
+	}
+
+	// Fall back to config file
+	if err := wanderlog.InitConfig(); err != nil {
+		return nil, err
+	}
+	return wanderlog.LoadCredentialsFromConfig()
+}
+
 func testStringPtr(value string) *string {
 	return &value
 }
 
 func TestFilterGeoGuideCounts(t *testing.T) {
-	data := json.RawMessage(`{
-		"geoGuideCounts": [
-			{"name": "Japan", "geoId": 86647, "guideCount": 16},
-			{"name": "Tokyo", "geoId": 1, "guideCount": 9},
-			{"name": "Kyoto", "geoId": 2, "guideCount": 7}
-		]
-	}`)
+	data := json.RawMessage(`[
+		{"name": "Japan", "id": 86647},
+		{"name": "Tokyo", "id": 1},
+		{"name": "Kyoto", "id": 2}
+	]`)
 
 	matches, err := filterGeoGuideCounts(data, "japan", 10)
 	require.NoError(t, err)
 	require.Len(t, matches, 1)
 	assert.Equal(t, 86647, matches[0].GeoID)
 	assert.Equal(t, "Japan", matches[0].Name)
+}
+
+func TestTripHasAddedPlaceRequiresRequestedSection(t *testing.T) {
+	var trip wanderlog.TripResponse
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"success": true,
+		"tripPlan": {
+			"itinerary": {
+				"sections": [
+					{"id": 10, "blocks": [{"type": "place", "place": {"name": "Tokyo Tower", "place_id": "tokyo-tower"}}]},
+					{"id": 11, "blocks": []}
+				]
+			}
+		},
+		"resources": {"placeMetadata": [{"name": "Tokyo Tower", "placeId": "tokyo-tower"}]}
+	}`), &trip))
+
+	assert.True(t, tripHasAddedPlace(&trip, 10, "Tokyo Tower", "tokyo-tower"))
+	assert.False(t, tripHasAddedPlace(&trip, 11, "Tokyo Tower", "tokyo-tower"))
+	assert.True(t, tripHasAddedPlace(&trip, 0, "Tokyo Tower", "tokyo-tower"))
+}
+
+func TestTripHasAddedFlightRequiresRequestedSectionAndDate(t *testing.T) {
+	var trip wanderlog.TripResponse
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"success": true,
+		"tripPlan": {
+			"itinerary": {
+				"sections": [
+					{"id": 10, "blocks": [{"type": "flight", "depart": {"date": "2026-05-11"}, "flightInfo": {"airline": {"iata": "MU"}, "number": 244}}]},
+					{"id": 11, "blocks": [{"type": "flight", "depart": {"date": "2026-05-12"}, "flightInfo": {"airline": {"iata": "MU"}, "number": 575}}]}
+				]
+			}
+		}
+	}`), &trip))
+
+	assert.True(t, tripHasAddedFlight(&trip, 10, "MU", 244, "2026-05-11"))
+	assert.False(t, tripHasAddedFlight(&trip, 11, "MU", 244, "2026-05-11"))
+	assert.False(t, tripHasAddedFlight(&trip, 10, "MU", 244, "2026-05-12"))
 }
 
 func TestResolveAddPlaceSectionIDRejectsImplicitUnscheduled(t *testing.T) {

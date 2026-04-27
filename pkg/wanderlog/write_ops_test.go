@@ -304,6 +304,28 @@ func TestAddPlace(t *testing.T) {
 				if !strings.Contains(r.URL.Path, tt.tripKey) {
 					t.Errorf("Expected path to contain '%s', got %s", tt.tripKey, r.URL.Path)
 				}
+				if !tt.expectError || strings.Contains(tt.serverResponse, "success") {
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Fatalf("reading request body: %v", err)
+					}
+					var payload struct {
+						Places []map[string]any `json:"places"`
+					}
+					if err := json.Unmarshal(body, &payload); err != nil {
+						t.Fatalf("decoding request body: %v", err)
+					}
+					if len(payload.Places) != 1 {
+						t.Fatalf("expected one place in native add-place payload, got %d", len(payload.Places))
+					}
+					nestedPlace, ok := payload.Places[0]["place"].(map[string]any)
+					if !ok {
+						t.Fatalf("expected nested place object in native add-place payload: %s", string(body))
+					}
+					if nestedPlace["place_id"] != tt.req.Place.PlaceID {
+						t.Fatalf("expected nested place_id %q, got %v", tt.req.Place.PlaceID, nestedPlace["place_id"])
+					}
+				}
 
 				w.WriteHeader(tt.serverStatus)
 				w.Write([]byte(tt.serverResponse))

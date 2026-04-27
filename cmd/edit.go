@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/denysvitali/wanderlog-cli/pkg/ui"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
@@ -82,9 +83,9 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("📍 Successfully added place '%s' to trip %s\n", placeName, tripKey)
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("📍 Successfully added place '%s' to trip %s", placeName, tripKey)))
 		if sectionIDFlag > 0 {
-			fmt.Printf("Section ID: %d\n", sectionIDFlag)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Section ID: %d", sectionIDFlag)))
 		}
 	},
 }
@@ -123,9 +124,9 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("🗑️  Successfully removed place %d from trip %s\n", placeIDInt, tripKey)
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🗑️  Successfully removed place %d from trip %s", placeIDInt, tripKey)))
 		if sectionIDFlag > 0 {
-			fmt.Printf("Section ID: %d\n", sectionIDFlag)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Section ID: %d", sectionIDFlag)))
 		}
 	},
 }
@@ -163,7 +164,7 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("🧹 Successfully cleared all blocks from section %d in trip %s\n", sectionID, tripKey)
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🧹 Successfully cleared all blocks from section %d in trip %s", sectionID, tripKey)))
 	},
 }
 
@@ -200,7 +201,7 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("🗑️ Successfully deleted section %d from trip %s\n", sectionID, tripKey)
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🗑️ Successfully deleted section %d from trip %s", sectionID, tripKey)))
 	},
 }
 
@@ -218,14 +219,14 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		tripKey := args[0]
 
-		fmt.Print("⚠️  WARNING: This will remove ALL places from ALL sections of your trip!\n")
+		fmt.Print(ui.WarningStyle.Render("⚠️  WARNING: This will remove ALL places from ALL sections of your trip!\n"))
 		fmt.Print("Are you sure you want to continue? (y/N): ")
 
 		var response string
 		_, _ = fmt.Scanln(&response)
 
 		if response != "y" && response != "Y" && response != "yes" {
-			fmt.Println("Operation canceled.")
+			fmt.Println(ui.InfoStyle.Render("Operation canceled."))
 			return
 		}
 
@@ -244,8 +245,8 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("💥 Successfully nuked all place data from trip %s\n", tripKey)
-		fmt.Println("🔄 Try accessing your trip now - the location error should be fixed.")
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("💥 Successfully nuked all place data from trip %s", tripKey)))
+		fmt.Println(ui.InfoStyle.Render("🔄 Try accessing your trip now - the location error should be fixed."))
 	},
 }
 

@@ -2,28 +2,27 @@ package wanderlog
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/sirupsen/logrus"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
 )
 
 const (
 	ClientVersion    = "2"
 	DefaultUserAgent = "wanderlog-cli/1.0"
-
-	googlePlacesFieldMask           = "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types"
-	googlePlacesRestaurantFieldMask = googlePlacesFieldMask + ",places.priceLevel,places.regularOpeningHours,places.photos"
 )
 
 var (
-	BaseURL                   = "https://wanderlog.com/api"
-	googlePlacesSearchTextURL = "https://places.googleapis.com/v1/places:searchText"
+	BaseURL = "https://wanderlog.com/api"
 )
 
 type Client struct {
@@ -31,41 +30,6 @@ type Client struct {
 	logger     *logrus.Logger
 	userAgent  string
 	auth       *AuthCredentials
-}
-
-type googlePlacesTextSearchRequest struct {
-	TextQuery    string                    `json:"textQuery"`
-	IncludedType string                    `json:"includedType,omitempty"`
-	LocationBias *googlePlacesLocationBias `json:"locationBias,omitempty"`
-}
-
-type googlePlacesLocationBias struct {
-	Circle googlePlacesCircle `json:"circle"`
-}
-
-type googlePlacesCircle struct {
-	Center googlePlacesLatLng `json:"center"`
-	Radius float64            `json:"radius"`
-}
-
-type googlePlacesLatLng struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-}
-
-type googlePlacesTextSearchResponse struct {
-	Places []googlePlacesTextSearchPlace `json:"places"`
-}
-
-type googlePlacesTextSearchPlace struct {
-	ID          string `json:"id"`
-	DisplayName struct {
-		Text string `json:"text"`
-	} `json:"displayName"`
-	FormattedAddress string             `json:"formattedAddress"`
-	Location         googlePlacesLatLng `json:"location"`
-	Rating           float64            `json:"rating"`
-	Types            []string           `json:"types"`
 }
 
 func NewClient() *Client {
@@ -80,6 +44,56 @@ func NewClient() *Client {
 
 func (c *Client) SetLogger(logger *logrus.Logger) {
 	c.logger = logger
+}
+
+func (c *Client) openAPI() (*openapi.ClientWithResponses, error) {
+	return openapi.NewClientWithResponses(
+		BaseURL,
+		openapi.WithHTTPClient(c.httpClient),
+		openapi.WithRequestEditorFn(c.openAPIRequestEditor),
+	)
+}
+
+func decodeOpenAPIBody(opName string, statusCode int, body []byte, out any) error {
+	if statusCode < 200 || statusCode >= 300 {
+		bodyText := string(body)
+		if msg, ok := knownWanderlogServerError(opName, bodyText); ok {
+			return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, msg)
+		}
+		return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, truncateForLog(bodyText, 500))
+	}
+	if out == nil || len(body) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("%s: decoding response: %w", opName, err)
+	}
+	return nil
+}
+
+func knownWanderlogServerError(opName, body string) (string, bool) {
+	if opName == "SearchLodgings" && strings.Contains(body, "Cannot read properties of undefined (reading 'length')") {
+		return "Wanderlog lodging search is currently failing server-side before returning hotel results", true
+	}
+	if strings.Contains(body, "Cannot read properties of undefined (reading 'place_id')") {
+		return "Wanderlog add-place is currently failing server-side while processing the place_id payload", true
+	}
+	return "", false
+}
+
+func parseOpenAPIDate(value, fieldName string) (openapi_types.Date, error) {
+	parsed, err := time.Parse(openapi_types.DateFormat, value)
+	if err != nil {
+		return openapi_types.Date{}, fmt.Errorf("parsing %s date: %w", fieldName, err)
+	}
+	return openapi_types.Date{Time: parsed}, nil
+}
+
+func truncateForLog(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 // DoAPI performs a raw request against a Wanderlog API endpoint. It is used by
@@ -140,58 +154,39 @@ func (c *Client) DoAPI(method, path string, body []byte, headers map[string]stri
 }
 
 func (c *Client) GetTrip(key string) (*TripResponse, error) {
-	url := fmt.Sprintf("%s/tripPlans/%s?clientSchemaVersion=2", BaseURL, key)
-
-	req, err := http.NewRequest("GET", url, nil)
+	api, err := c.openAPI()
 	if err != nil {
 		return nil, err
 	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
+	version := openapi.ClientSchemaVersion(2)
 
 	c.logger.WithFields(logrus.Fields{
 		"tripKey": key,
-		"url":     url,
-		"headers": req.Header,
 	}).Debug("GetTrip request details")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read response body for debugging
-	respBody, err := io.ReadAll(resp.Body)
+	resp, err := api.GetTripPlanWithResponse(context.Background(), key, &openapi.GetTripPlanParams{
+		ClientSchemaVersion: &version,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Log response for debugging
-	debugBody := string(respBody)
+	debugBody := string(resp.Body)
 	if len(debugBody) > 500 {
 		debugBody = debugBody[:500] + "..."
 	}
 
 	c.logger.WithFields(logrus.Fields{
 		"tripKey":      key,
-		"statusCode":   resp.StatusCode,
+		"statusCode":   resp.StatusCode(),
 		"responseBody": debugBody,
 	}).Debug("GetTrip API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s - Response: %s", resp.StatusCode, resp.Status, string(respBody))
-	}
-
 	var trip TripResponse
-	if err := json.Unmarshal(respBody, &trip); err != nil {
-		return nil, fmt.Errorf("failed to decode trip response: %w", err)
+	if err := decodeOpenAPIBody("GetTrip", resp.StatusCode(), resp.Body, &trip); err != nil {
+		return nil, err
 	}
 
-	// Check if the API returned an error
 	if trip.Error != "" {
 		return nil, fmt.Errorf("API error: %s", trip.Error)
 	}
@@ -201,50 +196,35 @@ func (c *Client) GetTrip(key string) (*TripResponse, error) {
 
 // GetTripSections retrieves only the sections of a trip without the full trip data
 func (c *Client) GetTripSections(key string) ([]ItSections, error) {
-	url := fmt.Sprintf("%s/tripPlans/%s/sections", BaseURL, key)
-
-	req, err := http.NewRequest("GET", url, nil)
+	api, err := c.openAPI()
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
+		return nil, err
 	}
 
 	c.logger.WithFields(logrus.Fields{
 		"tripKey": key,
-		"url":     url,
 	}).Debug("GetTripSections request details")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := api.GetTripPlanSectionsWithResponse(context.Background(), key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
 	c.logger.WithFields(logrus.Fields{
 		"tripKey":    key,
-		"statusCode": resp.StatusCode,
-		"bodySize":   len(respBody),
+		"statusCode": resp.StatusCode(),
+		"bodySize":   len(resp.Body),
 	}).Debug("GetTripSections API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s - Response: %s", resp.StatusCode, resp.Status, string(respBody))
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("GetTripSections: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
 	}
 
-	// The API returns sections wrapped in a success response with "data" key
 	var response struct {
 		Success bool         `json:"success"`
 		Data    []ItSections `json:"data"`
 	}
-	if err := json.Unmarshal(respBody, &response); err != nil {
+	if err := json.Unmarshal(resp.Body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode sections response: %w", err)
 	}
 
@@ -255,15 +235,15 @@ func (c *Client) GetTripSections(key string) ([]ItSections, error) {
 	return response.Data, nil
 }
 
-// SearchPlaces searches for places using Google Places API (New)
-func (c *Client) SearchPlaces(query string, latitude, longitude *float64, apiKey string) (*PlaceSearchResponse, error) {
+// SearchPlaces searches for places using Wanderlog's place autocomplete API.
+func (c *Client) SearchPlaces(query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
 	c.logger.WithFields(logrus.Fields{
 		"query":     query,
 		"latitude":  latitude,
 		"longitude": longitude,
-	}).Info("Searching places via Google Places API (New)")
+	}).Info("Searching places via Wanderlog API")
 
-	results, err := c.searchGooglePlaces(query, latitude, longitude, apiKey, "", googlePlacesFieldMask)
+	results, err := c.searchWanderlogPlaces(query, latitude, longitude)
 	if err != nil {
 		return results, err
 	}
@@ -271,20 +251,20 @@ func (c *Client) SearchPlaces(query string, latitude, longitude *float64, apiKey
 	c.logger.WithFields(logrus.Fields{
 		"query":       query,
 		"resultCount": len(results.Places),
-	}).Info("Successfully searched places via Google Places API (New)")
+	}).Info("Successfully searched places via Wanderlog API")
 
 	return results, nil
 }
 
-// SearchRestaurants searches for restaurants using Google Places API with restaurant type filter
-func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, apiKey string) (*PlaceSearchResponse, error) {
+// SearchRestaurants searches for restaurants using Wanderlog's place autocomplete API.
+func (c *Client) SearchRestaurants(query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
 	c.logger.WithFields(logrus.Fields{
 		"query":     query,
 		"latitude":  latitude,
 		"longitude": longitude,
-	}).Info("Searching restaurants via Google Places API")
+	}).Info("Searching restaurants via Wanderlog API")
 
-	results, err := c.searchGooglePlaces(query, latitude, longitude, apiKey, "restaurant", googlePlacesRestaurantFieldMask)
+	results, err := c.searchWanderlogPlaces(query, latitude, longitude)
 	if err != nil {
 		return results, err
 	}
@@ -292,84 +272,42 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, a
 	c.logger.WithFields(logrus.Fields{
 		"query":       query,
 		"resultCount": len(results.Places),
-	}).Info("Successfully searched restaurants via Google Places API")
+	}).Info("Successfully searched restaurants via Wanderlog API")
 
 	return results, nil
 }
 
-func (c *Client) searchGooglePlaces(query string, latitude, longitude *float64, apiKey, includedType, fieldMask string) (*PlaceSearchResponse, error) {
-	if apiKey == "" {
-		return &PlaceSearchResponse{
-			Success: false,
-			Places:  []SearchResult{},
-		}, fmt.Errorf("google Places API key is required; please provide an API key using --api-key flag")
+func (c *Client) searchWanderlogPlaces(query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
+	lat, lng := 0.0, 0.0
+	if latitude != nil {
+		lat = *latitude
+	}
+	if longitude != nil {
+		lng = *longitude
 	}
 
-	requestBody := googlePlacesTextSearchRequest{
-		TextQuery:    query,
-		IncludedType: includedType,
+	autocompleteResp, err := c.SearchPlacesWithWanderlog(query, lat, lng)
+	if err != nil {
+		return &PlaceSearchResponse{Success: false, Places: []SearchResult{}}, err
 	}
-	if latitude != nil && longitude != nil {
-		requestBody.LocationBias = &googlePlacesLocationBias{
-			Circle: googlePlacesCircle{
-				Center: googlePlacesLatLng{
-					Latitude:  *latitude,
-					Longitude: *longitude,
-				},
-				Radius: 50000.0,
-			},
+
+	results := make([]SearchResult, 0, len(autocompleteResp.Data))
+	for _, place := range autocompleteResp.Data {
+		name := place.StructuredFormatting.MainText
+		if name == "" {
+			name = place.Description
 		}
-	}
-
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", googlePlacesSearchTextURL, bytes.NewReader(jsonBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Goog-Api-Key", apiKey)
-	req.Header.Set("X-Goog-FieldMask", fieldMask)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request to Google Places API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-	bodyStr := string(body)
-	c.logger.WithFields(logrus.Fields{
-		"statusCode": resp.StatusCode,
-		"body":       truncateForLog(bodyStr, 500),
-		"url":        googlePlacesSearchTextURL,
-	}).Debug("Google Places API response")
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("google Places API returned status %d: %s", resp.StatusCode, bodyStr)
-	}
-
-	var googleResp googlePlacesTextSearchResponse
-	if err := json.Unmarshal(body, &googleResp); err != nil {
-		return nil, fmt.Errorf("failed to decode Google Places API response: %w", err)
-	}
-
-	results := make([]SearchResult, 0, len(googleResp.Places))
-	for _, place := range googleResp.Places {
+		address := place.StructuredFormatting.SecondaryText
+		if address == "" {
+			address = place.SecondaryText
+		}
 		results = append(results, SearchResult{
-			ID:         place.ID,
-			Name:       place.DisplayName.Text,
-			Address:    place.FormattedAddress,
-			PlaceID:    place.ID,
-			Latitude:   place.Location.Latitude,
-			Longitude:  place.Location.Longitude,
-			Rating:     place.Rating,
+			ID:         place.PlaceID,
+			Name:       name,
+			Address:    address,
+			PlaceID:    place.PlaceID,
+			Latitude:   lat,
+			Longitude:  lng,
 			Categories: place.Types,
 		})
 	}
@@ -500,8 +438,8 @@ type PlaceDetailsResponse struct {
 	} `json:"data"`
 }
 
-// WanderlLogAutocompleteResponse represents the response from the Wanderlog autocomplete API
-type WanderlLogAutocompleteResponse struct {
+// WanderlogAutocompleteResponse represents the response from the Wanderlog autocomplete API
+type WanderlogAutocompleteResponse struct {
 	Success bool `json:"success"`
 	Data    []struct {
 		PlaceID              string   `json:"place_id"`
@@ -526,40 +464,26 @@ type WanderlLogAutocompleteResponse struct {
 
 // GetPlaceDetails fetches detailed information about a place from Wanderlog's place details API
 func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) {
-	url := fmt.Sprintf("https://wanderlog.com/api/placesAPI/getPlaceDetailsAndCardData?placeId=%s&language=en", placeID)
-
-	req, err := http.NewRequest("GET", url, nil)
+	api, err := c.openAPI()
 	if err != nil {
 		return nil, err
 	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
-
-	resp, err := c.httpClient.Do(req)
+	language := "en"
+	resp, err := api.GetPlaceDetailsAndCardDataWithResponse(context.Background(), &openapi.GetPlaceDetailsAndCardDataParams{
+		PlaceId:  placeID,
+		Language: &language,
+	})
 	if err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncateForLog(string(respBody), 500))
 	}
 
 	var result PlaceDetailsResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decoding response: %w (body: %s)", err, truncateForLog(string(respBody), 200))
+	if err := decodeOpenAPIBody("GetPlaceDetails", resp.StatusCode(), resp.Body, &result); err != nil {
+		return nil, err
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("API request was not successful: %s", truncateForLog(string(respBody), 500))
+		return nil, fmt.Errorf("API request was not successful: %s", truncateForLog(string(resp.Body), 500))
 	}
 
 	return &result, nil
@@ -567,8 +491,16 @@ func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) 
 
 // GetAllAirlines retrieves all available airlines
 func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := api.GetAllAirlinesInternalWithResponse(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	var result AirlinesResponse
-	if err := c.doJSON(http.MethodGet, "/flights/allAirlines", nil, &result, false, "get all airlines"); err != nil {
+	if err := decodeOpenAPIBody("GetAllAirlines", resp.StatusCode(), resp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -576,9 +508,16 @@ func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
 
 // AutocompleteAirport searches for airports by query (path-based)
 func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse, error) {
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := api.AutocompleteAirportWithResponse(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
 	var result AirportAutocompleteResponse
-	path := fmt.Sprintf("/flights/autocompleteAirport/%s", url.PathEscape(query))
-	if err := c.doJSON(http.MethodGet, path, nil, &result, false, "autocomplete airport"); err != nil {
+	if err := decodeOpenAPIBody("AutocompleteAirport", resp.StatusCode(), resp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -586,12 +525,22 @@ func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse
 
 // AutocompleteAirportWithLocation searches for airports by query with location bias (query is path-based)
 func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64) (*AirportAutocompleteResponse, error) {
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := api.AutocompleteAirportWithLocationWithResponse(context.Background(), query, func(_ context.Context, req *http.Request) error {
+		values := req.URL.Query()
+		values.Set("latitude", fmt.Sprintf("%f", lat))
+		values.Set("longitude", fmt.Sprintf("%f", lng))
+		req.URL.RawQuery = values.Encode()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	var result AirportAutocompleteResponse
-	values := url.Values{}
-	values.Set("latitude", fmt.Sprintf("%f", lat))
-	values.Set("longitude", fmt.Sprintf("%f", lng))
-	path := fmt.Sprintf("/flights/autocompleteAirportWithLocation/%s?%s", url.PathEscape(query), values.Encode())
-	if err := c.doJSON(http.MethodGet, path, nil, &result, false, "autocomplete airport with location"); err != nil {
+	if err := decodeOpenAPIBody("AutocompleteAirportWithLocation", resp.StatusCode(), resp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -600,29 +549,41 @@ func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64)
 // GetFlightStops retrieves flight stops for a given flight.
 // The API requires flightNumber (integer string), airline IATA code (airlineIata), and departure date (departDate).
 func (c *Client) GetFlightStops(flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
-	values := url.Values{}
-	values.Set("flightNumber", flightNumber)
-	values.Set("airlineIata", airlineIata)
-	values.Set("departDate", departureDate)
-	body, err := c.doRaw(http.MethodGet, "/flights/flightStops?"+values.Encode(), nil, false, "get flight stops")
+	api, err := c.openAPI()
 	if err != nil {
 		return nil, err
 	}
-
+	date, err := parseOpenAPIDate(departureDate, "departure")
+	if err != nil {
+		return nil, fmt.Errorf("get flight stops: parsing departure date: %w", err)
+	}
+	httpResp, err := api.GetFlightStops(context.Background(), &openapi.GetFlightStopsParams{
+		FlightNumber: flightNumber,
+		AirlineIata:  airlineIata,
+		DepartDate:   date,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("get flight stops: reading response: %w", err)
+	}
 	if len(body) > 0 && body[0] == '<' {
 		return nil, fmt.Errorf("API returned HTML instead of JSON (endpoint may be unavailable)")
 	}
 
 	var result FlightStopsResponse
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := decodeOpenAPIBody("GetFlightStops", httpResp.StatusCode, body, &result); err != nil {
 		return nil, err
 	}
 
 	return &result, nil
 }
 
-// WanderlLogAutocompleteRequest represents the request for Wanderlog place autocomplete
-type WanderlLogAutocompleteRequest struct {
+// WanderlogAutocompleteRequest represents the request for Wanderlog place autocomplete
+type WanderlogAutocompleteRequest struct {
 	Input        string `json:"input"`
 	SessionToken string `json:"sessiontoken"`
 	Location     struct {
@@ -633,9 +594,9 @@ type WanderlLogAutocompleteRequest struct {
 	Language string  `json:"language"`
 }
 
-// SearchPlacesWithWanderllog searches for places using Wanderlog's autocomplete API
-func (c *Client) SearchPlacesWithWanderllog(query string, lat, lng float64) (*WanderlLogAutocompleteResponse, error) {
-	reqData := WanderlLogAutocompleteRequest{
+// SearchPlacesWithWanderlog searches for places using Wanderlog's autocomplete API
+func (c *Client) SearchPlacesWithWanderlog(query string, lat, lng float64) (*WanderlogAutocompleteResponse, error) {
+	reqData := WanderlogAutocompleteRequest{
 		Input:        query,
 		SessionToken: fmt.Sprintf("%d", time.Now().UnixNano()), // Simple session token
 		Location: struct {
@@ -654,31 +615,19 @@ func (c *Client) SearchPlacesWithWanderllog(query string, lat, lng float64) (*Wa
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://wanderlog.com/api/placesAPI/autocomplete/v2?request=%s",
-		url.QueryEscape(string(reqJSON)))
-
-	req, err := http.NewRequest("GET", apiURL, nil)
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := api.AutocompletePlacesAndSuggestionsWithResponse(context.Background(), &openapi.AutocompletePlacesAndSuggestionsParams{
+		Request: string(reqJSON),
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	var result WanderlLogAutocompleteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var result WanderlogAutocompleteResponse
+	if err := decodeOpenAPIBody("SearchPlacesWithWanderlog", resp.StatusCode(), resp.Body, &result); err != nil {
 		return nil, err
 	}
 
@@ -692,26 +641,50 @@ func (c *Client) SearchPlacesWithWanderllog(query string, lat, lng float64) (*Wa
 // SearchLodgings searches for hotels/lodgings for given dates and guest count.
 // The API uses startDate/endDate (not checkIn/checkOut) and aduldCount/roomCount/childrenAges.
 func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*LodgingSearchResponse, error) {
-	requestBody := map[string]interface{}{
-		"query":      query,
-		"startDate":  checkIn,
-		"endDate":    checkOut,
-		"adultCount": guests,
-		"roomCount":  1,
-	}
-
-	respBody, err := c.doRaw(http.MethodPost, "/lodging/searchLodgings", requestBody, false, "search lodgings")
+	api, err := c.openAPI()
 	if err != nil {
 		return nil, err
 	}
+	startDate, err := parseOpenAPIDate(checkIn, "check-in")
+	if err != nil {
+		return nil, fmt.Errorf("search lodgings: %w", err)
+	}
+	endDate, err := parseOpenAPIDate(checkOut, "check-out")
+	if err != nil {
+		return nil, fmt.Errorf("search lodgings: %w", err)
+	}
+
+	reqBody, err := json.Marshal(map[string]any{
+		"destination":  query,
+		"dates":        map[string]string{"startDate": startDate.Time.Format(openapi_types.DateFormat), "endDate": endDate.Time.Format(openapi_types.DateFormat)},
+		"guests":       guests,
+		"adultCount":   guests,
+		"aduldCount":   guests,
+		"roomCount":    1,
+		"childrenAges": []int{},
+		"source":       "google",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("search lodgings: marshaling request: %w", err)
+	}
+
+	httpResp, err := api.SearchLodgingsWithBody(context.Background(), "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("search lodgings: reading response: %w", err)
+	}
 
 	var result LodgingSearchResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	if err := decodeOpenAPIBody("SearchLodgings", httpResp.StatusCode, body, &result); err != nil {
+		return nil, err
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("lodging search API returned success=false for query %q; response: %s", query, string(respBody))
+		return nil, fmt.Errorf("lodging search API returned success=false for query %q; response: %s", query, string(body))
 	}
 
 	return &result, nil
@@ -719,12 +692,20 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 
 // GetGooglePriceRates retrieves Google price rates for a specific lodging property
 func (c *Client) GetGooglePriceRates(propertyID string) (*GooglePriceRatesResponse, error) {
-	requestBody := map[string]interface{}{
-		"propertyId": propertyID,
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
 	}
-
+	resp, err := api.GetGooglePriceRatesWithResponse(context.Background(), &openapi.GetGooglePriceRatesParams{
+		Id:     propertyID,
+		Dates:  "{}",
+		Guests: "{}",
+	})
+	if err != nil {
+		return nil, err
+	}
 	var result GooglePriceRatesResponse
-	if err := c.doJSON(http.MethodPost, "/lodging/getGooglePriceRates", requestBody, &result, false, "get Google price rates"); err != nil {
+	if err := decodeOpenAPIBody("GetGooglePriceRates", resp.StatusCode(), resp.Body, &result); err != nil {
 		return nil, err
 	}
 

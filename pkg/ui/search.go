@@ -15,7 +15,7 @@ func PrintSearchResults(results []wanderlog.SearchResult) {
 		return
 	}
 
-	fmt.Println(titleStyle.Render(fmt.Sprintf("🔍 Found %d place(s)", len(results))))
+	fmt.Println(TitleStyle.Render(fmt.Sprintf("🔍 Found %d place(s)", len(results))))
 	fmt.Println()
 
 	for i, place := range results {
@@ -29,37 +29,37 @@ func PrintSearchResults(results []wanderlog.SearchResult) {
 			name += fmt.Sprintf(" %s (%.1f)", stars, place.Rating)
 		}
 
-		fmt.Println(placeStyle.Render(fmt.Sprintf("📍 %s", name)))
+		fmt.Println(PlaceStyle.Render(fmt.Sprintf("📍 %s", name)))
 
 		// Address
 		if place.Address != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🏠 %s", place.Address)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏠 %s", place.Address)))
 		}
 
 		// Categories
 		if len(place.Categories) > 0 {
 			categories := strings.Join(place.Categories, ", ")
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🏷️  %s", categories)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏷️  %s", categories)))
 		}
 
 		// Description
 		if place.Description != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   📝 %s", place.Description)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📝 %s", place.Description)))
 		}
 
 		// Website
 		if place.Website != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🌐 %s", place.Website)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🌐 %s", place.Website)))
 		}
 
 		// Coordinates
 		if place.Latitude != 0 && place.Longitude != 0 {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🗺️  %.4f, %.4f", place.Latitude, place.Longitude)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🗺️  %.4f, %.4f", place.Latitude, place.Longitude)))
 		}
 
 		// Place ID
 		if place.PlaceID != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🆔 %s", place.PlaceID)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🆔 %s", place.PlaceID)))
 		}
 
 		// Spacer between places

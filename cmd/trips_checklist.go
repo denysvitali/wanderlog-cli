@@ -80,7 +80,7 @@ func init() {
 	tripsChecklistToggleCmd.Flags().BoolVar(&tripsChecklistChecked, "checked", true, "Checked state")
 
 	for _, c := range []*cobra.Command{tripsChecklistAddCmd, tripsChecklistToggleCmd} {
-		c.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+		c.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		c.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		c.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

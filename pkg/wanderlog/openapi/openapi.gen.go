@@ -129,7 +129,7 @@ type AddPlacesRequest struct {
 	// AddDuplicates Whether duplicate places may be added to the trip.
 	AddDuplicates *bool `json:"addDuplicates,omitempty"`
 
-	// Places Place objects to add. Usually Google Places-compatible objects.
+	// Places Place objects to add. Usually Wanderlog autocomplete/detail objects.
 	Places []map[string]interface{} `json:"places"`
 }
 

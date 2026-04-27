@@ -27,7 +27,7 @@ Requires authentication via 'wanderlog login'.
 
 Examples:
   wanderlog trips list
-  wanderlog trips list --format json`,
+  wanderlog trips list --output json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
@@ -64,8 +64,8 @@ https://wanderlog.com/view/TRIP_ID/trip-name
 
 Examples:
   wanderlog trips show abc123xyz
-  wanderlog trips show abc123xyz --format json
-  wanderlog trips show abc123xyz --format markdown --details
+  wanderlog trips show abc123xyz --output json
+  wanderlog trips show abc123xyz --output markdown --details
   wanderlog trips show --file trips/trip1.json`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if fromFile != "" && len(args) > 0 {
@@ -114,23 +114,24 @@ func init() {
 	tripsCmd.AddCommand(tripsListCmd, tripsShowCmd)
 
 	// trips list flags
-	tripsListCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripsListCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 	tripsListCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	tripsListCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 
 	// trips show flags
-	tripsShowCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripsShowCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 	tripsShowCmd.Flags().BoolVarP(&showDetails, "details", "d", false, "Show detailed information")
 	tripsShowCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
 }
 
 func tripsListPretty(trips *wanderlog.UserTripsResponse) {
 	if len(trips.Data) == 0 {
-		fmt.Println("📭 No trips found")
+		fmt.Println(ui.WarningStyle.Render("📭 No trips found"))
 		return
 	}
 
-	fmt.Printf("📚 Your Trips (%d total)\n\n", len(trips.Data))
+	fmt.Println(ui.TitleStyle.Render(fmt.Sprintf("📚 Your Trips (%d total)", len(trips.Data))))
+	fmt.Println()
 
 	for _, trip := range trips.Data {
 		privacy := "🌍"
@@ -138,34 +139,34 @@ func tripsListPretty(trips *wanderlog.UserTripsResponse) {
 			privacy = "⭐"
 		}
 
-		fmt.Printf("%s %s\n", privacy, trip.Title)
-		fmt.Printf("   Key: %s\n", trip.Key)
+		fmt.Printf("%s %s\n", privacy, ui.PlaceStyle.Render(trip.Title))
+		fmt.Println(ui.IdStyle.Render(fmt.Sprintf("   Key: %s", trip.Key)))
 
 		if trip.StartDate != "" && trip.EndDate != "" {
 			startDate, _ := time.Parse("2006-01-02", trip.StartDate)
 			endDate, _ := time.Parse("2006-01-02", trip.EndDate)
 			days := int(endDate.Sub(startDate).Hours()/24) + 1
-			fmt.Printf("   📅 %s → %s (%d days)\n",
+			fmt.Println(ui.DateStyle.Render(fmt.Sprintf("   📅 %s → %s (%d days)",
 				startDate.Format("Jan 2, 2006"),
 				endDate.Format("Jan 2, 2006"),
-				days)
+				days)))
 		}
 
 		stats := []string{
-			fmt.Sprintf("📍 %d places", trip.PlaceCount),
-			fmt.Sprintf("👀 %d views", trip.ViewCount),
+			ui.InfoStyle.Render(fmt.Sprintf("📍 %d places", trip.PlaceCount)),
+			ui.InfoStyle.Render(fmt.Sprintf("👀 %d views", trip.ViewCount)),
 		}
 		if trip.LikeCount > 0 {
-			stats = append(stats, fmt.Sprintf("❤️ %d likes", trip.LikeCount))
+			stats = append(stats, ui.SuccessStyle.Render(fmt.Sprintf("❤️ %d likes", trip.LikeCount)))
 		}
 
-		fmt.Printf("   %s\n", strings.Join(stats, "  •  "))
+		fmt.Printf("   %s\n", strings.Join(stats, ui.SeparatorStyle.Render("  •  ")))
 
 		if trip.IsPrimary {
-			fmt.Printf("   ⭐ Primary Trip\n")
+			fmt.Println(ui.HighlightStyle.Render("   ⭐ Primary Trip"))
 		}
 		if trip.IsDraft {
-			fmt.Printf("   📝 Draft\n")
+			fmt.Println(ui.WarningStyle.Render("   📝 Draft"))
 		}
 
 		fmt.Println()

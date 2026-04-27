@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/denysvitali/wanderlog-cli/pkg/ui"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
@@ -85,12 +86,12 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("🎉 Successfully created trip!\n")
-		fmt.Printf("Title: %s\n", resp.TripPlan.Title)
-		fmt.Printf("Trip ID: %d\n", resp.TripPlan.ID)
-		fmt.Printf("Trip Key: %s\n", resp.TripPlan.Key)
-		fmt.Printf("Edit Key: %s\n", resp.TripPlan.EditKey)
-		fmt.Printf("URL: https://wanderlog.com/view/%s/%s\n", resp.TripPlan.Key, resp.TripPlan.Title)
+		fmt.Println(ui.SuccessStyle.Render("🎉 Successfully created trip!"))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Title: %s", resp.TripPlan.Title)))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Trip ID: %d", resp.TripPlan.ID)))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Trip Key: %s", resp.TripPlan.Key)))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Edit Key: %s", resp.TripPlan.EditKey)))
+		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("URL: https://wanderlog.com/view/%s/%s", resp.TripPlan.Key, resp.TripPlan.Title)))
 	},
 }
 
@@ -117,14 +118,14 @@ WARNING: This action cannot be undone!`,
 			os.Exit(1)
 		}
 
-		fmt.Printf("⚠️  Are you sure you want to delete trip %s? This cannot be undone.\n", tripKey)
+		fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("⚠️  Are you sure you want to delete trip %s? This cannot be undone.", tripKey)))
 		fmt.Print("Type 'yes' to confirm: ")
 
 		var confirmation string
 		_, _ = fmt.Scanln(&confirmation)
 
 		if confirmation != "yes" {
-			fmt.Println("Trip deletion canceled.")
+			fmt.Println(ui.InfoStyle.Render("Trip deletion canceled."))
 			return
 		}
 
@@ -134,7 +135,7 @@ WARNING: This action cannot be undone!`,
 			os.Exit(1)
 		}
 
-		fmt.Printf("✅ Successfully deleted trip %s\n", tripKey)
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully deleted trip %s", tripKey)))
 	},
 }
 
@@ -163,12 +164,12 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("📋 Successfully copied trip!\n")
-		fmt.Printf("Original: %s\n", sourceKey)
-		fmt.Printf("New Title: %s\n", resp.TripPlan.Title)
-		fmt.Printf("New Key: %s\n", resp.TripPlan.Key)
-		fmt.Printf("Edit Key: %s\n", resp.TripPlan.EditKey)
-		fmt.Printf("URL: https://wanderlog.com/view/%s/%s\n", resp.TripPlan.Key, resp.TripPlan.Title)
+		fmt.Println(ui.SuccessStyle.Render("📋 Successfully copied trip!"))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Original: %s", sourceKey)))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("New Title: %s", resp.TripPlan.Title)))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("New Key: %s", resp.TripPlan.Key)))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Edit Key: %s", resp.TripPlan.EditKey)))
+		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("URL: https://wanderlog.com/view/%s/%s", resp.TripPlan.Key, resp.TripPlan.Title)))
 	},
 }
 

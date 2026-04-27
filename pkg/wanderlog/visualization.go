@@ -1,10 +1,8 @@
 package wanderlog
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"net/http"
-	"strings"
 )
 
 // UserTripsResponse represents the response from getting user's trips
@@ -95,145 +93,83 @@ type TripStatsResponse struct {
 
 // GetUserTrips retrieves all trips for the authenticated user
 func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
-	url := fmt.Sprintf("%s/tripPlans", BaseURL)
-
-	req, err := http.NewRequest("GET", url, nil)
+	api, err := c.openAPI()
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept", "application/json")
-
-	if c.auth != nil {
-		_ = c.addAuthHeaders(req)
+		return nil, err
 	}
 
 	c.logger.Debug("Fetching user trips")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := api.ListUserTripPlansWithResponse(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	var result UserTripsResponse
+	if err := decodeOpenAPIBody("GetUserTrips", resp.StatusCode(), resp.Body, &result); err != nil {
+		return nil, err
 	}
 
-	var tripsResponse UserTripsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tripsResponse); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
+	c.logger.WithField("tripCount", len(result.Data)).Info("Successfully fetched user trips")
 
-	c.logger.WithField("tripCount", len(tripsResponse.Data)).Info("Successfully fetched user trips")
-
-	return &tripsResponse, nil
+	return &result, nil
 }
 
 // GetTripImages retrieves images for a trip
 func (c *Client) GetTripImages(tripKey string) (*TripImagesResponse, error) {
-	url := fmt.Sprintf("%s/tripPlans/%s/images", BaseURL, tripKey)
-
-	req, err := http.NewRequest("GET", url, nil)
+	api, err := c.openAPI()
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept", "application/json")
 
 	c.logger.WithField("tripKey", tripKey).Debug("Fetching trip images")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := api.GetTripPlanImagesWithResponse(context.Background(), tripKey)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	var imagesResponse TripImagesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&imagesResponse); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	var result TripImagesResponse
+	if err := decodeOpenAPIBody("GetTripImages", resp.StatusCode(), resp.Body, &result); err != nil {
+		return nil, err
 	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":    tripKey,
-		"imageCount": len(imagesResponse.Images),
+		"imageCount": len(result.Images),
 	}).Info("Successfully fetched trip images")
 
-	return &imagesResponse, nil
+	return &result, nil
 }
 
 // GetTripPlaces retrieves places for a trip with additional details
 func (c *Client) GetTripPlaces(tripKey string) (*TripResponse, error) {
-	url := fmt.Sprintf("%s/tripPlans/%s/places", BaseURL, tripKey)
-
-	req, err := http.NewRequest("GET", url, nil)
+	api, err := c.openAPI()
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept", "application/json")
 
 	c.logger.WithField("tripKey", tripKey).Debug("Fetching trip places")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := api.GetTripPlanPlacesWithResponse(context.Background(), tripKey)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	var placesResponse TripResponse
-	if err := json.NewDecoder(resp.Body).Decode(&placesResponse); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	var result TripResponse
+	if err := decodeOpenAPIBody("GetTripPlaces", resp.StatusCode(), resp.Body, &result); err != nil {
+		return nil, err
 	}
 
 	c.logger.WithField("tripKey", tripKey).Info("Successfully fetched trip places")
 
-	return &placesResponse, nil
+	return &result, nil
 }
 
 // LikeTrip likes or unlikes a trip.
 //
 // Deprecated: Use SetLike in write_ops.go instead.
 func (c *Client) LikeTrip(tripKey string, liked bool) error {
-	if c.auth == nil {
-		return fmt.Errorf("authentication required for liking trips")
-	}
-
-	likeReq := struct {
-		Liked bool `json:"liked"`
-	}{
-		Liked: liked,
-	}
-
-	reqBody, err := json.Marshal(likeReq)
-	if err != nil {
-		return fmt.Errorf("marshaling like request: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/tripPlans/%s/like", BaseURL, tripKey)
-	req, err := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-
-	if err := c.addAuthHeaders(req); err != nil {
-		return fmt.Errorf("adding auth headers: %w", err)
-	}
-
 	action := "unliked"
 	if liked {
 		action = "liked"
@@ -242,15 +178,8 @@ func (c *Client) LikeTrip(tripKey string, liked bool) error {
 		"tripKey": tripKey,
 		"action":  action,
 	}).Debug("Updating trip like status")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	if err := c.SetLike(tripKey, liked); err != nil {
+		return err
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -265,30 +194,9 @@ func (c *Client) LikeTrip(tripKey string, liked bool) error {
 //
 // Deprecated: Use RegisterTripView in journal_ops.go instead.
 func (c *Client) RegisterView(tripKey string) error {
-	url := fmt.Sprintf("%s/tripPlans/%s/registerView", BaseURL, tripKey)
-
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-
-	// Views can be registered without authentication
-	if c.auth != nil {
-		_ = c.addAuthHeaders(req)
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Registering trip view")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	if err := c.RegisterTripView(tripKey); err != nil {
+		return err
 	}
 
 	c.logger.WithField("tripKey", tripKey).Debug("Successfully registered view")

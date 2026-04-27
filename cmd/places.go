@@ -19,8 +19,8 @@ names, addresses, ratings, and other metadata.
 Examples:
   wanderlog places abc123xyz
   wanderlog places --file trips/trip1.json
-  wanderlog places abc123xyz --format json
-  wanderlog places abc123xyz --format markdown`,
+  wanderlog places abc123xyz --output json
+  wanderlog places abc123xyz --output markdown`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if fromFile != "" && len(args) > 0 {
 			return fmt.Errorf("cannot specify both trip ID and --file flag")
@@ -69,6 +69,6 @@ func init() {
 	// root registration disabled - command moved under `trips places`
 	// rootCmd.AddCommand(placesCmd)
 
-	placesCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	placesCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 	placesCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
 }

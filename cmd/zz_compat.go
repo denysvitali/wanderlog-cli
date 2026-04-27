@@ -129,17 +129,17 @@ var compatLikeCountCmd = &cobra.Command{
 
 var compatSearchCmd = &cobra.Command{
 	Use:                "search",
-	Short:              "Search for places (deprecated: use 'wanderlog search google')",
+	Short:              "Search for places (deprecated: use 'wanderlog search places')",
 	Hidden:             true,
 	DisableSuggestions: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		searchGoogleCmd.Run(searchGoogleCmd, args)
+		searchWanderlogCmd.Run(searchWanderlogCmd, args)
 	},
 }
 
 var compatSearchPlacesCmd = &cobra.Command{
 	Use:                "search-places",
-	Short:              "Search places using Wanderlog autocomplete (deprecated: use 'wanderlog search wanderlog')",
+	Short:              "Search places using Wanderlog autocomplete (deprecated: use 'wanderlog search places')",
 	Hidden:             true,
 	DisableSuggestions: true,
 	Run: func(cmd *cobra.Command, args []string) {

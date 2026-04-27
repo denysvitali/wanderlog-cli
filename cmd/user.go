@@ -361,7 +361,7 @@ func init() {
 		userEmailsCmd,
 		userLogoutServerCmd,
 	} {
-		command.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+		command.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		command.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		command.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

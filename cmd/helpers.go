@@ -108,5 +108,5 @@ func printSuccess(format string, message string, data interface{}) {
 		ui.PrintJSON(data)
 		return
 	}
-	fmt.Println(message)
+	fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✓ %s", message)))
 }

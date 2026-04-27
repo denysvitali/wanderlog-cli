@@ -140,7 +140,7 @@ func init() {
 	travelFlightStopsCmd.Flags().StringVar(&flightStopsDate, "date", "", "Departure date (YYYY-MM-DD)")
 
 	for _, c := range []*cobra.Command{travelAirlinesCmd, travelAirportsCmd, travelFlightStopsCmd, travelHotelsCmd, travelHotelRatesCmd} {
-		c.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+		c.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		c.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		c.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

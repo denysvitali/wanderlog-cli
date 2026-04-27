@@ -21,7 +21,7 @@ Requires authentication via 'wanderlog login'.
 
 Examples:
   wanderlog list
-  wanderlog list --format json`,
+  wanderlog list --output json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
@@ -56,7 +56,7 @@ var imagesCmd = &cobra.Command{
 
 Examples:
   wanderlog images abc123xyz
-  wanderlog images abc123xyz --format json`,
+  wanderlog images abc123xyz --output json`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		tripID := args[0]
@@ -83,11 +83,12 @@ Examples:
 
 func printTripsList(trips *wanderlog.UserTripsResponse) {
 	if len(trips.Data) == 0 {
-		fmt.Println("📭 No trips found")
+		fmt.Println(ui.WarningStyle.Render("📭 No trips found"))
 		return
 	}
 
-	fmt.Printf("📚 Your Trips (%d total)\n\n", len(trips.Data))
+	fmt.Println(ui.TitleStyle.Render(fmt.Sprintf("📚 Your Trips (%d total)", len(trips.Data))))
+	fmt.Println()
 
 	for _, trip := range trips.Data {
 		// Trip title with privacy indicator (default to public since privacy field not in response)
@@ -96,37 +97,37 @@ func printTripsList(trips *wanderlog.UserTripsResponse) {
 			privacy = "⭐" // Star for primary trips
 		}
 
-		fmt.Printf("%s %s\n", privacy, trip.Title)
-		fmt.Printf("   Key: %s\n", trip.Key)
+		fmt.Printf("%s %s\n", privacy, ui.PlaceStyle.Render(trip.Title))
+		fmt.Println(ui.IdStyle.Render(fmt.Sprintf("   Key: %s", trip.Key)))
 
 		// Dates
 		if trip.StartDate != "" && trip.EndDate != "" {
 			startDate, _ := time.Parse("2006-01-02", trip.StartDate)
 			endDate, _ := time.Parse("2006-01-02", trip.EndDate)
 			days := int(endDate.Sub(startDate).Hours()/24) + 1
-			fmt.Printf("   📅 %s → %s (%d days)\n",
+			fmt.Println(ui.DateStyle.Render(fmt.Sprintf("   📅 %s → %s (%d days)",
 				startDate.Format("Jan 2, 2006"),
 				endDate.Format("Jan 2, 2006"),
-				days)
+				days)))
 		}
 
 		// Stats
 		stats := []string{
-			fmt.Sprintf("📍 %d places", trip.PlaceCount),
-			fmt.Sprintf("👀 %d views", trip.ViewCount),
+			ui.InfoStyle.Render(fmt.Sprintf("📍 %d places", trip.PlaceCount)),
+			ui.InfoStyle.Render(fmt.Sprintf("👀 %d views", trip.ViewCount)),
 		}
 		if trip.LikeCount > 0 {
-			stats = append(stats, fmt.Sprintf("❤️ %d likes", trip.LikeCount))
+			stats = append(stats, ui.SuccessStyle.Render(fmt.Sprintf("❤️ %d likes", trip.LikeCount)))
 		}
 
-		fmt.Printf("   %s\n", strings.Join(stats, "  •  "))
+		fmt.Printf("   %s\n", strings.Join(stats, ui.SeparatorStyle.Render("  •  ")))
 
 		// Additional indicators
 		if trip.IsPrimary {
-			fmt.Printf("   ⭐ Primary Trip\n")
+			fmt.Println(ui.HighlightStyle.Render("   ⭐ Primary Trip"))
 		}
 		if trip.IsDraft {
-			fmt.Printf("   📝 Draft\n")
+			fmt.Println(ui.WarningStyle.Render("   📝 Draft"))
 		}
 
 		fmt.Println()
@@ -135,24 +136,25 @@ func printTripsList(trips *wanderlog.UserTripsResponse) {
 
 func printImagesList(images *wanderlog.TripImagesResponse, tripID string) {
 	if len(images.Images) == 0 {
-		fmt.Printf("📷 No images found for trip %s\n", tripID)
+		fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("📷 No images found for trip %s", tripID)))
 		return
 	}
 
-	fmt.Printf("📷 Trip Images (%d total)\n\n", len(images.Images))
+	fmt.Println(ui.TitleStyle.Render(fmt.Sprintf("📷 Trip Images (%d total)", len(images.Images))))
+	fmt.Println()
 
 	for i, img := range images.Images {
-		fmt.Printf("%d. %s\n", i+1, img.Key)
-		fmt.Printf("   Size: %dx%d\n", img.Width, img.Height)
+		fmt.Printf("%d. %s\n", i+1, ui.PlaceStyle.Render(img.Key))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Size: %dx%d", img.Width, img.Height)))
 		if img.Caption != "" {
-			fmt.Printf("   Caption: %s\n", img.Caption)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Caption: %s", img.Caption)))
 		}
 		if img.PlaceID != "" {
-			fmt.Printf("   Place ID: %s\n", img.PlaceID)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Place ID: %s", img.PlaceID)))
 		}
-		fmt.Printf("   URL: %s\n", img.URL)
+		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("   URL: %s", img.URL)))
 		if img.ThumbnailURL != "" {
-			fmt.Printf("   Thumbnail: %s\n", img.ThumbnailURL)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Thumbnail: %s", img.ThumbnailURL)))
 		}
 		fmt.Println()
 	}
@@ -224,7 +226,7 @@ func init() {
 	// rootCmd.AddCommand(imagesCmd)
 
 	for _, cmd := range []*cobra.Command{listCmd, imagesCmd} {
-		cmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+		cmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 		cmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		cmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

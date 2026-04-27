@@ -475,7 +475,7 @@ func init() {
 		checklistAddCmd, checklistToggleCmd, airlinesCmd, airportsCmd, flightStopsCmd,
 		hotelsCmd, hotelRatesCmd,
 	} {
-		command.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format (json)")
+		command.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		command.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		command.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

@@ -13,12 +13,16 @@ type TripFlightsResponse struct {
 // TripFlight represents a flight in a trip
 type TripFlight struct {
 	ID            int           `json:"id,omitzero"`
+	SectionID     int           `json:"sectionId,omitempty"`
+	SectionDate   string        `json:"sectionDate,omitempty"`
 	FlightNumber  string        `json:"flightNumber"`
 	Airline       string        `json:"airline"`
 	AirlineIATA   string        `json:"airlineIata,omitempty"`
 	Origin        FlightAirport `json:"origin"`
 	Destination   FlightAirport `json:"destination"`
+	DepartureDate string        `json:"departureDate,omitempty"`
 	DepartureTime string        `json:"departureTime"`
+	ArrivalDate   string        `json:"arrivalDate,omitempty"`
 	ArrivalTime   string        `json:"arrivalTime"`
 	DurationMins  int           `json:"durationMins,omitempty"`
 	Stops         int           `json:"stops,omitempty"`

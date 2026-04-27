@@ -19,7 +19,7 @@ names, addresses, ratings, and other metadata.
 Examples:
   wanderlog trips places abc123xyz
   wanderlog trips places --file trips/trip1.json
-  wanderlog trips places abc123xyz --format json`,
+  wanderlog trips places abc123xyz --output json`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if fromFile != "" && len(args) > 0 {
 			return fmt.Errorf("cannot specify both trip ID and --file flag")
@@ -69,7 +69,7 @@ var tripsImagesCmd = &cobra.Command{
 
 Examples:
   wanderlog trips images abc123xyz
-  wanderlog trips images abc123xyz --format json`,
+  wanderlog trips images abc123xyz --output json`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		tripID := args[0]
@@ -126,38 +126,39 @@ Examples:
 func init() {
 	tripsCmd.AddCommand(tripsPlacesCmd, tripsImagesCmd, tripsExpensesCmd)
 
-	tripsPlacesCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripsPlacesCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 	tripsPlacesCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
 
-	tripsImagesCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripsImagesCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 	tripsImagesCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	tripsImagesCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 
-	tripsExpensesCmd.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+	tripsExpensesCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format")
 	tripsExpensesCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	tripsExpensesCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 }
 
 func tripsImagesPretty(images *wanderlog.TripImagesResponse, tripID string) {
 	if len(images.Images) == 0 {
-		fmt.Printf("📷 No images found for trip %s\n", tripID)
+		fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("📷 No images found for trip %s", tripID)))
 		return
 	}
 
-	fmt.Printf("📷 Trip Images (%d total)\n\n", len(images.Images))
+	fmt.Println(ui.TitleStyle.Render(fmt.Sprintf("📷 Trip Images (%d total)", len(images.Images))))
+	fmt.Println()
 
 	for i, img := range images.Images {
-		fmt.Printf("%d. %s\n", i+1, img.Key)
-		fmt.Printf("   Size: %dx%d\n", img.Width, img.Height)
+		fmt.Printf("%d. %s\n", i+1, ui.PlaceStyle.Render(img.Key))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Size: %dx%d", img.Width, img.Height)))
 		if img.Caption != "" {
-			fmt.Printf("   Caption: %s\n", img.Caption)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Caption: %s", img.Caption)))
 		}
 		if img.PlaceID != "" {
-			fmt.Printf("   Place ID: %s\n", img.PlaceID)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Place ID: %s", img.PlaceID)))
 		}
-		fmt.Printf("   URL: %s\n", img.URL)
+		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("   URL: %s", img.URL)))
 		if img.ThumbnailURL != "" {
-			fmt.Printf("   Thumbnail: %s\n", img.ThumbnailURL)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Thumbnail: %s", img.ThumbnailURL)))
 		}
 		fmt.Println()
 	}
