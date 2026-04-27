@@ -190,7 +190,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		s.AddTool(addPlaceTool, handleAddPlace)
 
 		addFlightTool := mcp.NewTool("add_flight",
-			mcp.WithDescription("Add a flight reservation block to a dated itinerary section. Requires flight_number and departure_date. Airport info is auto-resolved from flight number. Use section_date or a positive section_id from list_sections; section_date defaults to departure_date."),
+			mcp.WithDescription("Add a flight reservation block to a dated itinerary section. Requires flight_number and departure_date. Airport info is auto-resolved from flight number. Use section_date or a positive section_id from list_sections; section_date defaults to departure_date. Use unscheduled=true to add to any available section when no dated section exists."),
 			mcp.WithString("trip_key",
 				mcp.Description("The trip key to add the flight to (optional if default trip key is set)"),
 			),
@@ -228,6 +228,10 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			),
 			mcp.WithString("arrival_airport",
 				mcp.Description("Arrival airport IATA code override (e.g. 'NRT'). Provide when the flight stops API cannot resolve the airport."),
+			),
+			mcp.WithBoolean("unscheduled",
+				mcp.Description("Set true to add flight to any available section when no dated section exists for the flight date. Will use the first available section as a fallback."),
+				mcp.DefaultBool(false),
 			),
 		)
 		s.AddTool(addFlightTool, handleAddFlight)
