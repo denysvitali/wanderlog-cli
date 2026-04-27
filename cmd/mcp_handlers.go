@@ -408,19 +408,30 @@ func availableSectionDates(sections []wanderlog.ItSections) string {
 }
 
 func loadSectionsForResolution(client *wanderlog.Client, tripKey string) ([]wanderlog.ItSections, error) {
+	// First try GetTrip which includes full section data
 	trip, err := client.GetTrip(tripKey)
-	if err == nil && len(trip.TripPlan.Itinerary.Sections) > 0 {
+	if err != nil {
+		// GetTrip failed, try the dedicated sections endpoint as fallback
+		sections, secErr := client.GetTripSections(tripKey)
+		if secErr != nil {
+			return nil, fmt.Errorf("GetTrip failed: %w, GetTripSections also failed: %v", err, secErr)
+		}
+		return sections, nil
+	}
+
+	// GetTrip succeeded - check if it has sections
+	if len(trip.TripPlan.Itinerary.Sections) > 0 {
 		return trip.TripPlan.Itinerary.Sections, nil
 	}
 
+	// GetTrip succeeded but returned 0 sections - try dedicated endpoint
+	// This handles cases where the trip exists but the full trip response
+	// has an empty sections array while the sections endpoint returns data
 	sections, err := client.GetTripSections(tripKey)
-	if err == nil && len(sections) > 0 {
-		return sections, nil
-	}
 	if err != nil {
-		return nil, fmt.Errorf("full trip lookup failed and sections endpoint failed: %w", err)
+		return nil, fmt.Errorf("GetTrip returned no sections and GetTripSections failed: %w", err)
 	}
-	return nil, fmt.Errorf("full trip lookup returned no itinerary sections")
+	return sections, nil
 }
 
 func resolveSectionFromList(sections []wanderlog.ItSections, sectionID int, hasSectionID bool, sectionDate string, requireDated bool) (int, string, error) {
@@ -871,15 +882,44 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	userDepartAirport := strings.ToUpper(strings.TrimSpace(request.GetString("departure_airport", "")))
 	userArriveAirport := strings.ToUpper(strings.TrimSpace(request.GetString("arrival_airport", "")))
 
+	unscheduled := request.GetBool("unscheduled", false)
+
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	sectionID, sectionLabel, err := resolveDatedSectionID(client, tripKey, request, departureDate)
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+	var sectionID int
+	var sectionLabel string
+
+	if unscheduled {
+		// For unscheduled flights, try to find any section as a fallback
+		// If no sections exist at all, this will fail with a helpful message
+		sectionID, sectionLabel, err = resolveDatedSectionID(client, tripKey, request, departureDate)
+		if err != nil {
+			// Try to find ANY section in the trip as a last resort for unscheduled flights
+			trip, tripErr := client.GetTrip(tripKey)
+			if tripErr != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve section for flight: %v. Also failed to fetch trip: %v", err, tripErr)), nil
+			}
+			if len(trip.TripPlan.Itinerary.Sections) == 0 {
+				return mcp.NewToolResultError("No sections exist in this trip yet. Flights require a dated itinerary section. Please create sections first by adding places to each day of your trip, then try adding flights again."), nil
+			}
+			// Use the first available section as a fallback
+			firstSection := trip.TripPlan.Itinerary.Sections[0]
+			sectionID = firstSection.ID
+			if firstSection.Date != nil && *firstSection.Date != "" {
+				sectionLabel = fmt.Sprintf("%s section ID %d (fallback - unscheduled)", *firstSection.Date, firstSection.ID)
+			} else {
+				sectionLabel = fmt.Sprintf("section ID %d (fallback - unscheduled)", firstSection.ID)
+			}
+		}
+	} else {
+		sectionID, sectionLabel, err = resolveDatedSectionID(client, tripKey, request, departureDate)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 	}
 
 	airlineIATA, flightNum, err := validateFlightNumber(flightNumber)
