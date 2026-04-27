@@ -183,6 +183,17 @@ func skipIntegrationTest(t *testing.T) {
 	if os.Getenv("INTEGRATION_TESTS") != "1" {
 		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
 	}
+	if os.Getenv("CI") == "true" && !hasIntegrationAuthEnv() {
+		t.Skip("Skipping authenticated integration test. Configure Wanderlog auth secrets to run in CI.")
+	}
+}
+
+func hasIntegrationAuthEnv() bool {
+	hasSessionAuth := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE") != "" &&
+		os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN") != ""
+	hasLoginAuth := os.Getenv("WANDERLOG_AUTH_EMAIL") != "" &&
+		os.Getenv("WANDERLOG_AUTH_PASSWORD") != ""
+	return hasSessionAuth || hasLoginAuth
 }
 
 // extractTripKey extracts the trip key from create_trip result text.
