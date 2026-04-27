@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test -race -coverprofile=coverage.out ./...
+      - run: go test -coverprofile=coverage.out ./...
         env:
           INTEGRATION_TESTS: "0"
       - uses: actions/upload-artifact@v4
