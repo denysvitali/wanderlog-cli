@@ -13,69 +13,73 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    if: github.actor != 'denvit-gh-proxy[bot]'
     steps:
-      - name: Checkout
-        run: |
-          git init .
-          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-          git fetch --depth=1 origin "${{ github.sha }}"
-          git checkout --detach FETCH_HEAD
-      - name: Run golangci-lint
-        run: |
-          go version
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.5
-          "$(go env GOPATH)/bin/golangci-lint" run ./...
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
 
   test:
     name: Test
     runs-on: ubuntu-latest
+    if: github.actor != 'denvit-gh-proxy[bot]'
     steps:
-      - name: Checkout
-        run: |
-          git init .
-          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-          git fetch --depth=1 origin "${{ github.sha }}"
-          git checkout --detach FETCH_HEAD
-      - name: Run tests
-        run: go version && go test -race -coverprofile=coverage.out ./...
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test -race -coverprofile=coverage.out ./...
+      - uses: actions/upload-artifact@v4
+        if: success()
+        continue-on-error: true
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 3
 
   build:
     name: Build
     runs-on: ubuntu-latest
+    if: github.actor != 'denvit-gh-proxy[bot]'
     needs: [lint, test]
     strategy:
       matrix:
         goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
     steps:
-      - name: Checkout
-        run: |
-          git init .
-          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-          git fetch --depth=1 origin "${{ github.sha }}"
-          git checkout --detach FETCH_HEAD
-      - name: Build
-        run: |
-          go version
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
             go build -ldflags "-s -w" -o wanderlog-${{ matrix.goos }}-${{ matrix.goarch }} .
+      - uses: actions/upload-artifact@v4
+        if: success()
+        continue-on-error: true
+        with:
+          name: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
+          retention-days: 3
 
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
     # Only run on master/main branch pushes, not pull requests
     # because secrets are not available to PRs from forks
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.actor != 'denvit-gh-proxy[bot]'
     steps:
-      - name: Checkout
-        run: |
-          git init .
-          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-          git fetch --depth=1 origin "${{ github.sha }}"
-          git checkout --detach FETCH_HEAD
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - name: Run integration tests
         env:
           INTEGRATION_TESTS: "1"
           WANDERLOG_AUTH_EMAIL: ${{ secrets.WANDERLOG_AUTH_EMAIL }}
           WANDERLOG_AUTH_PASSWORD: ${{ secrets.WANDERLOG_AUTH_PASSWORD }}
-        run: go version && go test -v ./cmd/... -run "Integration"
+        run: go test -v ./cmd/... -run "Integration"
