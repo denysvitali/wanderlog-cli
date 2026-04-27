@@ -14,11 +14,11 @@ jobs:
     name: Lint
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
 
@@ -26,14 +26,14 @@ jobs:
     name: Test
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go test -coverprofile=coverage.out ./...
         env:
           INTEGRATION_TESTS: "0"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: success()
         continue-on-error: true
         with:
@@ -45,8 +45,8 @@ jobs:
     name: OpenAPI Spec Sync
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Regenerate OpenAPI client
@@ -61,8 +61,8 @@ jobs:
     runs-on: self-hosted
     needs: [lint, test, openapi-spec-sync]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go build -ldflags "-s -w" -o wanderlog .
@@ -74,8 +74,8 @@ jobs:
     # because secrets are not available to PRs from forks
     if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Run integration tests
