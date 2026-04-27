@@ -2,6 +2,7 @@ package wanderlog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/zalando/go-keyring"
@@ -38,7 +39,7 @@ func LoadCredentials() (*AuthCredentials, error) {
 	// Get from system keychain
 	credsJSON, err := keyring.Get(serviceName, userKey)
 	if err != nil {
-		if err == keyring.ErrNotFound {
+		if errors.Is(err, keyring.ErrNotFound) {
 			return nil, nil // No credentials stored
 		}
 		return nil, fmt.Errorf("retrieving credentials from keychain: %w", err)
@@ -56,7 +57,7 @@ func LoadCredentials() (*AuthCredentials, error) {
 // DeleteCredentials removes stored credentials from the system keychain
 func DeleteCredentials() error {
 	err := keyring.Delete(serviceName, userKey)
-	if err != nil && err != keyring.ErrNotFound {
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
 		return fmt.Errorf("deleting credentials from keychain: %w", err)
 	}
 	return nil

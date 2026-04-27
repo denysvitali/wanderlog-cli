@@ -10,18 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var searchPlacesCmd = &cobra.Command{
-	Use:   "search-places [query]",
-	Short: "Search for places using Wanderlog's autocomplete API",
-	Long:  `Search for places using Wanderlog's autocomplete API with optional location context.`,
-	Args:  cobra.ExactArgs(1),
-	Run:   runSearchPlaces,
-}
-
 func runSearchPlaces(cmd *cobra.Command, args []string) {
 	query := args[0]
 
-	// Get location parameters
 	latFlag, _ := cmd.Flags().GetString("lat")
 	lngFlag, _ := cmd.Flags().GetString("lng")
 
@@ -46,7 +37,6 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 
 	client := wanderlog.NewClient()
 
-	// Set up authentication if available
 	auth, err := wanderlog.LoadCredentials()
 	if err == nil {
 		client.SetAuth(auth)
@@ -58,7 +48,6 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Format output based on the requested format
 	format, _ := cmd.Flags().GetString("format")
 	switch format {
 	case "json":
@@ -69,7 +58,6 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 	default:
-		// Human-readable format
 		if len(results.Data) == 0 {
 			fmt.Printf("No places found for query: %s\n", query)
 			return
@@ -91,12 +79,4 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 			fmt.Println()
 		}
 	}
-}
-
-func init() {
-	searchPlacesCmd.Flags().String("format", "human", "Output format (human, json)")
-	searchPlacesCmd.Flags().String("lat", "", "Latitude for location context")
-	searchPlacesCmd.Flags().String("lng", "", "Longitude for location context")
-	// root registration disabled - command moved under `search wanderlog`
-	// rootCmd.AddCommand(searchPlacesCmd)
 }
