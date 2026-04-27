@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/sirupsen/logrus"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
@@ -701,6 +702,74 @@ func validateFlightNumber(flightNumber string) (string, int, error) {
 	return airline, number, nil
 }
 
+// getGooglePlaceForAirport searches for an airport by name and IATA code,
+// then fetches detailed place information to construct a googlePlace object.
+func getGooglePlaceForAirport(client *wanderlog.Client, airportName, iataCode, cityName string) map[string]any {
+	// Search for the airport with name + IATA code
+	query := fmt.Sprintf("%s Airport %s", airportName, iataCode)
+	if cityName != "" {
+		query = fmt.Sprintf("%s %s airport", cityName, airportName)
+	}
+
+	results, err := client.SearchPlaces(query, nil, nil)
+	if err != nil || !results.Success || len(results.Places) == 0 {
+		logger.WithFields(logrus.Fields{
+			"query": query,
+			"error": err,
+		}).Warn("Failed to search for airport place details")
+		return nil
+	}
+
+	// Find the best matching result (prefer exact IATA match in description)
+	var bestMatch *wanderlog.SearchResult
+	for i, place := range results.Places {
+		// Look for IATA code in the address or description
+		if strings.Contains(strings.ToUpper(place.Address), iataCode) ||
+			strings.Contains(strings.ToUpper(place.Name), iataCode) {
+			bestMatch = &results.Places[i]
+			break
+		}
+		// Use first result if no exact match
+		if i == 0 && bestMatch == nil {
+			bestMatch = &results.Places[i]
+		}
+	}
+
+	if bestMatch == nil {
+		return nil
+	}
+
+	// Fetch detailed place information
+	details, err := client.GetPlaceDetails(bestMatch.PlaceID)
+	if err != nil || !details.Success {
+		logger.WithFields(logrus.Fields{
+			"placeID": bestMatch.PlaceID,
+			"error":  err,
+		}).Warn("Failed to get place details for airport")
+		return nil
+	}
+
+	// Construct a googlePlace-like object with the data we have
+	googlePlace := map[string]any{
+		"place_id":          details.Data.Details.PlaceID,
+		"name":              details.Data.Details.Name,
+		"formatted_address": details.Data.Details.FormattedAddress,
+		"rating":            details.Data.Details.Rating,
+		"user_ratings_total": details.Data.Details.UserRatingsTotal,
+		"types":             details.Data.Details.Types,
+		"business_status":   details.Data.Details.BusinessStatus,
+		"url":               fmt.Sprintf("https://maps.google.com/?cid=%s", details.Data.Details.PlaceID),
+		"geometry": map[string]any{
+			"location": map[string]float64{
+				"lat": details.Data.Details.Geometry.Location.Lat,
+				"lng": details.Data.Details.Geometry.Location.Lng,
+			},
+		},
+	}
+
+	return googlePlace
+}
+
 // validateBlockSchema ensures block structures are compatible with the web/mobile app.
 // Flight blocks must not set depart.type="airport" or arrive.type="airport" without
 // providing a fully populated airport sub-object (with googlePlace), otherwise the
@@ -979,10 +1048,12 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		"startTime":          departureTime,
 		"endTime":            arrivalTime,
 		"depart": map[string]any{
+			"type": "depart",
 			"date": departureDate,
 			"time": departureTime,
 		},
 		"arrive": map[string]any{
+			"type": "arrive",
 			"date": arrivalDate,
 			"time": arrivalTime,
 		},
@@ -992,17 +1063,28 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 			},
 			"number": flightNum,
 		},
-		"text":          notes,
-		"travelMode":    nil,
+		"text": map[string]any{
+			"ops": []any{
+				map[string]any{"insert": notes + "\n"},
+			},
+		},
 		"travelerNames": []any{},
 	}
 
 	// Add airport info if we fetched it from the API
 	if departAirport != nil {
 		block["depart"].(map[string]any)["airport"] = departAirport
+		// Try to fetch googlePlace data for the departure airport
+		if googlePlace := getGooglePlaceForAirport(client, departAirport["name"].(string), departAirport["iata"].(string), departAirport["cityName"].(string)); googlePlace != nil {
+			departAirport["googlePlace"] = googlePlace
+		}
 	}
 	if arriveAirport != nil {
 		block["arrive"].(map[string]any)["airport"] = arriveAirport
+		// Try to fetch googlePlace data for the arrival airport
+		if googlePlace := getGooglePlaceForAirport(client, arriveAirport["name"].(string), arriveAirport["iata"].(string), arriveAirport["cityName"].(string)); googlePlace != nil {
+			arriveAirport["googlePlace"] = googlePlace
+		}
 	}
 
 	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
