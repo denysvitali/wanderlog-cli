@@ -12,7 +12,7 @@ permissions:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -24,7 +24,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -41,7 +41,7 @@ jobs:
 
   openapi-spec-sync:
     name: OpenAPI Spec Sync
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -56,7 +56,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [lint, test, openapi-spec-sync]
     strategy:
       matrix:
@@ -80,7 +80,7 @@ jobs:
 
   integration-test:
     name: Integration Test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # Only run on master/main branch pushes, not pull requests
     # because secrets are not available to PRs from forks
     if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
