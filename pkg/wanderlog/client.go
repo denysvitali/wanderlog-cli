@@ -228,7 +228,7 @@ func (c *Client) SearchPlaces(query string, latitude, longitude *float64, apiKey
 		return &PlaceSearchResponse{
 			Success: false,
 			Places:  []SearchResult{},
-		}, fmt.Errorf("Google Places API key is required. Please provide an API key using --api-key flag")
+		}, fmt.Errorf("google Places API key is required; please provide an API key using --api-key flag")
 	}
 
 	// New Google Places API endpoint
@@ -297,7 +297,7 @@ func (c *Client) SearchPlaces(query string, latitude, longitude *float64, apiKey
 
 	// Check for non-200 status codes
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Google Places API returned status %d: %s", resp.StatusCode, bodyStr)
+		return nil, fmt.Errorf("google Places API returned status %d: %s", resp.StatusCode, bodyStr)
 	}
 
 	// Parse the response - New Places API format
@@ -360,7 +360,7 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, a
 		return &PlaceSearchResponse{
 			Success: false,
 			Places:  []SearchResult{},
-		}, fmt.Errorf("Google Places API key is required. Please provide an API key using --api-key flag")
+		}, fmt.Errorf("google Places API key is required; please provide an API key using --api-key flag")
 	}
 
 	baseURL := "https://places.googleapis.com/v1/places:searchText"
@@ -409,7 +409,7 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64, a
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Google Places API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("google Places API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var googleResp struct {

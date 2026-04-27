@@ -1,50 +1,57 @@
-run:
-  timeout: 5m
-
+version: "2"
 linters:
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gosimple
-    - gocritic
-    - gofmt
-    - misspell
-    - unconvert
     - bodyclose
-    - nilerr
     - errorlint
-
-linters-settings:
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-    disabled-checks:
-      - appendAssign
-      - hugeParam
-      - rangeValCopy
-      - singleCaseSwitch
-
-  errorlint:
-    errorf: true
-    asserts: false
-    comparison: false
-
-  misspell:
-    locale: US
-
+    - gocritic
+    - misspell
+    - nilerr
+    - unconvert
+  settings:
+    errorlint:
+      errorf: true
+      asserts: false
+      comparison: false
+    gocritic:
+      disabled-checks:
+        - appendAssign
+        - hugeParam
+        - rangeValCopy
+        - singleCaseSwitch
+      enabled-tags:
+        - diagnostic
+        - performance
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+          - gocritic
+        path: _test\.go
+      - linters:
+          - gocritic
+          - nilerr
+        path: cmd/mcp\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gocritic
-    - path: cmd/mcp\.go
-      linters:
-        - gocritic
-        - nilerr
   max-issues-per-linter: 50
   max-same-issues: 10
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

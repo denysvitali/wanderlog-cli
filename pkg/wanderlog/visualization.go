@@ -203,6 +203,7 @@ func (c *Client) GetTripPlaces(tripKey string) (*TripResponse, error) {
 }
 
 // LikeTrip likes or unlikes a trip.
+//
 // Deprecated: Use SetLike in write_ops.go instead.
 func (c *Client) LikeTrip(tripKey string, liked bool) error {
 	if c.auth == nil {
@@ -261,6 +262,7 @@ func (c *Client) LikeTrip(tripKey string, liked bool) error {
 }
 
 // RegisterView registers a view for analytics.
+//
 // Deprecated: Use RegisterTripView in journal_ops.go instead.
 func (c *Client) RegisterView(tripKey string) error {
 	url := fmt.Sprintf("%s/tripPlans/%s/registerView", BaseURL, tripKey)

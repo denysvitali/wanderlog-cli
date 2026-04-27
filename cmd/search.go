@@ -112,7 +112,7 @@ Examples:
 		latFlag, _ := cmd.Flags().GetString("lat")
 		lngFlag, _ := cmd.Flags().GetString("lng")
 
-		var lat, lng float64 = 0.0, 0.0
+		lat, lng := 0.0, 0.0
 
 		if latFlag != "" {
 			var err error

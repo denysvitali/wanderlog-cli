@@ -949,7 +949,7 @@ func TestMCPIntegration_UpdatePlaceNotes(t *testing.T) {
 		require.NotNil(t, section, "Could not find dated section in trip data")
 
 		// Find the first place block in this section
-		var blockIndex int = -1
+		blockIndex := -1
 		for i, block := range section.Blocks {
 			if block.Type == "place" {
 				blockIndex = i
@@ -1113,11 +1113,12 @@ func TestMCPIntegration_ReorderPlaces(t *testing.T) {
 
 		// Copy blocks and swap the two places
 		for i, block := range section.Blocks {
-			if i == firstPlaceIdx {
+			switch i {
+			case firstPlaceIdx:
 				reorderedBlocks[i] = section.Blocks[secondPlaceIdx]
-			} else if i == secondPlaceIdx {
+			case secondPlaceIdx:
 				reorderedBlocks[i] = section.Blocks[firstPlaceIdx]
-			} else {
+			default:
 				reorderedBlocks[i] = block
 			}
 		}

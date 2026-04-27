@@ -25,7 +25,7 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 	latFlag, _ := cmd.Flags().GetString("lat")
 	lngFlag, _ := cmd.Flags().GetString("lng")
 
-	var lat, lng float64 = 0.0, 0.0
+	lat, lng := 0.0, 0.0
 	var err error
 
 	if latFlag != "" {
