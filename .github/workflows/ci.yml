@@ -60,25 +60,12 @@ jobs:
     name: Build
     runs-on: self-hosted
     needs: [lint, test, openapi-spec-sync]
-    strategy:
-      matrix:
-        goos: [linux, darwin, windows]
-        goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -ldflags "-s -w" -o wanderlog-${{ matrix.goos }}-${{ matrix.goarch }} .
-      - uses: actions/upload-artifact@v4
-        if: success()
-        continue-on-error: true
-        with:
-          name: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: wanderlog-${{ matrix.goos }}-${{ matrix.goarch }}
-          retention-days: 3
+      - run: go build -ldflags "-s -w" -o wanderlog .
 
   integration-test:
     name: Integration Test
