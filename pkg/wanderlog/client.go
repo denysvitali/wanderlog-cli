@@ -567,134 +567,50 @@ func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) 
 
 // GetAllAirlines retrieves all available airlines
 func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
-	url := fmt.Sprintf("%s/flights/allAirlines", BaseURL)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
-	}
-
 	var result AirlinesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.doJSON(http.MethodGet, "/flights/allAirlines", nil, &result, false, "get all airlines"); err != nil {
 		return nil, err
 	}
-
 	return &result, nil
 }
 
 // AutocompleteAirport searches for airports by query (path-based)
 func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse, error) {
-	url := fmt.Sprintf("%s/flights/autocompleteAirport/%s", BaseURL, url.PathEscape(query))
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
-	}
-
 	var result AirportAutocompleteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	path := fmt.Sprintf("/flights/autocompleteAirport/%s", url.PathEscape(query))
+	if err := c.doJSON(http.MethodGet, path, nil, &result, false, "autocomplete airport"); err != nil {
 		return nil, err
 	}
-
 	return &result, nil
 }
 
 // AutocompleteAirportWithLocation searches for airports by query with location bias (query is path-based)
 func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64) (*AirportAutocompleteResponse, error) {
-	url := fmt.Sprintf("%s/flights/autocompleteAirportWithLocation/%s?latitude=%f&longitude=%f",
-		BaseURL, url.PathEscape(query), lat, lng)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
-	}
-
 	var result AirportAutocompleteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	values := url.Values{}
+	values.Set("latitude", fmt.Sprintf("%f", lat))
+	values.Set("longitude", fmt.Sprintf("%f", lng))
+	path := fmt.Sprintf("/flights/autocompleteAirportWithLocation/%s?%s", url.PathEscape(query), values.Encode())
+	if err := c.doJSON(http.MethodGet, path, nil, &result, false, "autocomplete airport with location"); err != nil {
 		return nil, err
 	}
-
 	return &result, nil
 }
 
 // GetFlightStops retrieves flight stops for a given flight.
 // The API requires flightNumber (integer string), airline IATA code (airlineIata), and departure date (departDate).
 func (c *Client) GetFlightStops(flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
-	url := fmt.Sprintf("%s/flights/flightStops?flightNumber=%s&airlineIata=%s&departDate=%s",
-		BaseURL, url.QueryEscape(flightNumber), url.QueryEscape(airlineIata), url.QueryEscape(departureDate))
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", c.userAgent)
-	if c.auth != nil && c.auth.SessionCookie != "" {
-		req.Header.Set("Cookie", c.auth.SessionCookie)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	values := url.Values{}
+	values.Set("flightNumber", flightNumber)
+	values.Set("airlineIata", airlineIata)
+	values.Set("departDate", departureDate)
+	body, err := c.doRaw(http.MethodGet, "/flights/flightStops?"+values.Encode(), nil, false, "get flight stops")
 	if err != nil {
 		return nil, err
 	}
 
 	if len(body) > 0 && body[0] == '<' {
 		return nil, fmt.Errorf("API returned HTML instead of JSON (endpoint may be unavailable)")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
 	}
 
 	var result FlightStopsResponse
