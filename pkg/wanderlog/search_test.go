@@ -76,7 +76,7 @@ func TestSearchPlacesWithWanderllog(t *testing.T) {
 					Description          string   `json:"description"`
 					Types                []string `json:"types"`
 					StructuredFormatting struct {
-						MainText                  string   `json:"main_text"`
+						MainText                  string `json:"main_text"`
 						MainTextMatchedSubstrings []struct {
 							Offset int `json:"offset"`
 							Length int `json:"length"`
