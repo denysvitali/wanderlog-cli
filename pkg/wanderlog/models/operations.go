@@ -46,29 +46,32 @@ func DeleteInObject(path []interface{}, oldValue interface{}) Operation {
 	}
 }
 
+func pathWithIndex(path []interface{}, index int) []interface{} {
+	indexedPath := make([]interface{}, 0, len(path)+1)
+	indexedPath = append(indexedPath, path...)
+	return append(indexedPath, index)
+}
+
 // InsertInList creates a ShareDB operation to insert an item into an array at a specific index
 func InsertInList(path []interface{}, index int, value interface{}) Operation {
-	pathWithIndex := append(path, index)
 	return Operation{
-		P:  pathWithIndex,
+		P:  pathWithIndex(path, index),
 		LI: value,
 	}
 }
 
 // DeleteFromList creates a ShareDB operation to delete an item from an array at a specific index
 func DeleteFromList(path []interface{}, index int, oldValue interface{}) Operation {
-	pathWithIndex := append(path, index)
 	return Operation{
-		P:  pathWithIndex,
+		P:  pathWithIndex(path, index),
 		LD: oldValue,
 	}
 }
 
 // ReplaceInList creates a ShareDB operation to replace an item in an array
 func ReplaceInList(path []interface{}, index int, oldValue, newValue interface{}) Operation {
-	pathWithIndex := append(path, index)
 	return Operation{
-		P:  pathWithIndex,
+		P:  pathWithIndex(path, index),
 		LD: oldValue,
 		LI: newValue,
 	}
