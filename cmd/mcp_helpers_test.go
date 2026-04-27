@@ -49,14 +49,18 @@ func testStringPtr(value string) *string {
 }
 
 func TestFilterGeoGuideCounts(t *testing.T) {
-	data := json.RawMessage(`[
-		{"name": "Japan", "id": 86647},
-		{"name": "Tokyo", "id": 1},
-		{"name": "Kyoto", "id": 2}
-	]`)
+	result := &wanderlog.GeoSearchResult{
+		Countries: []wanderlog.GeoIDName{
+			{ID: 86647, Name: "Japan"},
+			{ID: 86648, Name: "Italy"},
+		},
+		Cities: []wanderlog.GeoIDName{
+			{ID: 1, Name: "Tokyo"},
+			{ID: 2, Name: "Kyoto"},
+		},
+	}
 
-	matches, err := filterGeoGuideCounts(data, "japan", 10)
-	require.NoError(t, err)
+	matches := filterGeoGuideCounts(result, "japan", 10)
 	require.Len(t, matches, 1)
 	assert.Equal(t, 86647, matches[0].GeoID)
 	assert.Equal(t, "Japan", matches[0].Name)

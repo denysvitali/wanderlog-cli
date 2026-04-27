@@ -372,32 +372,33 @@ func handleBrowseGuides(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 
 type geoGuideCount struct {
 	Name  string `json:"name"`
-	GeoID int    `json:"id"`
+	GeoID int    `json:"geoId"`
 }
 
-func filterGeoGuideCounts(data json.RawMessage, query string, limit int) ([]geoGuideCount, error) {
-	var geos []geoGuideCount
-	if err := json.Unmarshal(data, &geos); err != nil {
-		return nil, err
-	}
-
+func filterGeoGuideCounts(result *wanderlog.GeoSearchResult, query string, limit int) []geoGuideCount {
 	query = strings.ToLower(strings.TrimSpace(query))
 	if limit <= 0 {
 		limit = 10
 	}
 
 	matches := make([]geoGuideCount, 0, limit)
-	for _, geo := range geos {
-		if query != "" && !strings.Contains(strings.ToLower(geo.Name), query) {
-			continue
-		}
-		matches = append(matches, geo)
-		if len(matches) >= limit {
-			break
+	addIfMatch := func(name string, id int) {
+		if query == "" || strings.Contains(strings.ToLower(name), query) {
+			matches = append(matches, geoGuideCount{Name: name, GeoID: id})
 		}
 	}
 
-	return matches, nil
+	for _, c := range result.Countries {
+		addIfMatch(c.Name, c.ID)
+	}
+	for _, c := range result.Cities {
+		addIfMatch(c.Name, c.ID)
+	}
+
+	if len(matches) > limit {
+		matches = matches[:limit]
+	}
+	return matches
 }
 
 func handleSearchGeos(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -413,10 +414,7 @@ func handleSearchGeos(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 
-	matches, err := filterGeoGuideCounts(resp.Data, query, request.GetInt("limit", 10))
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to parse geos: %v", err)), nil
-	}
+	matches := filterGeoGuideCounts(resp, query, request.GetInt("limit", 10))
 
 	return mcp.NewToolResultStructuredOnly(map[string]any{
 		"success": true,

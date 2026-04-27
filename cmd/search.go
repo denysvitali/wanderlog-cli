@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -122,9 +123,100 @@ Examples:
 	},
 }
 
+var searchGeosCmd = &cobra.Command{
+	Use:   "geos [query]",
+	Short: "Search Wanderlog destination geo IDs",
+	Long: `Search for Wanderlog destination geo IDs (countries and cities).
+Use the returned geo_id with "wanderlog create trip --geo-id".
+
+This command fetches all available geos and filters client-side by name.
+Without a query, it returns all geos (limited by --limit).
+
+Examples:
+  wanderlog search geos Japan
+  wanderlog search geos Tokyo --limit 5`,
+	Args: cobra.ExactArgs(1),
+	Run:  runSearchGeos,
+}
+
+func runSearchGeos(cmd *cobra.Command, args []string) {
+	query := args[0]
+
+	limit, _ := cmd.Flags().GetInt("limit")
+
+	client := wanderlog.NewClient()
+
+	auth, err := wanderlog.LoadCredentials()
+	if err == nil {
+		client.SetAuth(auth)
+	}
+
+	result, err := client.SearchGeos()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error searching geos: %v\n", err)
+		os.Exit(1)
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+
+	var matches []geoIDNameMatch
+	queryLower := strings.ToLower(query)
+
+	addMatch := func(name string, id int) {
+		if strings.Contains(strings.ToLower(name), queryLower) {
+			matches = append(matches, geoIDNameMatch{Name: name, GeoID: id})
+		}
+	}
+
+	for _, c := range result.Countries {
+		addMatch(c.Name, c.ID)
+	}
+	for _, c := range result.Cities {
+		addMatch(c.Name, c.ID)
+	}
+
+	if len(matches) > limit {
+		matches = matches[:limit]
+	}
+
+	switch outputFormat {
+	case "json":
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(map[string]any{
+			"success": true,
+			"query":   query,
+			"count":   len(matches),
+			"geos":    matches,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		if len(matches) == 0 {
+			fmt.Printf("No geos found matching: %s\n", query)
+			return
+		}
+
+		fmt.Printf("Found %d geo(s) matching %q:\n\n", len(matches), query)
+		for _, m := range matches {
+			fmt.Printf("  %-30s  (geo_id: %d)\n", m.Name, m.GeoID)
+		}
+		fmt.Println()
+		fmt.Println("Use geo_id with: wanderlog create trip --geo-id <id> ...")
+	}
+}
+
+type geoIDNameMatch struct {
+	Name  string `json:"name"`
+	GeoID int    `json:"geoId"`
+}
+
 func init() {
 	rootCmd.AddCommand(searchParentCmd)
-	searchParentCmd.AddCommand(searchGoogleCmd, searchWanderlogCmd, searchPlaceDetailsCmd)
+	searchParentCmd.AddCommand(searchGoogleCmd, searchWanderlogCmd, searchPlaceDetailsCmd, searchGeosCmd)
 
 	searchGoogleCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 	searchGoogleCmd.Flags().String("lat", "", "Latitude for location context")
@@ -135,4 +227,7 @@ func init() {
 	searchWanderlogCmd.Flags().String("lng", "", "Longitude for location context")
 
 	searchPlaceDetailsCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
+
+	searchGeosCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
+	searchGeosCmd.Flags().Int("limit", 10, "Maximum number of results to return")
 }
