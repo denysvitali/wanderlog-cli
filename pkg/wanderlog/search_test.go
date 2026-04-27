@@ -32,6 +32,50 @@ func TestSearchPlaces(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("successful google places search", func(t *testing.T) {
+		lat, lng := 40.71, -74.00
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				t.Errorf("expected POST, got %s", r.Method)
+			}
+			if r.Header.Get("X-Goog-Api-Key") != "test-key" {
+				t.Errorf("missing API key header")
+			}
+			if r.Header.Get("X-Goog-FieldMask") == "" {
+				t.Errorf("missing field mask header")
+			}
+
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if body["textQuery"] != "coffee" {
+				t.Errorf("unexpected query body: %+v", body)
+			}
+			if _, ok := body["locationBias"]; !ok {
+				t.Errorf("expected location bias in body")
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"places":[{"id":"place-1","displayName":{"text":"Coffee Shop"},"formattedAddress":"123 Main St","location":{"latitude":40.71,"longitude":-74},"rating":4.5,"types":["cafe"]}]}`))
+		}))
+		defer server.Close()
+
+		client := newClientNoAuth(t)
+		client.httpClient = newRedirectClient(server)
+
+		resp, err := client.SearchPlaces("coffee", &lat, &lng, "test-key")
+		if err != nil {
+			t.Fatalf("SearchPlaces: %v", err)
+		}
+		if !resp.Success || len(resp.Places) != 1 {
+			t.Fatalf("unexpected response: %+v", resp)
+		}
+		if resp.Places[0].Name != "Coffee Shop" || resp.Places[0].PlaceID != "place-1" {
+			t.Errorf("unexpected place: %+v", resp.Places[0])
+		}
+	})
 }
 
 func TestSearchRestaurants(t *testing.T) {
@@ -43,6 +87,39 @@ func TestSearchRestaurants(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "API key is required") {
 			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("adds restaurant type filter", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if body["includedType"] != "restaurant" {
+				t.Errorf("expected restaurant type filter, got %+v", body)
+			}
+			if !strings.Contains(r.Header.Get("X-Goog-FieldMask"), "places.regularOpeningHours") {
+				t.Errorf("expected restaurant field mask, got %q", r.Header.Get("X-Goog-FieldMask"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"places":[{"id":"restaurant-1","displayName":{"text":"Pizza Place"},"formattedAddress":"456 Main St","location":{"latitude":41,"longitude":-75},"rating":4.2,"types":["restaurant"]}]}`))
+		}))
+		defer server.Close()
+
+		client := newClientNoAuth(t)
+		client.httpClient = newRedirectClient(server)
+
+		resp, err := client.SearchRestaurants("pizza", nil, nil, "test-key")
+		if err != nil {
+			t.Fatalf("SearchRestaurants: %v", err)
+		}
+		if !resp.Success || len(resp.Places) != 1 {
+			t.Fatalf("unexpected response: %+v", resp)
+		}
+		if resp.Places[0].Name != "Pizza Place" || resp.Places[0].PlaceID != "restaurant-1" {
+			t.Errorf("unexpected restaurant: %+v", resp.Places[0])
 		}
 	})
 }
