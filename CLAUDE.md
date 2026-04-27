@@ -158,9 +158,9 @@ Or use the MCP tool `get_trip` to fetch trip data.
 - Common operations: `CreateTrip()`, `DeleteTrip()`, `AddPlace()`, `RemovePlace()`, `CopyTrip()`
 
 **Place Search**:
-- Two methods: Google Places API (requires `GOOGLE_PLACES_API_KEY`) and Wanderlog's native autocomplete
-- `SearchPlaces()` uses new Google Places API v1 with Text Search
-- `SearchPlacesWithWanderllog()` uses Wanderlog's autocomplete API (no API key needed)
+- All place search uses Wanderlog's native autocomplete API
+- `SearchPlaces()` and `SearchRestaurants()` wrap Wanderlog autocomplete results for CLI/MCP consumers
+- `SearchPlacesWithWanderlog()` exposes the raw Wanderlog autocomplete response
 - `GetPlaceDetails()` fetches detailed place info from Wanderlog's API
 
 ### Notable Dependencies

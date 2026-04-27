@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/sirupsen/logrus"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
 
 // TestSnapshotTrip creates a trip, performs various operations, and captures
@@ -69,7 +70,7 @@ func TestSnapshotTrip(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Log("\n📸 STEP 2: Adding first place")
 
-	searchResp, err := client.SearchPlacesWithWanderllog("Eiffel Tower Paris", 48.8566, 2.3522)
+	searchResp, err := client.SearchPlacesWithWanderlog("Eiffel Tower Paris", 48.8566, 2.3522)
 	if err != nil || len(searchResp.Data) == 0 {
 		t.Fatal("Failed to find Eiffel Tower")
 	}
@@ -116,7 +117,7 @@ func TestSnapshotTrip(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Log("\n📸 STEP 3: Adding second place")
 
-	searchResp2, err := client.SearchPlacesWithWanderllog("Louvre Museum Paris", 48.8606, 2.3376)
+	searchResp2, err := client.SearchPlacesWithWanderlog("Louvre Museum Paris", 48.8606, 2.3376)
 	if err != nil || len(searchResp2.Data) == 0 {
 		t.Fatal("Failed to find Louvre Museum")
 	}

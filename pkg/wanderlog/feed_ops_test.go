@@ -72,13 +72,17 @@ func TestBrowseGuidesNoGeoID(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"geoGuideCounts":[{"name":"Japan","geoId":86647,"guideCount":16}]}}`))
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server)
-	if _, err := client.BrowseGuides(0); err != nil {
+	resp, err := client.BrowseGuides(0)
+	if err != nil {
 		t.Fatalf("BrowseGuides: %v", err)
+	}
+	if !strings.Contains(string(resp.Data), "geoGuideCounts") {
+		t.Fatalf("expected object data to be preserved, got %s", string(resp.Data))
 	}
 }
 

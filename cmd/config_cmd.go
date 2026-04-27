@@ -103,7 +103,7 @@ func init() {
 	configSessionPreferencesCmd.Flags().StringVar(&sessionLocale, "locale", "en", "Locale code")
 
 	for _, command := range []*cobra.Command{configGlobalCmd, configSessionGetCmd, configSessionSetCmd, configSessionPreferencesCmd} {
-		command.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+		command.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		command.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		command.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

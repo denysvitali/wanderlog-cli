@@ -21,7 +21,7 @@
 //   - Daily itineraries with places
 //   - Flight information
 //   - Budget and expense tracking
-//   - Place details with Google Places integration
+//   - Place search and details through Wanderlog APIs
 //
 // This package can be used both as a standalone library and as part of the
 // wanderlog-cli command-line application.

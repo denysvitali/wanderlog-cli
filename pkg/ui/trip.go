@@ -13,33 +13,99 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().
+	TitleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#7D56F4")).
 			Bold(true)
 
-	headerStyle = lipgloss.NewStyle().
+	HeaderStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#04B575")).
 			Bold(true)
 
-	subHeaderStyle = lipgloss.NewStyle().
+	SubHeaderStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#626262")).
 			Bold(true)
 
-	infoStyle = lipgloss.NewStyle().
+	InfoStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#7C7C7C"))
 
-	dateStyle = lipgloss.NewStyle().
+	DateStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#F25D94")).
 			Bold(true)
 
-	placeStyle = lipgloss.NewStyle().
+	PlaceStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#3C82F6")).
 			Bold(true)
 
-	boxStyle = lipgloss.NewStyle().
+	BoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#7D56F4")).
 			Padding(1, 2)
+
+	// Additional color styles
+	ErrorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#EF4444")).
+			Bold(true)
+
+	SuccessStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#10B981")).
+			Bold(true)
+
+	WarningStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F59E0B")).
+			Bold(true)
+
+	HighlightStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#06B6D4")).
+			Bold(true)
+
+	LinkStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#3B82F6")).
+			Underline(true)
+
+	UrlStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#8B5CF6")).
+			Underline(true)
+
+	FlightStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F97316")).
+			Bold(true)
+
+	HotelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#EC4899")).
+			Bold(true)
+
+	RestaurantStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F59E0B")).
+			Bold(true)
+
+	CategoryStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#8B5CF6"))
+
+	SeparatorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#374151"))
+
+	BoldStyle = lipgloss.NewStyle().
+			Bold(true)
+
+	ItalicStyle = lipgloss.NewStyle().
+			Italic(true)
+
+	DimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9CA3AF"))
+
+	CountStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6366F1")).
+			Bold(true)
+
+	UsernameStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#14B8A6")).
+			Bold(true)
+
+	IdStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#64748B"))
+
+	TimestampStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#78716C"))
 )
 
 func PrintJSON(data interface{}) {
@@ -57,7 +123,7 @@ func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
 	plan := trip.TripPlan
 
 	// Trip title and basic info
-	fmt.Println(titleStyle.Render("🌍 " + plan.Title))
+	fmt.Println(TitleStyle.Render("🌍 " + plan.Title))
 	fmt.Println()
 
 	// Trip dates
@@ -70,7 +136,7 @@ func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
 			endDate.Format("Jan 2, 2006"),
 			plan.Days)
 
-		fmt.Println(dateStyle.Render(dateInfo))
+		fmt.Println(DateStyle.Render(dateInfo))
 		fmt.Println()
 	}
 
@@ -83,7 +149,7 @@ func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
 		stats = append(stats, fmt.Sprintf("❤️  %d likes", plan.LikeCount))
 	}
 
-	statsBox := boxStyle.Render(strings.Join(stats, "  •  "))
+	statsBox := BoxStyle.Render(strings.Join(stats, "  •  "))
 	fmt.Println(statsBox)
 	fmt.Println()
 
@@ -95,7 +161,7 @@ func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
 }
 
 func printTripSummary(plan *wanderlog.Plan) {
-	fmt.Println(headerStyle.Render("📋 Quick Overview"))
+	fmt.Println(HeaderStyle.Render("📋 Quick Overview"))
 	fmt.Println()
 
 	// Basic trip information
@@ -103,11 +169,11 @@ func printTripSummary(plan *wanderlog.Plan) {
 	fmt.Printf("Total places: %d\n", plan.PlaceCount)
 	fmt.Println()
 
-	fmt.Println(infoStyle.Render("💡 Use --details flag to see full itinerary"))
+	fmt.Println(InfoStyle.Render("💡 Use --details flag to see full itinerary"))
 }
 
 func printTripDetails(trip *wanderlog.TripResponse, plan *wanderlog.Plan) {
-	fmt.Println(headerStyle.Render("🗓️  Detailed Itinerary"))
+	fmt.Println(HeaderStyle.Render("🗓️  Detailed Itinerary"))
 	fmt.Println()
 
 	// Show flights first
@@ -120,7 +186,7 @@ func printTripDetails(trip *wanderlog.TripResponse, plan *wanderlog.Plan) {
 func printFlights(sections []wanderlog.ItSections) {
 	for _, section := range sections {
 		if section.Heading == "Flights" && len(section.Blocks) > 0 {
-			fmt.Println(headerStyle.Render("✈️  Flights"))
+			fmt.Println(HeaderStyle.Render("✈️  Flights"))
 			fmt.Println()
 
 			for _, block := range section.Blocks {
@@ -129,7 +195,7 @@ func printFlights(sections []wanderlog.ItSections) {
 					flightInfo := fmt.Sprintf("%s %d",
 						block.FlightInfo.Airline.Name,
 						block.FlightInfo.Number)
-					fmt.Println(placeStyle.Render("🛫 " + flightInfo))
+					fmt.Println(PlaceStyle.Render("🛫 " + flightInfo))
 
 					// Departure
 					departTime, _ := time.Parse("2006-01-02", block.Depart.Date)
@@ -138,7 +204,7 @@ func printFlights(sections []wanderlog.ItSections) {
 						block.Depart.Time,
 						block.Depart.Airport.Iata,
 						block.Depart.Airport.CityName)
-					fmt.Println(infoStyle.Render(departInfo))
+					fmt.Println(InfoStyle.Render(departInfo))
 
 					// Arrival
 					if block.Arrive != nil {
@@ -148,7 +214,7 @@ func printFlights(sections []wanderlog.ItSections) {
 							block.Arrive.Time,
 							block.Arrive.Airport.Iata,
 							block.Arrive.Airport.CityName)
-						fmt.Println(infoStyle.Render(arriveInfo))
+						fmt.Println(InfoStyle.Render(arriveInfo))
 					}
 					fmt.Println()
 				}
@@ -158,7 +224,7 @@ func printFlights(sections []wanderlog.ItSections) {
 }
 
 func printDestinations(sections []wanderlog.ItSections, sectionRecommendations map[string][]wanderlog.Place) {
-	fmt.Println(headerStyle.Render("🌍 Destinations"))
+	fmt.Println(HeaderStyle.Render("🌍 Destinations"))
 	fmt.Println()
 
 	for _, section := range sections {
@@ -169,11 +235,11 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 		}
 
 		// Show destination header
-		fmt.Println(subHeaderStyle.Render("📍 " + section.Heading))
+		fmt.Println(SubHeaderStyle.Render("📍 " + section.Heading))
 
 		if section.Date != nil && *section.Date != "" {
 			sectionDate, _ := time.Parse("2006-01-02", *section.Date)
-			fmt.Println(infoStyle.Render("   " + sectionDate.Format("Monday, Jan 2, 2006")))
+			fmt.Println(InfoStyle.Render("   " + sectionDate.Format("Monday, Jan 2, 2006")))
 		}
 
 		// Show places and notes/blocks for this destination
@@ -183,14 +249,14 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 				switch block.Type {
 				case "place":
 					if block.Place != nil && block.Place.Name != "" {
-						fmt.Println(infoStyle.Render("🏢 " + block.Place.Name))
+						fmt.Println(InfoStyle.Render("🏢 " + block.Place.Name))
 						hasContent = true
 					}
 				case "note":
 					if !block.Text.IsString && len(block.Text.Text.Ops) > 0 && block.Text.Text.Ops[0].Insert != "\n" {
 						noteText := strings.TrimSpace(block.Text.Text.Ops[0].Insert)
 						if noteText != "" {
-							fmt.Println(infoStyle.Render("   📝 " + noteText))
+							fmt.Println(InfoStyle.Render("   📝 " + noteText))
 							hasContent = true
 						}
 					}
@@ -200,7 +266,7 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 			}
 		}
 		if !hasContent {
-			fmt.Println(infoStyle.Render("   No details available"))
+			fmt.Println(InfoStyle.Render("   No details available"))
 		}
 		fmt.Println()
 	}

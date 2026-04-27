@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/sirupsen/logrus"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
 
 // TestBeijingTripCreation creates a complete week-long trip to Beijing using search
@@ -158,7 +159,7 @@ func TestBeijingTripCreation(t *testing.T) {
 		for placeIdx, q := range queries {
 			t.Logf("🔍 Searching: %s", q.query)
 
-			searchResp, err := client.SearchPlacesWithWanderllog(q.query, beijingLat, beijingLng)
+			searchResp, err := client.SearchPlacesWithWanderlog(q.query, beijingLat, beijingLng)
 			if err != nil || searchResp == nil || len(searchResp.Data) == 0 {
 				t.Logf("⚠️  No results for '%s'", q.query)
 				continue

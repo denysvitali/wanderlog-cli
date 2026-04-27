@@ -35,8 +35,7 @@ func runPlaceDetails(cmd *cobra.Command, args []string) {
 	}
 
 	// Format output based on the requested format
-	format, _ := cmd.Flags().GetString("format")
-	switch format {
+	switch outputFormat {
 	case "json":
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
@@ -91,7 +90,7 @@ func runPlaceDetails(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	placeDetailsCmd.Flags().String("format", "human", "Output format (human, json)")
+	placeDetailsCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 	// root registration disabled - command moved under `search place-details`
 	// rootCmd.AddCommand(placeDetailsCmd)
 }

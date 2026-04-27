@@ -147,7 +147,7 @@ func init() {
 	getIfEditedCmd.Flags().StringVar(&getIfEditedBody, "body", "", "JSON request body")
 
 	for _, command := range []*cobra.Command{journalCmd, expensesCmd, registerViewCmd, updateRequiredCmd, distinctionCmd, createGuideCmd, getIfEditedCmd} {
-		command.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+		command.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		command.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		command.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

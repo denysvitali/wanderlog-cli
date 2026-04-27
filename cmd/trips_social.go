@@ -275,7 +275,7 @@ func init() {
 		tripsRegisterViewCmd, tripsDistinctionCmd, tripsCreateGuideCmd,
 		tripsGetIfEditedCmd, tripsUpdateRequiredCmd, tripsJournalCmd,
 	} {
-		c.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+		c.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		c.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		c.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

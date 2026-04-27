@@ -42,7 +42,7 @@ func init() {
 
 	tripsAutofillCmd.Flags().StringVarP(&tripsAutofillQuery, "query", "q", "", "Suggestion query, such as restaurants or museums")
 
-	tripsAutofillCmd.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format")
+	tripsAutofillCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 	tripsAutofillCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	tripsAutofillCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 }

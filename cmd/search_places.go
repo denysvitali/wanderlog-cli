@@ -6,8 +6,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 	"github.com/spf13/cobra"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
 func runSearchPlaces(cmd *cobra.Command, args []string) {
@@ -42,14 +43,13 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 		client.SetAuth(auth)
 	}
 
-	results, err := client.SearchPlacesWithWanderllog(query, lat, lng)
+	results, err := client.SearchPlacesWithWanderlog(query, lat, lng)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error searching places: %v\n", err)
 		os.Exit(1)
 	}
 
-	format, _ := cmd.Flags().GetString("format")
-	switch format {
+	switch outputFormat {
 	case "json":
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")

@@ -1,9 +1,14 @@
 package wanderlog
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
 )
 
 type (
@@ -20,60 +25,108 @@ type (
 
 // GetFeedHome fetches the authenticated user's home feed.
 func (c *Client) GetFeedHome() (*FeedHomeResponse, error) {
-	var resp FeedHomeResponse
-	if err := c.doJSON("GET", "/tripPlans/home", nil, &resp, true, "GetFeedHome"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	apiResp, err := api.ListHomeFeedTripPlansWithResponse(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var result FeedHomeResponse
+	if err := decodeOpenAPIBody("GetFeedHome", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetFeed fetches the legacy trip feed.
 func (c *Client) GetFeed() (*FeedResponse, error) {
-	var resp FeedResponse
-	if err := c.doJSON("GET", "/tripPlans/feed", nil, &resp, true, "GetFeed"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	apiResp, err := api.GetFeedV1WithResponse(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var result FeedResponse
+	if err := decodeOpenAPIBody("GetFeed", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetFeedV2 fetches the v2 trip feed.
 func (c *Client) GetFeedV2() (*FeedResponse, error) {
-	var resp FeedResponse
-	if err := c.doJSON("GET", "/tripPlans/feed/v2", nil, &resp, true, "GetFeedV2"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	apiResp, err := api.GetFeedV2WithResponse(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var result FeedResponse
+	if err := decodeOpenAPIBody("GetFeedV2", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetFeedMostRecent returns the user's most recently edited trip.
 func (c *Client) GetFeedMostRecent() (*FeedRecentResponse, error) {
-	var resp FeedRecentResponse
-	if err := c.doJSON("GET", "/tripPlans/feed/mostRecentlyEdited", nil, &resp, true, "GetFeedMostRecent"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	apiResp, err := api.GetFeedMostRecentWithResponse(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var result FeedRecentResponse
+	if err := decodeOpenAPIBody("GetFeedMostRecent", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetFriendsPlans fetches trip plans published by the user's friends.
 func (c *Client) GetFriendsPlans() (*FriendsPlansResponse, error) {
-	var resp FriendsPlansResponse
-	if err := c.doJSON("GET", "/tripPlans/friendsPlans", nil, &resp, true, "GetFriendsPlans"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	apiResp, err := api.ListFriendsTripPlansWithResponse(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var result FriendsPlansResponse
+	if err := decodeOpenAPIBody("GetFriendsPlans", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetTripHistory returns the paginated trip edit history.
 func (c *Client) GetTripHistory(offset int) (*TripHistoryResponse, error) {
-	path := "/tripPlans/history"
-	if offset > 0 {
-		path = fmt.Sprintf("%s?offset=%d", path, offset)
-	}
-	var resp TripHistoryResponse
-	if err := c.doJSON("GET", path, nil, &resp, true, "GetTripHistory"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	params := &openapi.ListTripPlansHistoryParams{}
+	if offset > 0 {
+		params.Offset = &offset
+	}
+	apiResp, err := api.ListTripPlansHistoryWithResponse(context.Background(), params)
+	if err != nil {
+		return nil, err
+	}
+	var result TripHistoryResponse
+	if err := decodeOpenAPIBody("GetTripHistory", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetIfEdited asks the server which of the given trip plans changed since the
@@ -84,25 +137,134 @@ func (c *Client) GetIfEdited(req GetIfEditedRequest) (*GetIfEditedResponse, erro
 			req.ClientSchemaVersion = v
 		}
 	}
-	var resp GetIfEditedResponse
-	if err := c.doJSON("POST", "/tripPlans/getIfEdited", req, &resp, true, "GetIfEdited"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("GetIfEdited: marshaling request: %w", err)
+	}
+	apiResp, err := api.GetTripPlansIfEditedWithBodyWithResponse(context.Background(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	var result GetIfEditedResponse
+	if err := decodeOpenAPIBody("GetIfEdited", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // BrowseGuides returns curated travel guides. When geoID is non-zero the guides
 // are scoped to that geography.
 func (c *Client) BrowseGuides(geoID int) (*BrowseGuidesResponse, error) {
-	path := "/tripPlans/browse/guides"
-	if geoID > 0 {
-		path = fmt.Sprintf("%s/%d", path, geoID)
-	}
-	var resp BrowseGuidesResponse
-	if err := c.doJSON("GET", path, nil, &resp, false, "BrowseGuides"); err != nil {
+	api, err := c.openAPI()
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	var apiRespBody []byte
+	var statusCode int
+	if geoID > 0 {
+		apiResp, err := api.ListGeoPageGoodGuides(context.Background(), geoID)
+		if err != nil {
+			return nil, err
+		}
+		defer apiResp.Body.Close()
+		apiRespBody, err = io.ReadAll(apiResp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("BrowseGuides: reading response: %w", err)
+		}
+		statusCode = apiResp.StatusCode
+	} else {
+		apiResp, err := api.ListBrowsePageGoodGuides(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		defer apiResp.Body.Close()
+		apiRespBody, err = io.ReadAll(apiResp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("BrowseGuides: reading response: %w", err)
+		}
+		statusCode = apiResp.StatusCode
+	}
+	var result BrowseGuidesResponse
+	if err := decodeOpenAPIBody("BrowseGuides", statusCode, apiRespBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// geoIDName represents a geo entry with ID and name, returned by various geo list endpoints.
+type geoIDName struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// SearchGeos returns all geographic destinations (countries and cities) from Wanderlog.
+// The caller can client-side filter by name since the full list is relatively small.
+func (c *Client) SearchGeos() (*BrowseGuidesResponse, error) {
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch countries
+	countriesResp, err := api.ListCountries(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("SearchGeos (countries): %w", err)
+	}
+	defer countriesResp.Body.Close()
+	countriesBody, err := io.ReadAll(countriesResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("SearchGeos: reading countries response: %w", err)
+	}
+
+	// Fetch cities
+	citiesResp, err := api.ListGeosWithSearchedCategories(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("SearchGeos (cities): %w", err)
+	}
+	defer citiesResp.Body.Close()
+	citiesBody, err := io.ReadAll(citiesResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("SearchGeos: reading cities response: %w", err)
+	}
+
+	var countries []geoIDName
+	var cities []geoIDName
+
+	if err := json.Unmarshal(countriesBody, &countries); err != nil {
+		return nil, fmt.Errorf("SearchGeos: parsing countries: %w", err)
+	}
+	if err := json.Unmarshal(citiesBody, &cities); err != nil {
+		return nil, fmt.Errorf("SearchGeos: parsing cities: %w", err)
+	}
+
+	// Transform to geoGuideCounts format and combine
+	type geoGuideCount struct {
+		Name       string `json:"name"`
+		GeoID      int    `json:"geoId"`
+		GuideCount int    `json:"guideCount"`
+	}
+
+	allGeos := make([]geoGuideCount, 0, len(countries)+len(cities))
+	for _, c := range countries {
+		allGeos = append(allGeos, geoGuideCount{Name: c.Name, GeoID: c.ID})
+	}
+	for _, c := range cities {
+		allGeos = append(allGeos, geoGuideCount{Name: c.Name, GeoID: c.ID})
+	}
+
+	combinedData, err := json.Marshal(map[string][]geoGuideCount{"geoGuideCounts": allGeos})
+	if err != nil {
+		return nil, fmt.Errorf("SearchGeos: marshaling combined geos: %w", err)
+	}
+
+	return &BrowseGuidesResponse{
+		Success: true,
+		Data:    combinedData,
+	}, nil
 }
 
 func clientSchemaVersionInt() (int, error) {

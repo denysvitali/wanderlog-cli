@@ -13,7 +13,7 @@ func PrintPlaces(places []wanderlog.Metadata) {
 		return
 	}
 
-	fmt.Println(titleStyle.Render("🏠 Places"))
+	fmt.Println(TitleStyle.Render("🏠 Places"))
 	fmt.Println()
 
 	for i, place := range places {
@@ -27,37 +27,37 @@ func PrintPlaces(places []wanderlog.Metadata) {
 			name += fmt.Sprintf(" %s (%.1f)", stars, place.Rating)
 		}
 
-		fmt.Println(placeStyle.Render(fmt.Sprintf("📍 %s", name)))
+		fmt.Println(PlaceStyle.Render(fmt.Sprintf("📍 %s", name)))
 
 		// Address
 		if place.Address != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   📍 %s", place.Address)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📍 %s", place.Address)))
 		}
 
 		// Categories
 		if len(place.Categories) > 0 {
 			categories := strings.Join(place.Categories, ", ")
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🏷️  %s", categories)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏷️  %s", categories)))
 		}
 
 		// Website
 		if place.Website != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   🌐 %s", place.Website)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🌐 %s", place.Website)))
 		}
 
 		// Phone
 		if place.InternationalPhoneNumber != "" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   📞 %s", place.InternationalPhoneNumber)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📞 %s", place.InternationalPhoneNumber)))
 		}
 
 		// Business status
 		if place.BusinessStatus != "" && place.BusinessStatus != "OPERATIONAL" {
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   ⚠️  Status: %s", place.BusinessStatus)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   ⚠️  Status: %s", place.BusinessStatus)))
 		}
 
 		// Permanently closed warning
 		if place.PermanentlyClosed {
-			fmt.Println(infoStyle.Render("   ❌ Permanently Closed"))
+			fmt.Println(InfoStyle.Render("   ❌ Permanently Closed"))
 		}
 
 		// Description
@@ -66,7 +66,7 @@ func PrintPlaces(places []wanderlog.Metadata) {
 			if len(desc) > 100 {
 				desc = desc[:97] + "..."
 			}
-			fmt.Println(infoStyle.Render(fmt.Sprintf("   💬 %s", desc)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   💬 %s", desc)))
 		}
 
 		// Spacer between places

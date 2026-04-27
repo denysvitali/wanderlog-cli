@@ -1,10 +1,12 @@
 package wanderlog
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"net/http"
-	"strings"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // AuthCredentials holds authentication information
@@ -33,46 +35,37 @@ type LoginResponse struct {
 
 // Login authenticates with the Wanderlog API
 func (c *Client) Login(email, password string) (*AuthCredentials, error) {
-	loginReq := LoginRequest{
-		Email:    email,
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := api.LoginWithResponse(context.Background(), openapi.LoginJSONRequestBody{
+		Email:    openapi_types.Email(email),
 		Password: password,
-	}
-
-	reqBody, err := json.Marshal(loginReq)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling login request: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", BaseURL+"/user/login", strings.NewReader(string(reqBody)))
-	if err != nil {
-		return nil, fmt.Errorf("creating login request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-
-	resp, err := c.httpClient.Do(req)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("making login request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("login failed with status %d: %s", resp.StatusCode, resp.Status)
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("login failed with status %d: %s", resp.StatusCode(), resp.Status())
+	}
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("decoding login response: empty JSON response")
 	}
 
-	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
-		return nil, fmt.Errorf("decoding login response: %w", err)
-	}
-
-	if !loginResp.Success {
+	loginResp := resp.JSON200
+	if loginResp.Success == nil || !*loginResp.Success {
 		return nil, fmt.Errorf("login failed: invalid credentials")
+	}
+	if loginResp.User == nil || loginResp.User.Id == nil {
+		return nil, fmt.Errorf("login failed: user id not found in response")
 	}
 
 	// Extract session cookie and XSRF token from response headers
 	var sessionCookie, xsrfToken string
-	for _, cookie := range resp.Cookies() {
+	for _, cookie := range resp.HTTPResponse.Cookies() {
 		switch cookie.Name {
 		case "connect.sid":
 			sessionCookie = cookie.Value
@@ -86,15 +79,22 @@ func (c *Client) Login(email, password string) (*AuthCredentials, error) {
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"userID":   loginResp.User.ID,
-		"username": loginResp.User.Username,
+		"userID":   *loginResp.User.Id,
+		"username": derefString(loginResp.User.Username),
 	}).Info("Successfully authenticated")
 
 	return &AuthCredentials{
 		SessionCookie: sessionCookie,
 		XSRFToken:     xsrfToken,
-		UserID:        fmt.Sprintf("%d", loginResp.User.ID),
+		UserID:        fmt.Sprintf("%d", *loginResp.User.Id),
 	}, nil
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // SetAuth configures the client with authentication credentials

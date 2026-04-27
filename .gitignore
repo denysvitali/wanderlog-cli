@@ -3,6 +3,9 @@
 /wanderlog-cli
 wanderlog-*-*
 
+# AI
+.claude/settings.local.json
+
 # Test & coverage
 coverage.out
 coverage.html

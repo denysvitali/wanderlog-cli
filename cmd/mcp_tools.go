@@ -371,16 +371,13 @@ func handleBrowseGuides(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 }
 
 type geoGuideCount struct {
-	Name       string `json:"name"`
-	GeoID      int    `json:"geoId"`
-	GuideCount int    `json:"guideCount"`
+	Name  string `json:"name"`
+	GeoID int    `json:"id"`
 }
 
 func filterGeoGuideCounts(data json.RawMessage, query string, limit int) ([]geoGuideCount, error) {
-	var payload struct {
-		GeoGuideCounts []geoGuideCount `json:"geoGuideCounts"`
-	}
-	if err := json.Unmarshal(data, &payload); err != nil {
+	var geos []geoGuideCount
+	if err := json.Unmarshal(data, &geos); err != nil {
 		return nil, err
 	}
 
@@ -390,7 +387,7 @@ func filterGeoGuideCounts(data json.RawMessage, query string, limit int) ([]geoG
 	}
 
 	matches := make([]geoGuideCount, 0, limit)
-	for _, geo := range payload.GeoGuideCounts {
+	for _, geo := range geos {
 		if query != "" && !strings.Contains(strings.ToLower(geo.Name), query) {
 			continue
 		}
@@ -411,7 +408,7 @@ func handleSearchGeos(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	}
 
 	client := optionalAuthClient()
-	resp, err := client.BrowseGuides(0)
+	resp, err := client.SearchGeos()
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}

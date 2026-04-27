@@ -20,7 +20,9 @@
       "Bash(git push:*)",
       "Bash(go list:*)",
       "Read(//home/dvitali/go/pkg/mod/github.com/mark3labs/mcp-go@v0.37.0/**)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(go vet *)",
+      "Bash(INTEGRATION_TESTS=1 go test -v ./cmd/... -run Integration)"
     ],
     "deny": []
   }

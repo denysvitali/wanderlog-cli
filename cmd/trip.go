@@ -26,8 +26,8 @@ https://wanderlog.com/view/TRIP_ID/trip-name
 
 Examples:
   wanderlog trip abc123xyz
-  wanderlog trip abc123xyz --format json
-  wanderlog trip abc123xyz --format markdown --details
+  wanderlog trip abc123xyz --output json
+  wanderlog trip abc123xyz --output markdown --details
   wanderlog trip --file trips/trip1.json`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if fromFile != "" && len(args) > 0 {
@@ -77,7 +77,7 @@ func init() {
 	// root registration disabled - command moved under `trips show`
 	// rootCmd.AddCommand(tripCmd)
 
-	tripCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format (pretty, json, markdown)")
+	tripCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json, markdown)")
 	tripCmd.Flags().BoolVarP(&showDetails, "details", "d", false, "Show detailed information")
 	tripCmd.Flags().StringVar(&fromFile, "file", "", "Load trip data from local JSON file instead of API")
 }

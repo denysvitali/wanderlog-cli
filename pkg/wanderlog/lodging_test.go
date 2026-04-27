@@ -2,6 +2,7 @@ package wanderlog
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,17 @@ func TestSearchLodgings(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "POST" || !strings.HasSuffix(r.URL.Path, "/lodging/searchLodgings") {
 				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("reading body: %v", err)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(body, &payload); err != nil {
+				t.Fatalf("decoding body: %v", err)
+			}
+			if _, ok := payload["childrenAges"]; !ok {
+				t.Fatalf("expected childrenAges in request body: %s", string(body))
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
@@ -60,14 +72,11 @@ func TestSearchLodgings(t *testing.T) {
 func TestGetGooglePriceRates(t *testing.T) {
 	t.Run("successful fetch", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != "POST" || !strings.HasSuffix(r.URL.Path, "/lodging/getGooglePriceRates") {
+			if r.Method != "GET" || !strings.HasSuffix(r.URL.Path, "/lodging/getGooglePriceRates") {
 				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 			}
-			// Verify propertyId is in the body
-			var body map[string]string
-			json.NewDecoder(r.Body).Decode(&body)
-			if body["propertyId"] != "prop-123" {
-				t.Errorf("expected propertyId=prop-123, got %v", body)
+			if r.URL.Query().Get("id") != "prop-123" {
+				t.Errorf("expected id=prop-123, got %s", r.URL.RawQuery)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"success":true,"data":{"propertyId":"prop-123","rates":[]}}`))

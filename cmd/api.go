@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/ui"
 )
 
 var (
@@ -73,7 +75,7 @@ default and is attached when credentials are available; use --auth to require it
 			return
 		}
 
-		fmt.Printf("HTTP %d\n", status)
+		fmt.Printf("HTTP %s\n", ui.HighlightStyle.Render(fmt.Sprintf("%d", status)))
 		_, _ = io.Copy(os.Stdout, strings.NewReader(string(respBody)))
 		if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
 			fmt.Println()
@@ -89,7 +91,7 @@ func init() {
 	apiCmd.Flags().StringVar(&apiBodyFile, "body-file", "", "File containing a JSON request body")
 	apiCmd.Flags().StringArrayVarP(&apiHeaderValues, "header", "H", nil, "HTTP header as 'Name: value'")
 	apiCmd.Flags().BoolVar(&apiAuthenticated, "auth", false, "Require stored or supplied authentication")
-	apiCmd.Flags().StringVarP(&outputFormat, "format", "f", "raw", "Output format (raw, json, pretty)")
+	apiCmd.Flags().StringVarP(&outputFormat, "output", "o", "raw", "Output format (raw, json, pretty)")
 	apiCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	apiCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 }

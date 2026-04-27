@@ -4,68 +4,39 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 )
 
 func TestSearchPlaces(t *testing.T) {
-	t.Run("no api key", func(t *testing.T) {
-		client := newClientNoAuth(t)
-		resp, err := client.SearchPlaces("test", nil, nil, "")
-		if err == nil {
-			t.Fatal("expected error for empty API key")
-		}
-		if resp != nil && resp.Success {
-			t.Error("expected success=false when no API key")
-		}
-	})
-
-	t.Run("missing api key returns error", func(t *testing.T) {
-		client := newClientNoAuth(t)
-		_, err := client.SearchPlaces("test", nil, nil, "")
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if !strings.Contains(err.Error(), "API key is required") {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("successful google places search", func(t *testing.T) {
+	t.Run("successful wanderlog places search", func(t *testing.T) {
 		lat, lng := 40.71, -74.00
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				t.Errorf("expected POST, got %s", r.Method)
-			}
-			if r.Header.Get("X-Goog-Api-Key") != "test-key" {
-				t.Errorf("missing API key header")
-			}
-			if r.Header.Get("X-Goog-FieldMask") == "" {
-				t.Errorf("missing field mask header")
+			if r.Method != http.MethodGet {
+				t.Errorf("expected GET, got %s", r.Method)
 			}
 
-			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("decode request body: %v", err)
+			var reqBody map[string]any
+			if err := json.Unmarshal([]byte(r.URL.Query().Get("request")), &reqBody); err != nil {
+				t.Fatalf("decode request query: %v", err)
 			}
-			if body["textQuery"] != "coffee" {
-				t.Errorf("unexpected query body: %+v", body)
+			if reqBody["input"] != "coffee" {
+				t.Errorf("unexpected request query: %+v", reqBody)
 			}
-			if _, ok := body["locationBias"]; !ok {
-				t.Errorf("expected location bias in body")
+			location, ok := reqBody["location"].(map[string]any)
+			if !ok || location["latitude"] != lat || location["longitude"] != lng {
+				t.Errorf("unexpected location: %+v", reqBody["location"])
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"places":[{"id":"place-1","displayName":{"text":"Coffee Shop"},"formattedAddress":"123 Main St","location":{"latitude":40.71,"longitude":-74},"rating":4.5,"types":["cafe"]}]}`))
+			_, _ = w.Write([]byte(`{"success":true,"data":[{"place_id":"place-1","description":"Coffee Shop, 123 Main St","types":["cafe"],"structured_formatting":{"main_text":"Coffee Shop","secondary_text":"123 Main St"}}]}`))
 		}))
 		defer server.Close()
 
-		client := newClientNoAuth(t)
-		client.httpClient = newRedirectClient(server)
+		client := newTestClient(t, server)
 
-		resp, err := client.SearchPlaces("coffee", &lat, &lng, "test-key")
+		resp, err := client.SearchPlaces("coffee", &lat, &lng)
 		if err != nil {
 			t.Fatalf("SearchPlaces: %v", err)
 		}
@@ -75,43 +46,27 @@ func TestSearchPlaces(t *testing.T) {
 		if resp.Places[0].Name != "Coffee Shop" || resp.Places[0].PlaceID != "place-1" {
 			t.Errorf("unexpected place: %+v", resp.Places[0])
 		}
+		if resp.Places[0].Address != "123 Main St" {
+			t.Errorf("unexpected address: %+v", resp.Places[0])
+		}
 	})
 }
 
 func TestSearchRestaurants(t *testing.T) {
-	t.Run("no api key returns error", func(t *testing.T) {
-		client := newClientNoAuth(t)
-		_, err := client.SearchRestaurants("pizza", nil, nil, "")
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if !strings.Contains(err.Error(), "API key is required") {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("adds restaurant type filter", func(t *testing.T) {
+	t.Run("uses wanderlog places search", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("decode request body: %v", err)
-			}
-			if body["includedType"] != "restaurant" {
-				t.Errorf("expected restaurant type filter, got %+v", body)
-			}
-			if !strings.Contains(r.Header.Get("X-Goog-FieldMask"), "places.regularOpeningHours") {
-				t.Errorf("expected restaurant field mask, got %q", r.Header.Get("X-Goog-FieldMask"))
+			if r.URL.Path != "/placesAPI/autocomplete/v2" {
+				t.Errorf("unexpected path: %s", r.URL.Path)
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"places":[{"id":"restaurant-1","displayName":{"text":"Pizza Place"},"formattedAddress":"456 Main St","location":{"latitude":41,"longitude":-75},"rating":4.2,"types":["restaurant"]}]}`))
+			_, _ = w.Write([]byte(`{"success":true,"data":[{"place_id":"restaurant-1","description":"Pizza Place, 456 Main St","types":["restaurant"],"structured_formatting":{"main_text":"Pizza Place","secondary_text":"456 Main St"}}]}`))
 		}))
 		defer server.Close()
 
-		client := newClientNoAuth(t)
-		client.httpClient = newRedirectClient(server)
+		client := newTestClient(t, server)
 
-		resp, err := client.SearchRestaurants("pizza", nil, nil, "test-key")
+		resp, err := client.SearchRestaurants("pizza", nil, nil)
 		if err != nil {
 			t.Fatalf("SearchRestaurants: %v", err)
 		}
@@ -139,14 +94,14 @@ func TestSearchPlacesInTrips(t *testing.T) {
 	})
 }
 
-func TestSearchPlacesWithWanderllog(t *testing.T) {
+func TestSearchPlacesWithWanderlog(t *testing.T) {
 	t.Run("successful search", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
 				t.Errorf("expected GET, got %s", r.Method)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			resp := WanderlLogAutocompleteResponse{
+			resp := WanderlogAutocompleteResponse{
 				Success: true,
 				Data: []struct {
 					PlaceID              string   `json:"place_id"`
@@ -178,9 +133,9 @@ func TestSearchPlacesWithWanderllog(t *testing.T) {
 		client := newTestClient(t, server)
 		client.httpClient = newRedirectClient(server)
 
-		result, err := client.SearchPlacesWithWanderllog("test", 40.71, -74.00)
+		result, err := client.SearchPlacesWithWanderlog("test", 40.71, -74.00)
 		if err != nil {
-			t.Fatalf("SearchPlacesWithWanderllog: %v", err)
+			t.Fatalf("SearchPlacesWithWanderlog: %v", err)
 		}
 		if !result.Success {
 			t.Error("expected success")

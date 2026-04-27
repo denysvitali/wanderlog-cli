@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/denysvitali/wanderlog-cli/pkg/ui"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
@@ -55,19 +56,19 @@ Examples:
 		if keychainErr != nil && configErr != nil {
 			logger.WithError(keychainErr).Warn("Failed to save credentials to keychain")
 			logger.WithError(configErr).Warn("Failed to save credentials to config file")
-			fmt.Printf("⚠️ Credentials saved in memory only (this session)\n")
+			fmt.Println(ui.WarningStyle.Render("⚠️ Credentials saved in memory only (this session)"))
 		} else {
 			if keychainErr == nil {
-				fmt.Printf("🔐 Credentials saved to keychain\n")
+				fmt.Println(ui.SuccessStyle.Render("🔐 Credentials saved to keychain"))
 			}
 			if configErr == nil {
-				fmt.Printf("📝 Credentials saved to config file\n")
+				fmt.Println(ui.SuccessStyle.Render("📝 Credentials saved to config file"))
 			}
 		}
 
-		fmt.Printf("✅ Successfully logged in!\n")
-		fmt.Printf("Session: %s...\n", creds.SessionCookie[:20])
-		fmt.Printf("User ID: %s\n", creds.UserID)
+		fmt.Println(ui.SuccessStyle.Render("✅ Successfully logged in!"))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Session: %s...", creds.SessionCookie[:20])))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %s", creds.UserID)))
 	},
 }
 
@@ -90,12 +91,12 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("✅ Successfully logged out\n")
+		fmt.Println(ui.SuccessStyle.Render("✅ Successfully logged out"))
 		if keychainErr == nil {
-			fmt.Printf("🗑️ Credentials cleared from keychain\n")
+			fmt.Println(ui.InfoStyle.Render("🗑️ Credentials cleared from keychain"))
 		}
 		if configErr == nil {
-			fmt.Printf("🗑️ Credentials cleared from config file\n")
+			fmt.Println(ui.InfoStyle.Render("🗑️ Credentials cleared from config file"))
 		}
 	},
 }
@@ -132,18 +133,18 @@ Examples:
 		}
 
 		if creds != nil {
-			fmt.Printf("✅ Authenticated (via %s)\n", source)
+			fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✅ Authenticated (via %s)", source)))
 			sessionDisplay := creds.SessionCookie
 			if len(sessionDisplay) > 20 {
 				sessionDisplay = sessionDisplay[:20]
 			}
-			fmt.Printf("Session: %s...\n", sessionDisplay)
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Session: %s...", sessionDisplay)))
 			if creds.UserID != "" {
-				fmt.Printf("User ID: %s\n", creds.UserID)
+				fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %s", creds.UserID)))
 			}
 		} else {
-			fmt.Printf("❌ Not authenticated\n")
-			fmt.Printf("Run 'wanderlog login' to authenticate\n")
+			fmt.Println(ui.ErrorStyle.Render("❌ Not authenticated"))
+			fmt.Println(ui.InfoStyle.Render("Run 'wanderlog login' to authenticate"))
 		}
 	},
 }

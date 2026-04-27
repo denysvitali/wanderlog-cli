@@ -26,7 +26,7 @@ https://wanderlog.com/view/TRIP_ID/trip-name
 
 Examples:
   wanderlog verify-trip abc123xyz
-  wanderlog verify-trip abc123xyz --format json`,
+  wanderlog verify-trip abc123xyz --output json`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		tripID := args[0]
@@ -41,13 +41,13 @@ Examples:
 		}
 
 		// Output in text format (human readable)
-		fmt.Println("=== TEXT FORMAT ===")
+		fmt.Println(ui.HeaderStyle.Render("=== TEXT FORMAT ==="))
 		fmt.Println()
 		ui.PrintTrip(trip, true)
 
 		// Output in JSON format
 		fmt.Println()
-		fmt.Println("=== JSON FORMAT ===")
+		fmt.Println(ui.HeaderStyle.Render("=== JSON FORMAT ==="))
 		fmt.Println()
 		jsonBytes, err := json.MarshalIndent(trip, "", "  ")
 		if err != nil {
@@ -61,6 +61,6 @@ Examples:
 func init() {
 	rootCmd.AddCommand(verifyTripCmd)
 
-	verifyTripCmd.Flags().StringVarP(&verifyOutputFormat, "format", "f", "both",
+	verifyTripCmd.Flags().StringVarP(&verifyOutputFormat, "output", "o", "both",
 		"Output format: 'text', 'json', or 'both' (default: both)")
 }
