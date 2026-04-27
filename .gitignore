@@ -18,6 +18,7 @@ coverage.html
 # JS artifacts
 /*.js
 dist*.js
+/artifacts/index.android.bundle
 
 # Build
 /dist/
