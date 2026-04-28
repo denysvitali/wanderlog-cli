@@ -2,7 +2,14 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to improve integration test coverage for the Wanderlog CLI codebase. The current test suite has solid unit test coverage for many components (~26 test files), but integration test coverage is sparse and concentrated in a few areas. This plan categorizes improvements by priority based on criticality and impact.
+This document outlines a comprehensive plan to improve integration test coverage for the Wanderlog CLI codebase. The current test suite has solid unit test coverage for many components (~26 test files), but integration test coverage is sparse and concentrated in a few areas. Analysis from 8 specialized agents reveals significant gaps across authentication, trip operations, MCP tools, models, and operational transforms.
+
+**Key Statistics:**
+- 26 test files in the project
+- ~14 tools fully tested at MCP handler level
+- 17+ MCP tools completely untested
+- 37+ model types lack JSON round-trip tests
+- 9 OT helper functions lack individual unit tests
 
 ---
 
@@ -12,13 +19,19 @@ These features are core to the CLI's value proposition and any failures would di
 
 ### 1.1 Authentication System
 
-**What needs to be tested:**
-- Full login flow with real credentials (currently only mocked)
-- Session token persistence and retrieval from keychain
-- XSRF token handling
+**Agent: agent-auth**
+
+**Current Coverage:**
+- `TestAddAuthHeaders` - session cookie and XSRF token headers
+- `TestLogin` - success/failure/missing cookie scenarios (mocked)
+- `TestSetAuth` - credential storage
+
+**Critical Gaps:**
+- Keychain operations (save/load/delete credentials)
 - `EnsureAuthenticated()` fallback chain: keychain -> env vars -> flags
-- Logout and session cleanup
-- Auth refresh when session expires
+- Token refresh and re-login flow
+- Session expiration handling
+- Invalid credential handling
 
 **Why it's important:**
 Authentication is the foundation for all write operations. If auth fails, users cannot manage trips.
@@ -32,65 +45,63 @@ INTEGRATION_TESTS=1 WANDERLOG_AUTH_EMAIL=test@example.com WANDERLOG_AUTH_PASSWOR
 
 **Files to create/modify:**
 - `pkg/wanderlog/auth_integration_test.go` - Real auth flow tests
-- Modify `auth_helper.go` to support test injection points
+- Mock keychain for CI environments
 
-### 1.2 Trip CRUD Operations
+**Test scenarios to add:**
+1. Test `EnsureAuthenticated` with keychain credentials present
+2. Test `EnsureAuthenticated` falls back to env vars when keychain is empty
+3. Test `EnsureAuthenticated` uses flags when env vars are also missing
+4. Test login with invalid credentials returns appropriate error
+5. Test session persistence across client instances
 
-**What needs to be tested:**
-- **Create Trip**: Full creation with geo_id, dates, privacy settings
-- **Get Trip**: Fetching existing trip, handling non-existent trips
-- **Update Trip**: Title, dates, privacy mutations (partially covered in `sections_test.go`)
-- **Delete Trip**: Deletion and cleanup verification
-- **Copy Trip**: Creating trip copies
+---
+
+### 1.2 Trip Operations (Handler Level)
+
+**Agent: agent-trip-ops**
+
+**Current Coverage:**
+- `copy_trip` at client level (mocked)
+- `delete_trips` MCP handler
+- `get_like_count` at client level (mocked)
+
+**Critical Gaps:**
+- `get_trip_sections` MCP handler (no handler-level test)
+- `copy_trip` MCP handler (no handler-level test)
+- Bulk delete with multiple keys (partially covered)
+- `get_like_count` MCP handler (no handler-level test)
 
 **Why it's important:**
-Trip CRUD is the primary user workflow. Users must be able to create, read, update, and delete trips reliably.
-
-**Current coverage:**
-- `write_ops_test.go` has unit tests for CreateTrip, DeleteTrip (mocked)
-- `write_ops_integration_test.go` has `TestIntegration_CreateAndDeleteTrip`
-- `sections_test.go` has `TestIntegration_UpdateTrip`
-
-**Gaps:**
-- No integration test for `GetTrip` with real data
-- No integration test for `CopyTrip` with cleanup verification
-- No test for bulk `DeleteTrips` (only in `mcp_integration_write_test.go`)
+Trip operations are the primary user workflow. Users must be able to view, copy, and delete trips.
 
 **Suggested approach:**
 ```go
-// TestIntegration_CompleteTripLifecycle
-// 1. Create trip with all parameters
-// 2. Fetch trip and verify all fields
-// 3. Update title, verify
-// 4. Update dates, verify
-// 5. Update privacy, verify
-// 6. Copy trip, verify copy exists
-// 7. Delete original, verify deletion
-// 8. Delete copy, verify cleanup
+// TestMCP_GetTripSections
+// TestMCP_CopyTrip
+// TestMCP_GetLikeCount (at handler level)
+// TestMCP_DeleteTrips_MultipleKeys
 ```
 
-### 1.3 Place Operations (Add/Remove/Move/Reorder)
+**Files to create/modify:**
+- `cmd/mcp_trip_ops_integration_test.go`
 
-**What needs to be tested:**
-- **Add Place**: With coordinates, without coordinates, to dated section
-- **Remove Place**: With valid/invalid place IDs
-- **Move Place**: Between sections with position tracking
-- **Reorder Places**: Within a section, verify order persists
-- **List Places**: Verify added places appear correctly
+---
+
+### 1.3 Place Operations (Complete Workflow)
+
+**Current Coverage:**
+- Unit tests for AddPlace, RemovePlace with mocks
+- MCP integration tests for AddPlace (adds to test trip, doesn't clean up)
+- MCP integration test for RemovePlace (error cases only)
+
+**Critical Gaps:**
+- No integration test that adds a place, extracts its ID, removes it, and verifies removal
+- No test for MovePlace MCP tool (both client and handler)
+- No test for ReorderPlaces MCP tool (only via direct ApplyOperations)
+- No test for adding place without coordinates (auto-fetch via place_id)
 
 **Why it's important:**
-Places are the core content of any trip. Users must be able to add, remove, and organize places.
-
-**Current coverage:**
-- `write_ops_test.go` has unit tests for AddPlace, RemovePlace (mocked)
-- `cmd/mcp_integration_write_test.go` has `TestMCPIntegration_AddPlace`, `TestMCPIntegration_RemovePlace`
-- `TestMCPIntegration_UpdatePlaceNotes` and `TestMCPIntegration_ReorderPlaces` test operational transforms directly
-
-**Gaps:**
-- No integration test that adds a place, extracts its ID, removes it, and verifies removal
-- No integration test for `MovePlace` MCP tool
-- No test for `ReorderPlaces` via MCP tool (only via direct ApplyOperations)
-- No test for adding place without coordinates (auto-fetch)
+Places are the core content of any trip. Users must be able to add, remove, move, and organize places.
 
 **Suggested approach:**
 ```go
@@ -101,188 +112,305 @@ Places are the core content of any trip. Users must be able to add, remove, and 
 // 4. Remove the place
 // 5. List places again, verify removal
 
-// TestIntegration_MovePlace
-// 1. Add place to section A
-// 2. Move place to section B at specific position
-// 3. Verify place appears in section B at correct position
-// 4. Verify place no longer in section A (or reordered if same section)
+// TestMCP_MovePlace
+// 1. Get section IDs for a trip
+// 2. Add place to section A
+// 3. Call move_place to move to section B at position 0
+// 4. Verify place appears in section B at correct position
+// 5. Verify place no longer in section A (or reordered if same section)
+
+// TestMCP_ReorderPlaces
+// 1. Get section with 3+ places
+// 2. Call reorder_places with reversed order
+// 3. Verify order persisted
 ```
 
-### 1.4 Section Operations
+---
 
-**What needs to be tested:**
-- **List Sections**: Verify section structure and dates
-- **Get Section Details**: Block content, metadata
-- **Create Section**: If applicable
-- **Update Section**: Heading, notes
-- **Delete Section**: Cleanup verification
+### 1.4 Operational Transforms (Complete Coverage)
+
+**Agent: agent-operational-transforms**
+
+**Current Coverage:**
+- `ApplyOperations` unit tests (mocked)
+- `ReplaceInObject` via UpdatePlaceNotes and ReorderPlaces
+
+**Critical Gaps:**
+- `InsertInObject` - no direct unit test
+- `DeleteInObject` - no direct unit test
+- `InsertInList` - no direct unit test
+- `DeleteFromList` - no direct unit test
+- `ReplaceInList` - no direct unit test
+- `MovePlace` OT - no direct unit test
+- `ClearSectionBlocks` - no direct unit test
+- `DeleteSection` - no direct unit test
+- `NukeTripPlaces` - no direct unit test
+- Edge cases: empty paths, concurrent modifications, path validation
 
 **Why it's important:**
-Sections represent days in a trip itinerary. Proper section handling is critical.
+Operational transforms are the foundation of all write operations. Without comprehensive OT tests, regressions can occur silently.
 
-**Current coverage:**
-- `sections_test.go` has `TestIntegration_GetTripSections` and `TestIntegration_UpdateTrip`
+**Suggested approach:**
+```go
+// TestOT_InsertInObject
+// TestOT_DeleteInObject
+// TestOT_InsertInList
+// TestOT_DeleteFromList
+// TestOT_ReplaceInList
+// TestOT_MovePlace
+// TestOT_ClearSectionBlocks
+// TestOT_DeleteSection
+// TestOT_NukeTripPlaces
+// TestOT_EdgeCase_EmptyPath
+// TestOT_EdgeCase_ConcurrentModifications
+```
 
-**Gaps:**
-- No integration test for section deletion
-- No test for section with blocks (places, flights, notes)
-- No test for section ordering or reorganization
+**Files to create:**
+- `pkg/wanderlog/ot_integration_test.go` (or expand `write_ops_test.go`)
 
 ---
 
 ## Priority 2: Important Functionality (SHOULD Test)
 
-These features enhance user experience but aren't strictly required for basic usage.
+### 2.1 MCP Extended Tools (17+ Untested)
 
-### 2.1 Search Operations
+**Agent: agent-mcp-server**
 
-**What needs to be tested:**
-- **search_places**: Query with/without coordinates, verify result structure
-- **search_restaurants**: Restaurant-specific search
-- **search_geos**: Destination search for trip creation
-- **get_place_details**: Detailed place info retrieval
-- **search_hotels**: Lodging search with check-in/out dates
+**Current Coverage:**
+- Core read tools: list_trips, get_trip, list_places, list_sections, get_place_details, search_places_wanderlog
+- Write tools: add_place, remove_place, create_trip, delete_trips, add_flight
+- Lifecycle test: complete trip creation with places, lodging, flights
+
+**Critical Gaps (17+ tools untested):**
+| Tool | Status | Priority |
+|------|--------|----------|
+| get_me | NOT TESTED | P2 |
+| get_user_profile | NOT TESTED | P2 |
+| get_notifications | NOT TESTED | P2 |
+| get_notification_settings | NOT TESTED | P3 |
+| mark_notifications_read | NOT TESTED | P3 |
+| get_user_emails | NOT TESTED | P3 |
+| autocomplete_users | NOT TESTED | P3 |
+| is_username_taken | NOT TESTED | P3 |
+| get_feed_home | NOT TESTED | P2 |
+| get_feed_recent | NOT TESTED | P2 |
+| get_feed_friends | NOT TESTED | P2 |
+| get_trip_history | NOT TESTED | P2 |
+| browse_guides | NOT TESTED | P2 |
+| search_geos | NOT TESTED | P2 |
+| get_view_only_journal | NOT TESTED | P3 |
+| get_trip_expenses_csv | NOT TESTED | P3 |
+| get_trip_distinction | NOT TESTED | P3 |
+| get_global_config | NOT TESTED | P3 |
+| HTTP transport mode | NOT TESTED | P2 |
+| CLI flag combinations | NOT TESTED | P2 |
 
 **Why it's important:**
-Search is the primary discovery mechanism for places to add to trips.
-
-**Current coverage:**
-- `search_test.go` has unit tests for SearchPlaces, SearchRestaurants, SearchPlacesWithWanderlog, matchesQuery
-- `cmd/mcp_integration_test.go` has `TestMCPIntegration_SearchPlacesWanderlog`
-- `mcp_integration_write_test.go` has hotel search within lifecycle test
-
-**Gaps:**
-- No integration test for `search_places` with real Google Places API
-- No integration test for `search_geos` with real Wanderlog API
-- No test for `search_restaurants`
-- No test for `get_place_details` with place_id validation
+The MCP server exposes 30+ tools. Users and AI assistants rely on these tools for trip management.
 
 **Suggested approach:**
 ```go
-// TestIntegration_SearchPlacesReal
-// 1. Search for "Eiffel Tower Paris"
-// 2. Verify results have place_id, name, address
-// 3. Verify results can be used in add_place
+// cmd/mcp_extended_integration_test.go
+// Separate file for extended tool tests
 
-// TestIntegration_SearchGeosForTripCreation
-// 1. Search for "Tokyo"
-// 2. Extract geo_id
-// 3. Create trip with that geo_id
-// 4. Verify trip has correct destination
+// Priority P2 tests:
+TestMCP_GetMe
+TestMCP_GetUserProfile
+TestMCP_GetNotifications
+TestMCP_GetFeedHome
+TestMCP_GetFeedRecent
+TestMCP_GetFeedFriends
+TestMCP_GetTripHistory
+TestMCP_BrowseGuides
+TestMCP_SearchGeos
+TestMCP_HTTPTransport
+TestMCP_CLIFlagCombinations
 ```
-
-### 2.2 Flight Operations
-
-**What needs to be tested:**
-- **GetTripFlights**: Retrieve flights for a trip
-- **Add Flight**: Add flight to trip with flight number, dates
-- **GetFlightStops**: Query stops for a flight
-- **AutocompleteAirport**: Airport search
-
-**Why it's important:**
-Flights are a common travel component and users need to track them.
-
-**Current coverage:**
-- `flights_test.go` has unit tests for GetAllAirlines, AutocompleteAirport, GetFlightStops
-- `write_ops_integration_test.go` has `TestIntegration_GetTripFlights`
-
-**Gaps:**
-- No integration test for `add_flight` MCP tool
-- No integration test for adding flight, then retrieving trip to verify
-- No test for flight with multiple stops
-
-**Suggested approach:**
-```go
-// TestIntegration_AddFlightAndVerify
-// 1. Create new trip
-// 2. Add flight MU244 on specific date
-// 3. Get trip sections, find flights section
-// 4. Verify flight appears in correct section
-
-// TestIntegration_FlightStopsReal
-// 1. Query flight stops for MU244
-// 2. Verify stops include departure/arrival airports
-```
-
-### 2.3 Social Features
-
-**What needs to be tested:**
-- **Like/Unlike Trip**: Toggle like status
-- **GetLikeCount**: Retrieve like count and user status
-- **GetTripDistinction**: Badge/info retrieval
-
-**Why it's important:**
-Social features enable trip sharing and discovery.
-
-**Current coverage:**
-- `write_ops_integration_test.go` has `TestIntegration_LikeTrip`, `TestIntegration_GetLikeCount`
-- `write_ops_social.go` has related operations
-
-**Gaps:**
-- No test for like/unlike cycle (like, verify count, unlike, verify count)
-- No test for distinction/badge display
-
-### 2.4 Lodging/Hotel Operations
-
-**What needs to be tested:**
-- **SearchHotels**: Hotel search with location and dates
-- **GetGooglePriceRates**: Price rate retrieval
-- **Add lodging to trip as place**
-
-**Why it's important:**
-Users frequently need lodging information during trip planning.
-
-**Current coverage:**
-- `lodging_test.go` has unit tests for SearchLodgings, GetGooglePriceRates
-- `mcp_integration_write_test.go` handles lodging search outage gracefully
-
-**Gaps:**
-- No integration test for full hotel search -> add as place workflow
-- No test for `GetGooglePriceRates` with real property ID
-
-### 2.5 Feed Operations
-
-**What needs to be tested:**
-- **GetFeedHome**: User's home feed
-- **GetFeedMostRecent**: Most recently edited trip
-- **GetFriendsPlans**: Friends' public trips
-- **BrowseGuides**: Guide discovery
-
-**Why it's important:**
-Feed operations support trip discovery and collaboration.
-
-**Current coverage:**
-- `feed_ops_test.go` has unit tests for all feed operations (mocked)
-
-**Gaps:**
-- No integration tests for feed operations with real data
-- No test for feed pagination
-
-### 2.6 User Operations
-
-**What needs to be tested:**
-- **GetMe**: Current user profile
-- **GetUserProfile**: Other user profiles
-- **GetNotifications**: Notification inbox
-- **MarkNotificationsRead**: Mark notifications as read
-
-**Why it's important:**
-User operations support profile management and collaboration.
-
-**Current coverage:**
-- `user_ops_test.go` has unit tests (mocked)
-
-**Gaps:**
-- No integration tests for user operations
-- No test for notification workflow
 
 ---
 
-## Priority 3: Nice-to-Have (Edge Cases, Error Scenarios)
+### 2.2 Travel Search Tools (4 Untested)
 
-These are valuable for robustness but lower priority than P1/P2 items.
+**Agent: agent-travel-search**
 
-### 3.1 Error Handling
+**Current Coverage:**
+- `search_hotels` MCP handler
+- `search_places_wanderlog` MCP handler
+
+**Critical Gaps:**
+- `search_places` MCP handler (Google Places API)
+- `search_restaurants` MCP handler
+- `get_trip_flights` MCP handler (not the client method)
+- `get_flight_stops` MCP handler
+
+**Why it's important:**
+Travel search is the primary discovery mechanism for places, lodging, and flights.
+
+**Suggested approach:**
+```go
+// TestMCP_SearchPlaces
+// TestMCP_SearchRestaurants
+// TestMCP_GetTripFlights
+// TestMCP_GetFlightStops
+```
+
+---
+
+### 2.3 CLI Command Behavioral Tests
+
+**Agent: agent-cli-commands**
+
+**Current Coverage:**
+- Command registration tests only
+
+**Critical Gaps:**
+- All behavioral tests for:
+  - `trip` command (view trip details)
+  - `places` command (list places)
+  - `create` command (create new trip)
+  - `edit` subcommands (update-trip, add-place, remove-place, etc.)
+  - `travel` subcommands (airlines, airports, flight-stops, hotels)
+  - `user` subcommands (profile, notifications, settings)
+  - `feed` subcommands (home, recent, friends, history)
+  - `journal` command
+  - `expenses` command
+- Argument parsing tests
+- Flag handling tests
+- Output formatting tests (pretty vs JSON vs markdown)
+
+**Why it's important:**
+Users interact with the CLI via commands. Regression in command behavior breaks user workflows.
+
+**Suggested approach:**
+```go
+// cmd/cliBehavioral_test.go
+TestCLI_TripCommand
+TestCLI_CreateCommand
+TestCLI_EditCommands
+TestCLI_TravelCommands
+TestCLI_UserCommands
+TestCLI_FeedCommands
+TestCLI_FlagCombinations
+TestCLI_OutputFormats
+```
+
+---
+
+### 2.4 User/Feed/Journal Tools (17 Untested)
+
+**Agent: agent-user-feed-journal**
+
+**Current Coverage:**
+- 14 tools partially tested at unit level with mocks
+
+**Critical Gaps (17 tools need MCP handler tests):**
+1. `get_me` - Current user profile
+2. `get_user_profile` - Other user profiles
+3. `get_notifications` - Notification inbox
+4. `get_notification_settings` - User notification preferences
+5. `get_user_emails` - Registered email addresses
+6. `autocomplete_users` - User search by name
+7. `is_username_taken` - Username availability check
+8. `get_feed_home` - Home feed (own + friends' trips)
+9. `get_feed_recent` - Most recently edited trip
+10. `get_feed_friends` - Friends' public trips
+11. `get_trip_history` - Trip edit history with pagination
+12. `browse_guides` - Curated guide discovery
+13. `search_geos` - Destination search for trip creation
+14. `get_view_only_journal` - Shared journal view
+15. `get_trip_expenses_csv` - Expense export
+16. `get_trip_distinction` - Trip badge/info
+17. `get_global_config` - Server configuration
+
+**Why it's important:**
+These tools support profile management, social features, and trip discovery.
+
+**Suggested approach:**
+```go
+// cmd/mcp_user_feed_journal_test.go
+TestMCP_GetMe
+TestMCP_GetUserProfile
+TestMCP_GetNotifications
+TestMCP_GetFeedHome
+TestMCP_GetFeedRecent
+TestMCP_GetFeedFriends
+TestMCP_GetTripHistory
+TestMCP_BrowseGuides
+TestMCP_SearchGeos
+// ... etc.
+```
+
+---
+
+### 2.5 Section Operations
+
+**Current Coverage:**
+- `TestIntegration_GetTripSections`
+- `TestIntegration_UpdateTrip`
+
+**Critical Gaps:**
+- Section deletion
+- Section with blocks (places, flights, notes)
+- Section reordering/organization
+- Block-level operations (add block, remove block, update block)
+
+---
+
+## Priority 3: Nice-to-Have (Edge Cases, Model Tests)
+
+### 3.1 Model JSON Round-Trip Tests
+
+**Agent: agent-models**
+
+**Current Coverage:**
+- TripResponse JSON parsing only
+
+**Critical Gaps (37+ models untested):**
+- FlexibleText marshaling/unmarshaling
+- All response wrappers (success/error structures)
+- Travel models (Flight, Airline, Airport, Lodging)
+- User models (Profile, Notifications, Settings)
+- Feed models (TripPlan, Guide)
+- Block models (PlaceBlock, FlightBlock, NoteBlock, etc.)
+
+**Why it's important:**
+Models are the foundation of all API communication. Malformed JSON can cause silent failures.
+
+**Suggested approach:**
+```go
+// pkg/wanderlog/models_test.go
+// Add JSON round-trip tests for each model type
+
+TestFlexibleText_MarshalUnmarshal
+TestTripPlan_MarshalUnmarshal
+TestPlaceBlock_MarshalUnmarshal
+TestFlightBlock_MarshalUnmarshal
+TestLodgingSearchResponse_MarshalUnmarshal
+// ... etc.
+
+// Use table-driven tests with JSON fixtures
+```
+
+**Files to create:**
+- `pkg/wanderlog/testdata/*.json` - JSON fixtures for all model types
+
+---
+
+### 3.2 OT Edge Cases
+
+**Current Coverage:**
+- Basic ApplyOperations with mocked server
+
+**Critical Gaps:**
+- Nested path operations (e.g., `["itinerary", "sections", 0, "blocks", 0, "text"]`)
+- Array index boundaries (negative, out-of-bounds)
+- Partial updates vs full replacements
+- Conflict resolution scenarios
+- Invalid path validation
+
+---
+
+### 3.3 Error Handling Integration Tests
 
 **What needs to be tested:**
 - Invalid trip key returns appropriate error
@@ -290,46 +418,30 @@ These are valuable for robustness but lower priority than P1/P2 items.
 - Network failures are handled gracefully
 - Rate limiting is respected (with delays)
 - API server errors (5xx) are handled
+- Malformed JSON responses
 
-**Suggested approach:**
-```go
-// TestErrorHandling
-func TestIntegration_InvalidTripKey(t *testing.T) {
-    // Attempt operations with obviously invalid keys
-    // Verify appropriate error messages
-}
+---
 
-func TestIntegration_MissingRequiredFields(t *testing.T) {
-    // Create trip without title
-    // Create trip without dates
-    // Verify validation errors
-}
-```
+### 3.4 MCP Server Edge Cases
 
-### 3.2 Edge Cases
+**What needs to be tested:**
+- HTTP transport mode (not just stdio)
+- Concurrent tool calls
+- Resource URI variations (invalid URIs)
+- Prompt variations with different focus areas
+- Empty results handling
+- Large result pagination
+
+---
+
+### 3.5 CLI Command Edge Cases
 
 **What needs to be tested:**
 - Empty trip (no places, no sections)
 - Trip with very long title
 - Unicode in place names and notes
-- Concurrent operations on same trip
 - Large number of places in single section
-
-### 3.3 MCP Server Specific
-
-**What needs to be tested:**
-- HTTP transport mode (not just stdio)
-- Concurrent tool calls
-- Resource URI variations
-- Prompt variations with different focus areas
-
-### 3.4 Operational Transform Edge Cases
-
-**What needs to be tested:**
-- Nested path operations
-- Array index operations
-- Partial updates vs full replacements
-- Conflict resolution scenarios
+- Concurrent operations on same trip
 
 ---
 
@@ -341,29 +453,33 @@ Create reusable test fixtures for:
 - Authenticated client setup
 - Common trip templates
 - Place data for popular destinations (Paris, Tokyo, NYC)
+- JSON fixtures for all model types
 
 ```go
 // pkg/wanderlog/testfixtures/fixtures.go
 var (
-    AuthenticatedClient *Client // Setup via test helper
+    AuthenticatedClient *Client
     ParisTripTemplate   CreateTripRequest
     TestPlaces          map[string]PlaceData
 )
+
+// pkg/wanderlog/testdata/*.json
 ```
 
 ### B. Test Helpers
 
-Create helper functions to reduce boilerplate:
-
 ```go
-// RequiresRealAuth skips tests that need real credentials
-func requiresRealAuth(t *testing.T) {
+// SkipIfNoAuth skips tests that need real credentials
+func skipIfNoAuth(t *testing.T) {
     if os.Getenv("INTEGRATION_TESTS") != "1" {
         t.Skip("Set INTEGRATION_TESTS=1 to run")
     }
+    if os.Getenv("CI") == "true" && !hasAuthEnv() {
+        t.Skip("CI without auth secrets")
+    }
 }
 
-// authenticatedClient returns a client with real auth loaded
+// authenticatedClient returns a client with real auth
 func authenticatedClient(t *testing.T) *Client {
     client := NewClient()
     if err := client.EnsureAuthenticated("", ""); err != nil {
@@ -375,8 +491,6 @@ func authenticatedClient(t *testing.T) *Client {
 
 ### C. CI Integration
 
-Ensure tests can run in CI with proper secrets management:
-
 ```bash
 # .github/workflows/integration-tests.yml
 env:
@@ -384,70 +498,93 @@ env:
   WANDERLOG_AUTH_SESSION_XSRF_TOKEN: ${{ secrets.WANDERLOG_XSRF_TOKEN }}
 ```
 
-### D. Test Data Management
-
-- Use snapshot tests to capture API responses for debugging
-- Implement `SAVE_SNAPSHOTS=1` for local development
-- Keep test trips isolated and clean them up in `defer`
-
 ---
 
-## Testing Matrix
+## Consolidated Testing Matrix
 
-| Feature Area | Unit Tests | Integration Tests | MCP Tests | Priority |
-|-------------|------------|-------------------|-----------|----------|
-| Auth (Login) | Yes | **GAP** | N/A | P1 |
-| Auth (Session) | Partial | **GAP** | N/A | P1 |
-| CreateTrip | Yes | Yes | Yes | P1 |
-| GetTrip | Yes | **GAP** | Yes | P1 |
-| UpdateTrip | Yes | Yes | **GAP** | P1 |
-| DeleteTrip | Yes | Yes | Yes | P1 |
-| CopyTrip | Yes | Yes | Yes | P1 |
-| ListPlaces | Partial | Partial | Yes | P1 |
-| AddPlace | Yes | Partial | Yes | P1 |
-| RemovePlace | Yes | **GAP** | Partial | P1 |
-| MovePlace | N/A | **GAP** | **GAP** | P1 |
-| ReorderPlaces | Yes | **GAP** | **GAP** | P1 |
-| ListSections | Yes | Yes | Yes | P1 |
-| SearchPlaces | Yes | **GAP** | Yes | P2 |
-| SearchRestaurants | Yes | **GAP** | **GAP** | P2 |
-| SearchGeos | N/A | **GAP** | **GAP** | P2 |
-| GetPlaceDetails | Yes | **GAP** | Yes | P2 |
-| SearchHotels | Yes | **GAP** | Yes | P2 |
-| GetTripFlights | Yes | Yes | **GAP** | P2 |
-| AddFlight | N/A | **GAP** | Yes | P2 |
-| LikeTrip | Yes | Yes | **GAP** | P2 |
-| GetLikeCount | Yes | Yes | **GAP** | P2 |
-| Feed (Home/Recent/Friends) | Yes | **GAP** | **GAP** | P2 |
-| User Profile | Yes | **GAP** | **GAP** | P2 |
-| Notifications | Yes | **GAP** | **GAP** | P2 |
-| Journal | Yes | **GAP** | **GAP** | P3 |
-| Operational Transforms | Yes | Yes | Yes | P1 |
+### Priority 1 (Critical)
+
+| Feature | Unit Tests | Integration Tests | MCP Tests | Agent |
+|---------|------------|-------------------|-----------|-------|
+| Auth (Login) | Yes | **GAP** | N/A | auth |
+| Auth (EnsureAuthenticated) | Partial | **GAP** | N/A | auth |
+| Auth (Keychain) | **GAP** | **GAP** | N/A | auth |
+| CopyTrip (client) | Yes | Yes | Yes | trip-ops |
+| CopyTrip (handler) | **GAP** | **GAP** | **GAP** | trip-ops |
+| GetTripSections (handler) | **GAP** | **GAP** | **GAP** | trip-ops |
+| AddPlace workflow | Yes | Partial | Yes | - |
+| RemovePlace (complete) | Yes | **GAP** | Partial | - |
+| MovePlace | **GAP** | **GAP** | **GAP** | - |
+| ReorderPlaces (MCP) | Yes | **GAP** | **GAP** | - |
+| OT: InsertInObject | **GAP** | **GAP** | N/A | OT |
+| OT: DeleteInObject | **GAP** | **GAP** | N/A | OT |
+| OT: InsertInList | **GAP** | **GAP** | N/A | OT |
+| OT: DeleteFromList | **GAP** | **GAP** | N/A | OT |
+| OT: ReplaceInList | **GAP** | **GAP** | N/A | OT |
+| OT: MovePlace | **GAP** | **GAP** | N/A | OT |
+| OT: ClearSectionBlocks | **GAP** | **GAP** | N/A | OT |
+| OT: DeleteSection | **GAP** | **GAP** | N/A | OT |
+| OT: NukeTripPlaces | **GAP** | **GAP** | N/A | OT |
+
+### Priority 2 (Important)
+
+| Feature | MCP Handler Tests | Agent |
+|---------|------------------|-------|
+| get_me | **GAP** | user-feed-journal |
+| get_user_profile | **GAP** | user-feed-journal |
+| get_notifications | **GAP** | user-feed-journal |
+| get_feed_home | **GAP** | user-feed-journal |
+| get_feed_recent | **GAP** | user-feed-journal |
+| get_feed_friends | **GAP** | user-feed-journal |
+| get_trip_history | **GAP** | user-feed-journal |
+| browse_guides | **GAP** | user-feed-journal |
+| search_geos | **GAP** | user-feed-journal |
+| search_places | **GAP** | travel-search |
+| search_restaurants | **GAP** | travel-search |
+| get_trip_flights (handler) | **GAP** | travel-search |
+| get_flight_stops (handler) | **GAP** | travel-search |
+| HTTP transport | **GAP** | mcp-server |
+| CLI flag combos | **GAP** | cli-commands |
+| All CLI behavioral | **GAP** | cli-commands |
+
+### Priority 3 (Nice-to-Have)
+
+| Feature | Gap | Agent |
+|---------|-----|-------|
+| FlexibleText JSON | **GAP** | models |
+| 37+ models JSON | **GAP** | models |
+| Error handling edge cases | **GAP** | - |
+| MCP HTTP transport | **GAP** | mcp-server |
+| Concurrent tool calls | **GAP** | mcp-server |
+| Unicode/large payloads | **GAP** | cli-commands |
 
 ---
 
 ## Implementation Roadmap
 
 ### Phase 1: Critical Gaps (Week 1-2)
-1. Create `auth_integration_test.go` for real auth flow
-2. Expand `TestIntegration_CompleteTripLifecycle` to cover all CRUD operations
-3. Add integration test for AddPlace -> extract ID -> RemovePlace workflow
-4. Add integration test for MovePlace
-5. Add integration test for ReorderPlaces via MCP tool
+1. Create `auth_integration_test.go` for real auth flow + keychain
+2. Add `EnsureAuthenticated` table-driven tests
+3. Add OT helper function tests (InsertInObject, DeleteInObject, InsertInList, DeleteFromList, etc.)
+4. Add `TestMCP_GetTripSections` handler test
+5. Add `TestMCP_CopyTrip` handler test
+6. Add `TestMCP_MovePlace` integration test
+7. Add complete AddPlace -> RemovePlace workflow test
 
 ### Phase 2: Important Gaps (Week 3-4)
-1. Create `search_integration_test.go` for real search operations
-2. Add flight integration tests (add flight, verify, get stops)
-3. Add social features integration tests (like/unlike cycle)
+1. Add all 17+ MCP extended tool tests
+2. Add 4 travel search MCP handler tests
+3. Add CLI behavioral tests for core commands
 4. Add feed operations integration tests
 5. Add user operations integration tests
+6. Add HTTP transport test
 
-### Phase 3: Polish (Week 5+)
-1. Add comprehensive error handling tests
-2. Add edge case tests
-3. Implement test fixtures and helpers
-4. Document testing patterns
-5. Add performance/load tests if needed
+### Phase 3: Nice-to-Have (Week 5+)
+1. Add JSON round-trip tests for 37+ models
+2. Add comprehensive error handling tests
+3. Add edge case tests (Unicode, large payloads)
+4. Implement test fixtures and helpers
+5. Document testing patterns
 
 ---
 
