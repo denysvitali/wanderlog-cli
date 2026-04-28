@@ -38,10 +38,7 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 
 	// Fall back to keychain
 	creds, err := wanderlog.LoadCredentials()
-	if err != nil {
-		return nil, err
-	}
-	if creds != nil {
+	if err == nil && creds != nil {
 		return creds, nil
 	}
 
@@ -120,6 +117,40 @@ func TestTripHasAddedFlightRequiresRequestedSectionAndDate(t *testing.T) {
 	assert.True(t, tripHasAddedFlight(&trip, 10, "MU", 244, "2026-05-11"))
 	assert.False(t, tripHasAddedFlight(&trip, 11, "MU", 244, "2026-05-11"))
 	assert.False(t, tripHasAddedFlight(&trip, 10, "MU", 244, "2026-05-12"))
+}
+
+func TestFindFlightsSectionIDPrefersTypedFlightsSection(t *testing.T) {
+	var trip wanderlog.TripResponse
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"success": true,
+		"tripPlan": {
+			"itinerary": {
+				"sections": [
+					{"id": 10, "heading": "Flights", "type": "normal", "placeMarkerIcon": "map-marker", "blocks": []},
+					{"id": 11, "heading": "Flights", "type": "flights", "placeMarkerIcon": "plane", "blocks": []}
+				]
+			}
+		}
+	}`), &trip))
+
+	assert.Equal(t, 11, findFlightsSectionID(&trip))
+}
+
+func TestFindFlightsSectionIDFallsBackToManualFlightsShape(t *testing.T) {
+	var trip wanderlog.TripResponse
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"success": true,
+		"tripPlan": {
+			"itinerary": {
+				"sections": [
+					{"id": 10, "heading": "", "type": "normal", "placeMarkerIcon": "map-marker", "blocks": []},
+					{"id": 12, "heading": "Flights", "mode": "placeList", "placeMarkerIcon": "plane", "blocks": []}
+				]
+			}
+		}
+	}`), &trip))
+
+	assert.Equal(t, 12, findFlightsSectionID(&trip))
 }
 
 func TestResolveAddPlaceSectionIDRejectsImplicitUnscheduled(t *testing.T) {
