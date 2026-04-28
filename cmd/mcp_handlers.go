@@ -2012,7 +2012,10 @@ func handleListInvites(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 
 	result := fmt.Sprintf("Invites for trip %s:\n", tripKey)
 	for i, invite := range invites {
-		result += fmt.Sprintf("%d. %s - Status: %s (Sent: %s)\n", i+1, invite.Email, invite.Status, invite.InvitedAt)
+		email, _ := invite["email"].(string)
+		status, _ := invite["status"].(string)
+		invitedAt, _ := invite["invitedAt"].(string)
+		result += fmt.Sprintf("%d. %s - Status: %s (Sent: %s)\n", i+1, email, status, invitedAt)
 	}
 
 	return mcp.NewToolResultText(result), nil

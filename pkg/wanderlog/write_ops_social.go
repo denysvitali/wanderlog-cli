@@ -152,7 +152,7 @@ func (c *Client) SendTripInvites(tripKey string, req SendInvitesRequest) error {
 }
 
 // ListTripInvites lists all invites that have been sent out for a trip plan
-func (c *Client) ListTripInvites(tripKey string) ([]TripInvite, error) {
+func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, error) {
 	if c.auth == nil {
 		return nil, fmt.Errorf("authentication required for listing invites")
 	}
@@ -171,12 +171,11 @@ func (c *Client) ListTripInvites(tripKey string) ([]TripInvite, error) {
 		return nil, fmt.Errorf("ListTripInvites: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
 	}
 
-	var invites []TripInvite
-	if err := json.Unmarshal(resp.Body, &invites); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if resp.JSON200 == nil || resp.JSON200.Data == nil {
+		return nil, fmt.Errorf("ListTripInvites: unexpected response format")
 	}
 
-	return invites, nil
+	return *resp.JSON200.Data, nil
 }
 
 // SetLike likes or unlikes a trip plan
