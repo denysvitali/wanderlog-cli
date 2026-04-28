@@ -494,35 +494,6 @@ func resolveAddPlaceSectionID(client *wanderlog.Client, tripKey string, request 
 	return resolveSectionFromList(sections, sectionID, hasSectionID, sectionDate, false)
 }
 
-func resolveDatedSectionID(client *wanderlog.Client, tripKey string, request mcp.CallToolRequest, defaultDate string) (int, string, error) {
-	sectionDate, err := validateDateArgument("section_date", request.GetString("section_date", ""), false)
-	if err != nil {
-		return 0, "", err
-	}
-	sectionID, hasSectionID := optionalIntArgument(request, "section_id")
-
-	if sectionDate == "" {
-		sectionDate = strings.TrimSpace(defaultDate)
-	}
-
-	if hasSectionID {
-		if request.GetString("section_date", "") != "" {
-			return 0, "", fmt.Errorf("use either section_id or section_date, not both")
-		}
-		if sectionID <= 0 {
-			return 0, "", fmt.Errorf("section_id must be a positive itinerary section ID")
-		}
-	} else if sectionDate == "" {
-		return 0, "", fmt.Errorf("section_id or section_date is required")
-	}
-
-	sections, err := loadSectionsForResolution(client, tripKey)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to resolve section date: %w", err)
-	}
-	return resolveSectionFromList(sections, sectionID, hasSectionID, sectionDate, true)
-}
-
 func currentUserID() int {
 	auth, err := wanderlog.LoadCredentials()
 	if err != nil || auth.UserID == "" {
