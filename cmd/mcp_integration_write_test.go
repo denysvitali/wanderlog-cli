@@ -879,6 +879,10 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 	})
 
 	// 5. TEST WRITE TOOLS
+	var lifecycleSectionID int
+	expectedPlaces := make([]PlaceData, 0, 3)
+	var expectedFlightSectionID int
+
 	// First need a section ID - get trip and find first section
 	t.Run("add_place_to_new_trip", func(t *testing.T) {
 		sectionID := getFirstSectionID(ctx, tripKey)
@@ -915,10 +919,12 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		if sectionID == 0 {
 			t.Skip("No dated itinerary sections found in trip")
 		}
+		lifecycleSectionID = sectionID
 
 		places := []string{"Eiffel Tower", "Notre-Dame de Paris"}
 		for _, query := range places {
 			placeData := searchAndGetPlaceData(t, query)
+			expectedPlaces = append(expectedPlaces, placeData)
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
 					Name: "add_place",
@@ -986,6 +992,12 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		}
 
 		placeData := searchAndGetPlaceData(t, lodgingName+" Paris")
+		expectedPlaces = append(expectedPlaces, PlaceData{
+			PlaceID: placeData.PlaceID,
+			Lat:     placeData.Lat,
+			Lng:     placeData.Lng,
+			Name:    lodgingName,
+		})
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Name: "add_place",
@@ -1014,6 +1026,7 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		if sectionID == 0 {
 			t.Skip("No dated itinerary sections found in trip")
 		}
+		expectedFlightSectionID = sectionID
 
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
@@ -1049,6 +1062,44 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		assert.False(t, getResult.IsError, "get_trip after add_flight should not return error")
 
 		t.Logf("✓ Successfully added flight and verified trip can be fetched")
+	})
+
+	t.Run("verify_retained_trip_has_lifecycle_contents", func(t *testing.T) {
+		require.NotZero(t, lifecycleSectionID, "No lifecycle itinerary section was recorded")
+		require.NotZero(t, expectedFlightSectionID, "No flight itinerary section was recorded")
+		require.Len(t, expectedPlaces, 3, "Expected two attraction places plus one lodging place")
+
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+		require.NoError(t, client.EnsureAuthenticated("", ""))
+
+		trip, err := client.GetTrip(tripKey)
+		require.NoError(t, err, "Failed to reload retained lifecycle trip")
+
+		sectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, lifecycleSectionID)
+		require.NotEqual(t, -1, sectionIdx, "Lifecycle itinerary section disappeared")
+		section := trip.TripPlan.Itinerary.Sections[sectionIdx]
+
+		t.Logf("Retained lifecycle trip: title=%q key=%s section_id=%d", trip.TripPlan.Title, tripKey, lifecycleSectionID)
+		for i, block := range section.Blocks {
+			switch {
+			case block.Place != nil:
+				t.Logf("  section block[%d] place: %s (%s)", i, block.Place.Name, block.Place.PlaceID)
+			case block.FlightInfo != nil:
+				t.Logf("  section block[%d] flight: %s%d on %s", i, block.FlightInfo.Airline.Iata, block.FlightInfo.Number, block.Depart.Date)
+			default:
+				t.Logf("  section block[%d] type: %s", i, block.Type)
+			}
+		}
+
+		for _, place := range expectedPlaces {
+			assert.True(t,
+				tripHasAddedPlace(trip, lifecycleSectionID, place.Name, place.PlaceID),
+				"Retained trip is missing place %q (%s) in section %d", place.Name, place.PlaceID, lifecycleSectionID)
+		}
+		assert.True(t,
+			tripHasAddedFlight(trip, expectedFlightSectionID, "MU", 244, "2026-06-02"),
+			"Retained trip is missing flight MU244 on 2026-06-02 in section %d", expectedFlightSectionID)
 	})
 
 	// 6. TEST ERROR CASES
