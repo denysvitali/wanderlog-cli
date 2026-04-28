@@ -110,6 +110,13 @@ func searchGeoIDForLifecycleTest(t *testing.T, ctx context.Context, query string
 	return parsed.Data.Geos[0].GeoID
 }
 
+func lifecycleTripTitle() string {
+	if runID := os.Getenv("GITHUB_RUN_ID"); runID != "" {
+		return fmt.Sprintf("MCP Lifecycle Test - CI Run %s", runID)
+	}
+	return fmt.Sprintf("MCP Lifecycle Test - Local %d", time.Now().UnixNano())
+}
+
 // searchAndGetPlaceData searches for a place and returns complete data including coordinates
 func searchAndGetPlaceData(t *testing.T, query string) PlaceData {
 	t.Helper()
@@ -785,7 +792,7 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 
 	// 2. Search for a destination geo and create a trip with unique name
 	geoID := searchGeoIDForLifecycleTest(t, ctx, "Paris")
-	tripTitle := fmt.Sprintf("MCP Lifecycle Test - %d", time.Now().UnixNano())
+	tripTitle := lifecycleTripTitle()
 	createReq := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "create_trip",
@@ -816,24 +823,9 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		require.NotEmpty(t, tripKey, "Failed to extract trip key from: %s", textContent.Text)
 	}
 
-	// 3. DEFER CLEANUP - Delete trip at end (only if we created it)
-	createdTripKey := tripKey
-	defer func() {
-		if createdTripKey != testTripID {
-			t.Logf("Cleaning up: deleting trip %s", createdTripKey)
-			deleteReq := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name: "delete_trip",
-					Arguments: map[string]interface{}{
-						"trip_key": createdTripKey,
-					},
-				},
-			}
-			handleDeleteTrip(context.Background(), deleteReq)
-		} else {
-			t.Logf("Skipping cleanup for fallback trip %s", testTripID)
-		}
-	}()
+	if tripKey != testTripID {
+		t.Logf("Keeping lifecycle test trip for inspection: title=%q key=%s", tripTitle, tripKey)
+	}
 
 	// 4. TEST READ TOOLS with created trip
 	t.Run("list_trips_verifies_new_trip", func(t *testing.T) {
