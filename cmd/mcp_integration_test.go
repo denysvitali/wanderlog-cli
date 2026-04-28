@@ -1186,7 +1186,7 @@ func TestMCPIntegration_MovePlace(t *testing.T) {
 				Name: "move_place",
 				Arguments: map[string]interface{}{
 					"trip_key":      testTripID,
-					"place_id":     12345,
+					"place_id":      12345,
 					"to_section_id": 2,
 					"position":      0,
 					// Missing from_section_id
@@ -1206,7 +1206,7 @@ func TestMCPIntegration_MovePlace(t *testing.T) {
 				Name: "move_place",
 				Arguments: map[string]interface{}{
 					"trip_key":        testTripID,
-					"place_id":       12345,
+					"place_id":        12345,
 					"from_section_id": 1,
 					"position":        0,
 					// Missing to_section_id
@@ -1226,7 +1226,7 @@ func TestMCPIntegration_MovePlace(t *testing.T) {
 				Name: "move_place",
 				Arguments: map[string]interface{}{
 					"trip_key":        testTripID,
-					"place_id":       12345,
+					"place_id":        12345,
 					"from_section_id": 1,
 					"to_section_id":   2,
 					// Missing position
