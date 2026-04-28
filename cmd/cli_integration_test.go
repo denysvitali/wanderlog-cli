@@ -302,7 +302,7 @@ func TestCLI_TripsShow_MarkdownOutput(t *testing.T) {
 
 	auth, err := loadAuthFromEnvOrKeychain()
 	if err != nil {
-		t.Skipf("Auth required for CLI trips show markdown test: %v", err)
+		t.Skip("Auth required for CLI trips show markdown test")
 	}
 	_ = auth
 
@@ -332,7 +332,7 @@ func TestCLI_TripsPlaces_MarkdownOutput(t *testing.T) {
 
 	auth, err := loadAuthFromEnvOrKeychain()
 	if err != nil {
-		t.Skipf("Auth required for CLI trips places markdown test: %v", err)
+		t.Skip("Auth required for CLI trips places markdown test")
 	}
 	_ = auth
 
