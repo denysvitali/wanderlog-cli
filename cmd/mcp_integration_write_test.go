@@ -1021,19 +1021,11 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 
 	// Test add_flight
 	t.Run("add_flight_to_new_trip", func(t *testing.T) {
-		// Get a dated section for the flight
-		sectionID := getDatedItinerarySectionID(t, tripKey)
-		if sectionID == 0 {
-			t.Skip("No dated itinerary sections found in trip")
-		}
-		expectedFlightSectionID = sectionID
-
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Name: "add_flight",
 				Arguments: map[string]interface{}{
 					"trip_key":       tripKey,
-					"section_id":     sectionID,
 					"flight_number":  "MU244",
 					"departure_date": "2026-06-02",
 				},
@@ -1061,6 +1053,14 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		require.NotNil(t, getResult)
 		assert.False(t, getResult.IsError, "get_trip after add_flight should not return error")
 
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+		require.NoError(t, client.EnsureAuthenticated("", ""))
+		trip, err := client.GetTrip(tripKey)
+		require.NoError(t, err, "Failed to reload trip after add_flight")
+		expectedFlightSectionID = findFlightsSectionID(trip)
+		require.NotZero(t, expectedFlightSectionID, "add_flight did not create or reuse a Flights section")
+
 		t.Logf("✓ Successfully added flight and verified trip can be fetched")
 	})
 
@@ -1085,10 +1085,20 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 			switch {
 			case block.Place != nil:
 				t.Logf("  section block[%d] place: %s (%s)", i, block.Place.Name, block.Place.PlaceID)
-			case block.FlightInfo != nil:
-				t.Logf("  section block[%d] flight: %s%d on %s", i, block.FlightInfo.Airline.Iata, block.FlightInfo.Number, block.Depart.Date)
 			default:
 				t.Logf("  section block[%d] type: %s", i, block.Type)
+			}
+		}
+		flightSectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, expectedFlightSectionID)
+		require.NotEqual(t, -1, flightSectionIdx, "Flights section disappeared")
+		flightSection := trip.TripPlan.Itinerary.Sections[flightSectionIdx]
+		assert.Equal(t, "flights", flightSection.Type, "Flight block must live in the app's Flights section")
+		assert.Equal(t, "plane", flightSection.PlaceMarkerIcon, "Flights section should use the plane marker icon")
+		for i, block := range flightSection.Blocks {
+			if block.FlightInfo != nil {
+				t.Logf("  flights block[%d] flight: %s%d on %s", i, block.FlightInfo.Airline.Iata, block.FlightInfo.Number, block.Depart.Date)
+			} else {
+				t.Logf("  flights block[%d] type: %s", i, block.Type)
 			}
 		}
 

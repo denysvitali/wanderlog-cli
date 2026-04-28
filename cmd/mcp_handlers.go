@@ -614,6 +614,83 @@ func tripHasAddedFlight(trip *wanderlog.TripResponse, sectionID int, airlineIATA
 	return false
 }
 
+func findFlightsSectionID(trip *wanderlog.TripResponse) int {
+	if trip == nil {
+		return 0
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.Type == "flights" {
+			return section.ID
+		}
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if strings.EqualFold(section.Heading, "Flights") || section.PlaceMarkerIcon == "plane" {
+			return section.ID
+		}
+	}
+	return 0
+}
+
+func maxItineraryItemID(trip *wanderlog.TripResponse) int {
+	maxID := 0
+	if trip == nil {
+		return maxID
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.ID > maxID {
+			maxID = section.ID
+		}
+		for _, block := range section.Blocks {
+			if block.ID > maxID {
+				maxID = block.ID
+			}
+		}
+	}
+	return maxID
+}
+
+func createFlightsSection(client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
+	if trip == nil {
+		return 0, fmt.Errorf("trip response is nil")
+	}
+	sectionID := maxItineraryItemID(trip) + 1
+	section := map[string]any{
+		"id":               sectionID,
+		"heading":          "Flights",
+		"displayHeading":   "",
+		"date":             nil,
+		"type":             "flights",
+		"mode":             "placeList",
+		"placeMarkerColor": "#3498db",
+		"placeMarkerIcon":  "plane",
+		"text": map[string]any{
+			"ops": []any{map[string]any{"insert": "\n"}},
+		},
+		"blocks": []any{},
+	}
+	position := len(trip.TripPlan.Itinerary.Sections)
+	op := wanderlog.InsertInList([]interface{}{"itinerary", "sections"}, position, section)
+	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+		return 0, err
+	}
+	return sectionID, nil
+}
+
+func ensureFlightsSectionID(client *wanderlog.Client, tripKey string) (int, string, error) {
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return 0, "", fmt.Errorf("getting current trip: %w", err)
+	}
+	if sectionID := findFlightsSectionID(trip); sectionID > 0 {
+		return sectionID, fmt.Sprintf("Flights section ID %d", sectionID), nil
+	}
+	sectionID, err := createFlightsSection(client, tripKey, trip)
+	if err != nil {
+		return 0, "", fmt.Errorf("creating Flights section: %w", err)
+	}
+	return sectionID, fmt.Sprintf("Flights section ID %d", sectionID), nil
+}
+
 func verifyAddedFlightPersisted(client *wanderlog.Client, tripKey string, sectionID int, airlineIATA string, flightNumber int, departureDate string) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
@@ -951,44 +1028,15 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	userDepartAirport := strings.ToUpper(strings.TrimSpace(request.GetString("departure_airport", "")))
 	userArriveAirport := strings.ToUpper(strings.TrimSpace(request.GetString("arrival_airport", "")))
 
-	unscheduled := request.GetBool("unscheduled", false)
-
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	var sectionID int
-	var sectionLabel string
-
-	if unscheduled {
-		// For unscheduled flights, try to find any section as a fallback
-		// If no sections exist at all, this will fail with a helpful message
-		sectionID, sectionLabel, err = resolveDatedSectionID(client, tripKey, request, departureDate)
-		if err != nil {
-			// Try to find ANY section in the trip as a last resort for unscheduled flights
-			trip, tripErr := client.GetTrip(tripKey)
-			if tripErr != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve section for flight: %v. Also failed to fetch trip: %v", err, tripErr)), nil
-			}
-			if len(trip.TripPlan.Itinerary.Sections) == 0 {
-				return mcp.NewToolResultError("No sections exist in this trip yet. Flights require a dated itinerary section. Please create sections first by adding places to each day of your trip, then try adding flights again."), nil
-			}
-			// Use the first available section as a fallback
-			firstSection := trip.TripPlan.Itinerary.Sections[0]
-			sectionID = firstSection.ID
-			if firstSection.Date != nil && *firstSection.Date != "" {
-				sectionLabel = fmt.Sprintf("%s section ID %d (fallback - unscheduled)", *firstSection.Date, firstSection.ID)
-			} else {
-				sectionLabel = fmt.Sprintf("section ID %d (fallback - unscheduled)", firstSection.ID)
-			}
-		}
-	} else {
-		sectionID, sectionLabel, err = resolveDatedSectionID(client, tripKey, request, departureDate)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
+	sectionID, sectionLabel, err := ensureFlightsSectionID(client, tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve Flights section for trip %s: %v", tripKey, err)), nil
 	}
 
 	airlineIATA, flightNum, err := validateFlightNumber(flightNumber)
