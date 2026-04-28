@@ -14,7 +14,6 @@ func skipIntegrationTest(t *testing.T) {
 	}
 }
 
-
 func TestIntegration_EnsureAuthenticated(t *testing.T) {
 	skipIntegrationTest(t)
 
@@ -75,8 +74,8 @@ func TestIntegration_KeychainCredentialOperations(t *testing.T) {
 	t.Run("save and load credentials", func(t *testing.T) {
 		testCreds := &AuthCredentials{
 			SessionCookie: "s:test-session-" + t.Name(),
-			XSRFToken:    "test-xsrf-" + t.Name(),
-			UserID:       "99999",
+			XSRFToken:     "test-xsrf-" + t.Name(),
+			UserID:        "99999",
 		}
 
 		// Save credentials
@@ -121,8 +120,8 @@ func TestIntegration_KeychainCredentialOperations(t *testing.T) {
 		// First save some credentials
 		testCreds := &AuthCredentials{
 			SessionCookie: "s:test-delete-session",
-			XSRFToken:    "test-delete-xsrf",
-			UserID:       "12345",
+			XSRFToken:     "test-delete-xsrf",
+			UserID:        "12345",
 		}
 		err := SaveCredentials(testCreds)
 		if err != nil {
@@ -164,8 +163,8 @@ func TestIntegration_KeychainCredentialOperations(t *testing.T) {
 		// Save credentials
 		testCreds := &AuthCredentials{
 			SessionCookie: "s:test-presence",
-			XSRFToken:    "test-presence-xsrf",
-			UserID:       "11111",
+			XSRFToken:     "test-presence-xsrf",
+			UserID:        "11111",
 		}
 		err := SaveCredentials(testCreds)
 		if err != nil {
