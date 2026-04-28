@@ -391,3 +391,236 @@ func TestMCPIntegration_ContextWithTripID(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, testTripID, tripID)
 }
+
+// TestMCPIntegration_GetMe tests the get_me tool
+func TestMCPIntegration_GetMe(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "get_me",
+		},
+	}
+
+	result, err := handleGetMe(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+}
+
+// TestMCPIntegration_GetUserProfile tests the get_user_profile tool
+func TestMCPIntegration_GetUserProfile(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("by_username", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_user_profile",
+				Arguments: map[string]interface{}{
+					"target": "@denysvitali",
+				},
+			},
+		}
+
+		result, err := handleGetUserProfile(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_target", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "get_user_profile",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleGetUserProfile(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_GetNotifications tests the get_notifications tool
+func TestMCPIntegration_GetNotifications(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("default_offset", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_notifications",
+			},
+		}
+
+		result, err := handleGetNotifications(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("with_offset", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_notifications",
+				Arguments: map[string]interface{}{
+					"offset": 10,
+				},
+			},
+		}
+
+		result, err := handleGetNotifications(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_GetNotificationSettings tests the get_notification_settings tool
+func TestMCPIntegration_GetNotificationSettings(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "get_notification_settings",
+		},
+	}
+
+	result, err := handleGetNotificationSettings(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+}
+
+// TestMCPIntegration_GetUserEmails tests the get_user_emails tool
+func TestMCPIntegration_GetUserEmails(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "get_user_emails",
+		},
+	}
+
+	result, err := handleGetUserEmails(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+}
+
+// TestMCPIntegration_AutocompleteUsers tests the autocomplete_users tool
+func TestMCPIntegration_AutocompleteUsers(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("valid_query", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "autocomplete_users",
+				Arguments: map[string]interface{}{
+					"query": "denys",
+				},
+			},
+		}
+
+		result, err := handleAutocompleteUsers(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_query", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "autocomplete_users",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleAutocompleteUsers(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_IsUsernameTaken tests the is_username_taken tool
+func TestMCPIntegration_IsUsernameTaken(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("username_not_taken", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "is_username_taken",
+				Arguments: map[string]interface{}{
+					"username": "this_username_definitely_does_not_exist_12345",
+				},
+			},
+		}
+
+		result, err := handleIsUsernameTaken(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_username", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "is_username_taken",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleIsUsernameTaken(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
