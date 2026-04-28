@@ -31,9 +31,9 @@ type UpdateUserRequest struct {
 
 // NotificationsResponse represents the paged notification inbox.
 type NotificationsResponse struct {
-	Success       bool           `json:"success"`
-	Notifications []Notification `json:"notifications"`
-	NextOffset    *int           `json:"nextOffset,omitempty"`
+	Success    bool           `json:"success"`
+	Data       []Notification `json:"data"`
+	NextOffset *int           `json:"nextOffset,omitempty"`
 }
 
 // Notification is intentionally loose: the Wanderlog bundle models this as a
