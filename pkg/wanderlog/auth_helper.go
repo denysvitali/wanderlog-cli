@@ -2,6 +2,7 @@ package wanderlog
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -22,6 +23,30 @@ func (c *Client) EnsureAuthenticated(sessionCookie, xsrfToken string) error {
 		creds := &AuthCredentials{
 			SessionCookie: sessionCookie,
 			XSRFToken:     xsrfToken,
+		}
+		c.SetAuth(creds)
+		return nil
+	}
+
+	envSession := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE")
+	envXSRF := firstNonEmpty(os.Getenv("WANDERLOG_AUTH_XSRF_TOKEN"), os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN"))
+	if envSession != "" && envXSRF != "" {
+		c.SetAuth(&AuthCredentials{
+			SessionCookie: envSession,
+			XSRFToken:     envXSRF,
+			UserID:        os.Getenv("WANDERLOG_AUTH_USER_ID"),
+		})
+		c.logger.Debug("Using session credentials from environment variables")
+		return nil
+	}
+
+	envEmail := os.Getenv("WANDERLOG_AUTH_EMAIL")
+	envPassword := os.Getenv("WANDERLOG_AUTH_PASSWORD")
+	if envEmail != "" && envPassword != "" {
+		c.logger.Debug("Logging in with email/password from environment variables")
+		creds, err := c.Login(envEmail, envPassword)
+		if err != nil {
+			return fmt.Errorf("login with environment credentials failed: %w", err)
 		}
 		c.SetAuth(creds)
 		return nil
@@ -97,4 +122,13 @@ func (c *Client) EnsureAuthenticated(sessionCookie, xsrfToken string) error {
 	}
 
 	return fmt.Errorf("authentication required - run 'wanderlog login', set credentials in config file, or provide --session and --xsrf flags")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

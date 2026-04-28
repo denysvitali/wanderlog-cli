@@ -100,7 +100,7 @@ func (c *Client) GetTripUpdateRequired(tripKey string) (*UpdateRequiredResponse,
 	if err != nil {
 		return nil, err
 	}
-	openAPIVersion := openapi.ClientSchemaVersion(version)
+	openAPIVersion := version
 	apiResp, err := api.CheckIfUpdateRequiredWithResponse(context.Background(), tripKey, &openapi.CheckIfUpdateRequiredParams{
 		ClientSchemaVersion: &openAPIVersion,
 	})

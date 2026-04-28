@@ -415,7 +415,7 @@ func loadSectionsForResolution(client *wanderlog.Client, tripKey string) ([]wand
 		// GetTrip failed, try the dedicated sections endpoint as fallback
 		sections, secErr := client.GetTripSections(tripKey)
 		if secErr != nil {
-			return nil, fmt.Errorf("GetTrip failed: %w, GetTripSections also failed: %v", err, secErr)
+			return nil, fmt.Errorf("GetTrip failed: %w, GetTripSections also failed: %w", err, secErr)
 		}
 		return sections, nil
 	}
@@ -744,21 +744,21 @@ func getGooglePlaceForAirport(client *wanderlog.Client, airportName, iataCode, c
 	if err != nil || !details.Success {
 		logger.WithFields(logrus.Fields{
 			"placeID": bestMatch.PlaceID,
-			"error":  err,
+			"error":   err,
 		}).Warn("Failed to get place details for airport")
 		return nil
 	}
 
 	// Construct a googlePlace-like object with the data we have
 	googlePlace := map[string]any{
-		"place_id":          details.Data.Details.PlaceID,
-		"name":              details.Data.Details.Name,
-		"formatted_address": details.Data.Details.FormattedAddress,
-		"rating":            details.Data.Details.Rating,
+		"place_id":           details.Data.Details.PlaceID,
+		"name":               details.Data.Details.Name,
+		"formatted_address":  details.Data.Details.FormattedAddress,
+		"rating":             details.Data.Details.Rating,
 		"user_ratings_total": details.Data.Details.UserRatingsTotal,
-		"types":             details.Data.Details.Types,
-		"business_status":   details.Data.Details.BusinessStatus,
-		"url":               fmt.Sprintf("https://maps.google.com/?cid=%s", details.Data.Details.PlaceID),
+		"types":              details.Data.Details.Types,
+		"business_status":    details.Data.Details.BusinessStatus,
+		"url":                fmt.Sprintf("https://maps.google.com/?cid=%s", details.Data.Details.PlaceID),
 		"geometry": map[string]any{
 			"location": map[string]float64{
 				"lat": details.Data.Details.Geometry.Location.Lat,
@@ -1110,8 +1110,7 @@ func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 
 	placeID, err := request.RequireInt("place_id")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("place_id is required"), nil
+		return mcp.NewToolResultError("place_id is required"), nil //nolint:nilerr
 	}
 
 	sectionID := request.GetInt("section_id", 0)
@@ -1184,8 +1183,7 @@ func handleTripResource(ctx context.Context, request mcp.ReadResourceRequest) ([
 func handleSearchPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("query is required"), nil
+		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
 	}
 
 	format := request.GetString("format", "default")
@@ -1345,8 +1343,7 @@ func handleSearchPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 func handleSearchRestaurants(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("query is required"), nil
+		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
 	}
 
 	format := request.GetString("format", "default")
@@ -1488,8 +1485,7 @@ func handleSearchRestaurants(ctx context.Context, request mcp.CallToolRequest) (
 func handleGetPlaceDetails(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	placeID, err := request.RequireString("place_id")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("place_id is required"), nil
+		return mcp.NewToolResultError("place_id is required"), nil //nolint:nilerr
 	}
 
 	format := request.GetString("format", "default")
@@ -1561,8 +1557,7 @@ func handleGetPlaceDetails(ctx context.Context, request mcp.CallToolRequest) (*m
 func handleSearchPlacesWanderlog(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("query is required"), nil
+		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
 	}
 
 	lat := request.GetFloat("latitude", 0.0)
@@ -2017,26 +2012,22 @@ func handleMovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 
 	placeID, err := request.RequireInt("place_id")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("place_id is required"), nil
+		return mcp.NewToolResultError("place_id is required"), nil //nolint:nilerr
 	}
 
 	fromSectionID, err := request.RequireInt("from_section_id")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("from_section_id is required"), nil
+		return mcp.NewToolResultError("from_section_id is required"), nil //nolint:nilerr
 	}
 
 	toSectionID, err := request.RequireInt("to_section_id")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("to_section_id is required"), nil
+		return mcp.NewToolResultError("to_section_id is required"), nil //nolint:nilerr
 	}
 
 	position, err := request.RequireInt("position")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("position is required"), nil
+		return mcp.NewToolResultError("position is required"), nil //nolint:nilerr
 	}
 
 	client := wanderlog.NewClient()
@@ -2071,14 +2062,12 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	sectionID, err := request.RequireInt("section_id")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("section_id is required"), nil
+		return mcp.NewToolResultError("section_id is required"), nil //nolint:nilerr
 	}
 
 	placeIDsStr, err := request.RequireString("place_ids")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("place_ids is required"), nil
+		return mcp.NewToolResultError("place_ids is required"), nil //nolint:nilerr
 	}
 
 	// Parse comma-separated place IDs
@@ -2118,18 +2107,15 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 func handleGetFlightStops(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	flightNumber, err := request.RequireString("flight_number")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("flight_number is required"), nil
+		return mcp.NewToolResultError("flight_number is required"), nil //nolint:nilerr
 	}
 	airline, err := request.RequireString("airline")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("airline is required"), nil
+		return mcp.NewToolResultError("airline is required"), nil //nolint:nilerr
 	}
 	date, err := request.RequireString("date")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("date is required"), nil
+		return mcp.NewToolResultError("date is required"), nil //nolint:nilerr
 	}
 
 	client := wanderlog.NewClient()
@@ -2153,20 +2139,17 @@ func handleGetFlightStops(ctx context.Context, request mcp.CallToolRequest) (*mc
 func handleSearchHotels(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	location, err := request.RequireString("location")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("location is required"), nil
+		return mcp.NewToolResultError("location is required"), nil //nolint:nilerr
 	}
 
 	checkIn, err := request.RequireString("check_in")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("check_in is required"), nil
+		return mcp.NewToolResultError("check_in is required"), nil //nolint:nilerr
 	}
 
 	checkOut, err := request.RequireString("check_out")
 	if err != nil {
-		_ = err
-		return mcp.NewToolResultError("check_out is required"), nil
+		return mcp.NewToolResultError("check_out is required"), nil //nolint:nilerr
 	}
 
 	guests := request.GetInt("guests", 1)

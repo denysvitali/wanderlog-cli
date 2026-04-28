@@ -102,7 +102,7 @@ var (
 			Bold(true)
 
 	IdStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#64748B"))
+		Foreground(lipgloss.Color("#64748B"))
 
 	TimestampStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#78716C"))
