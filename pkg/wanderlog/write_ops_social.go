@@ -209,16 +209,12 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 
 // GetLikeCount gets whether we've liked a trip plan and the total number of likes
 func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
-	reqBody, err := json.Marshal(map[string][]string{"keys": {tripKey}})
-	if err != nil {
-		return nil, fmt.Errorf("marshaling like count request: %w", err)
-	}
 	api, err := c.openAPI()
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := api.GetLikesBulkWithBodyWithResponse(context.Background(), "application/json", bytes.NewReader(reqBody))
+	resp, err := api.GetLikeCountWithResponse(context.Background(), tripKey)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
@@ -229,7 +225,7 @@ func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
 
 	var bulkResp struct {
 		Success bool `json:"success"`
-		Data    []struct {
+		Data    struct {
 			Like      bool `json:"like"`
 			LikeCount int  `json:"likeCount"`
 		} `json:"data"`
@@ -240,13 +236,10 @@ func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
 	if !bulkResp.Success {
 		return nil, fmt.Errorf("failed to get like count")
 	}
-	if len(bulkResp.Data) == 0 {
-		return &LikeCount{}, nil
-	}
 
 	return &LikeCount{
-		Count:     bulkResp.Data[0].LikeCount,
-		UserLiked: bulkResp.Data[0].Like,
+		Count:     bulkResp.Data.LikeCount,
+		UserLiked: bulkResp.Data.Like,
 	}, nil
 }
 
