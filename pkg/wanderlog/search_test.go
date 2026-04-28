@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/sirupsen/logrus"
 )
 
 func TestSearchPlaces(t *testing.T) {
@@ -203,14 +201,4 @@ func TestMatchesQueryInSearch(t *testing.T) {
 			}
 		})
 	}
-}
-
-// newClientNoAuth creates a client without auth for testing error paths
-func newClientNoAuth(t *testing.T) *Client {
-	t.Helper()
-	client := NewClient()
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
-	client.SetLogger(logger)
-	return client
 }

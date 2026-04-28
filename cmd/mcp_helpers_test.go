@@ -18,7 +18,7 @@ import (
 func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 	// Try environment variables first
 	sessionCookie := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE")
-	xsrfToken := os.Getenv("WANDERLOG_AUTH_XSRF_TOKEN")
+	xsrfToken := firstNonEmpty(os.Getenv("WANDERLOG_AUTH_XSRF_TOKEN"), os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN"))
 
 	if sessionCookie != "" && xsrfToken != "" {
 		return &wanderlog.AuthCredentials{
@@ -26,6 +26,14 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 			XSRFToken:     xsrfToken,
 			UserID:        os.Getenv("WANDERLOG_AUTH_USER_ID"),
 		}, nil
+	}
+
+	email := os.Getenv("WANDERLOG_AUTH_EMAIL")
+	password := os.Getenv("WANDERLOG_AUTH_PASSWORD")
+	if email != "" && password != "" {
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+		return client.Login(email, password)
 	}
 
 	// Fall back to keychain
@@ -42,6 +50,15 @@ func loadAuthFromEnvOrKeychain() (*wanderlog.AuthCredentials, error) {
 		return nil, err
 	}
 	return wanderlog.LoadCredentialsFromConfig()
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func testStringPtr(value string) *string {

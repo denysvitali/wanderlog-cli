@@ -656,7 +656,7 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 
 	reqBody, err := json.Marshal(map[string]any{
 		"destination":  query,
-		"dates":        map[string]string{"startDate": startDate.Time.Format(openapi_types.DateFormat), "endDate": endDate.Time.Format(openapi_types.DateFormat)},
+		"dates":        map[string]string{"startDate": startDate.Format(openapi_types.DateFormat), "endDate": endDate.Format(openapi_types.DateFormat)},
 		"guests":       guests,
 		"adultCount":   guests,
 		"aduldCount":   guests,
