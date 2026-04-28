@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -68,6 +69,45 @@ type PlaceData struct {
 	Lat     float64
 	Lng     float64
 	Name    string
+}
+
+type geoSearchToolResult struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Geos []geoGuideCount `json:"geos"`
+	} `json:"data"`
+}
+
+func searchGeoIDForLifecycleTest(t *testing.T, ctx context.Context, query string) int {
+	t.Helper()
+
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_geos",
+			Arguments: map[string]interface{}{
+				"query": query,
+				"limit": 5,
+			},
+		},
+	}
+
+	result, err := handleSearchGeos(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.False(t, result.IsError, "search_geos should not return error: %s", getTextContent(result))
+	require.NotNil(t, result.StructuredContent, "search_geos should return structured content")
+
+	raw, err := json.Marshal(result.StructuredContent)
+	require.NoError(t, err)
+
+	var parsed geoSearchToolResult
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+	require.True(t, parsed.Success, "search_geos returned success=false")
+	require.NotEmpty(t, parsed.Data.Geos, "No geos found for %q", query)
+	require.NotZero(t, parsed.Data.Geos[0].GeoID, "First geo result has no geo ID")
+
+	t.Logf("Found geo_id for %q: %d (%s)", query, parsed.Data.Geos[0].GeoID, parsed.Data.Geos[0].Name)
+	return parsed.Data.Geos[0].GeoID
 }
 
 // searchAndGetPlaceData searches for a place and returns complete data including coordinates
@@ -743,13 +783,15 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 2. Create a trip with unique name
+	// 2. Search for a destination geo and create a trip with unique name
+	geoID := searchGeoIDForLifecycleTest(t, ctx, "Paris")
 	tripTitle := fmt.Sprintf("MCP Lifecycle Test - %d", time.Now().UnixNano())
 	createReq := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "create_trip",
 			Arguments: map[string]interface{}{
 				"title":      tripTitle,
+				"geo_id":     geoID,
 				"start_date": "2026-06-01",
 				"end_date":   "2026-06-05",
 				"privacy":    "private",
@@ -874,6 +916,91 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.False(t, result.IsError)
+	})
+
+	t.Run("add_places_to_itinerary_section", func(t *testing.T) {
+		sectionID := getDatedItinerarySectionID(t, tripKey)
+		if sectionID == 0 {
+			t.Skip("No dated itinerary sections found in trip")
+		}
+
+		places := []string{"Eiffel Tower", "Notre-Dame de Paris"}
+		for _, query := range places {
+			placeData := searchAndGetPlaceData(t, query)
+			request := mcp.CallToolRequest{
+				Params: mcp.CallToolParams{
+					Name: "add_place",
+					Arguments: map[string]interface{}{
+						"trip_key":   tripKey,
+						"name":       placeData.Name,
+						"place_id":   placeData.PlaceID,
+						"latitude":   placeData.Lat,
+						"longitude":  placeData.Lng,
+						"section_id": sectionID,
+						"text":       "Added to dated itinerary during lifecycle test",
+					},
+				},
+			}
+
+			result, err := handleAddPlace(ctx, request)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.False(t, result.IsError, "add_place should not return error for %s: %s", query, getTextContent(result))
+		}
+	})
+
+	t.Run("search_lodging_and_add_to_itinerary", func(t *testing.T) {
+		sectionID := getDatedItinerarySectionID(t, tripKey)
+		if sectionID == 0 {
+			t.Skip("No dated itinerary sections found in trip")
+		}
+
+		searchHotelsReq := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "search_hotels",
+				Arguments: map[string]interface{}{
+					"location":  "Paris",
+					"check_in":  "2026-06-01",
+					"check_out": "2026-06-05",
+					"guests":    1,
+				},
+			},
+		}
+
+		hotelResult, err := handleSearchHotels(ctx, searchHotelsReq)
+		require.NoError(t, err)
+		require.NotNil(t, hotelResult)
+		require.False(t, hotelResult.IsError, "search_hotels should not return error: %s", getTextContent(hotelResult))
+
+		lodgings, ok := hotelResult.StructuredContent.(*wanderlog.LodgingSearchResponse)
+		require.True(t, ok, "search_hotels returned unexpected structured content type %T", hotelResult.StructuredContent)
+		require.True(t, lodgings.Success, "search_hotels returned success=false")
+		require.NotEmpty(t, lodgings.Data, "No lodging results found for Paris")
+
+		lodging := lodgings.Data[0]
+		require.NotEmpty(t, lodging.Name, "First lodging result has empty name")
+		t.Logf("Found lodging for lifecycle test: %s (%s)", lodging.Name, lodging.Address)
+
+		placeData := searchAndGetPlaceData(t, lodging.Name+" Paris")
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_place",
+				Arguments: map[string]interface{}{
+					"trip_key":   tripKey,
+					"name":       lodging.Name,
+					"place_id":   placeData.PlaceID,
+					"latitude":   placeData.Lat,
+					"longitude":  placeData.Lng,
+					"section_id": sectionID,
+					"text":       fmt.Sprintf("Lodging added during lifecycle test. Address: %s", lodging.Address),
+				},
+			},
+		}
+
+		result, err := handleAddPlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError, "add_place should add lodging to itinerary: %s", getTextContent(result))
 	})
 
 	// Test add_flight
