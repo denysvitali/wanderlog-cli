@@ -1134,3 +1134,505 @@ func TestMCPIntegration_GetGlobalConfig(t *testing.T) {
 	require.NotNil(t, result)
 	assert.False(t, result.IsError)
 }
+
+// TestMCPIntegration_MovePlace tests the move_place tool (write operation)
+func TestMCPIntegration_MovePlace(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("move_place_missing_params", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "move_place",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleMovePlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("move_place_missing_place_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "move_place",
+				Arguments: map[string]interface{}{
+					"trip_key":        testTripID,
+					"from_section_id": 1,
+					"to_section_id":   2,
+					"position":        0,
+					// Missing place_id
+				},
+			},
+		}
+
+		result, err := handleMovePlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("move_place_missing_from_section_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "move_place",
+				Arguments: map[string]interface{}{
+					"trip_key":      testTripID,
+					"place_id":     12345,
+					"to_section_id": 2,
+					"position":      0,
+					// Missing from_section_id
+				},
+			},
+		}
+
+		result, err := handleMovePlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("move_place_missing_to_section_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "move_place",
+				Arguments: map[string]interface{}{
+					"trip_key":        testTripID,
+					"place_id":       12345,
+					"from_section_id": 1,
+					"position":        0,
+					// Missing to_section_id
+				},
+			},
+		}
+
+		result, err := handleMovePlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("move_place_missing_position", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "move_place",
+				Arguments: map[string]interface{}{
+					"trip_key":        testTripID,
+					"place_id":       12345,
+					"from_section_id": 1,
+					"to_section_id":   2,
+					// Missing position
+				},
+			},
+		}
+
+		result, err := handleMovePlace(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_ReorderPlaces_ErrorCases tests the reorder_places tool error cases
+func TestMCPIntegration_ReorderPlaces_ErrorCases(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("reorder_places_missing_section_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "reorder_places",
+				Arguments: map[string]interface{}{
+					"place_ids": "123,456",
+					// Missing section_id
+				},
+			},
+		}
+
+		result, err := handleReorderPlaces(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("reorder_places_missing_place_ids", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "reorder_places",
+				Arguments: map[string]interface{}{
+					"section_id": 1,
+					// Missing place_ids
+				},
+			},
+		}
+
+		result, err := handleReorderPlaces(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("reorder_places_missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "reorder_places",
+				Arguments: map[string]interface{}{
+					"section_id": 1,
+					"place_ids":  "123,456",
+					// Missing trip_key and no default in context
+				},
+			},
+		}
+
+		result, err := handleReorderPlaces(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_UpdateTrip tests the update_trip tool (write operation)
+func TestMCPIntegration_UpdateTrip(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip",
+				Arguments: map[string]interface{}{
+					"title": "New Title",
+				},
+			},
+		}
+
+		result, err := handleUpdateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("update_title", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"title":    "Updated Test Title",
+				},
+			},
+		}
+
+		result, err := handleUpdateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("update_dates", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip",
+				Arguments: map[string]interface{}{
+					"trip_key":   testTripID,
+					"start_date": "2026-06-01",
+					"end_date":   "2026-06-10",
+				},
+			},
+		}
+
+		result, err := handleUpdateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("update_privacy", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"privacy":  "private",
+				},
+			},
+		}
+
+		result, err := handleUpdateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("update_all_fields", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip",
+				Arguments: map[string]interface{}{
+					"trip_key":   testTripID,
+					"title":      "Fully Updated Title",
+					"start_date": "2026-07-01",
+					"end_date":   "2026-07-15",
+					"privacy":    "public",
+				},
+			},
+		}
+
+		result, err := handleUpdateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("no_fields_provided", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleUpdateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_LikeTrip tests the like_trip tool (write operation)
+func TestMCPIntegration_LikeTrip(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("liked_true", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "like_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"liked":    true,
+				},
+			},
+		}
+
+		result, err := handleLikeTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("liked_false", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "like_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"liked":    false,
+				},
+			},
+		}
+
+		result, err := handleLikeTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "like_trip",
+				Arguments: map[string]interface{}{
+					"liked": true,
+				},
+			},
+		}
+
+		result, err := handleLikeTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_GetLikeCount tests the get_like_count tool
+func TestMCPIntegration_GetLikeCount(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("with_trip_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_like_count",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleGetLikeCount(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "get_like_count",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleGetLikeCount(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_SendTripInvites tests the send_trip_invites tool (write operation)
+func TestMCPIntegration_SendTripInvites(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "send_trip_invites",
+				Arguments: map[string]interface{}{
+					"invitees": "test@example.com",
+				},
+			},
+		}
+
+		result, err := handleSendInvites(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("missing_invitees", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "send_trip_invites",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleSendInvites(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_ListTripInvites tests the list_trip_invites tool
+func TestMCPIntegration_ListTripInvites(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("with_trip_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "list_trip_invites",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleListInvites(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "list_trip_invites",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleListInvites(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_RestoreTrip tests the restore_trip tool (write operation)
+func TestMCPIntegration_RestoreTrip(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "restore_trip",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleRestoreTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
