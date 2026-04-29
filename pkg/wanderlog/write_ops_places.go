@@ -137,14 +137,24 @@ func (c *Client) ClearSectionBlocks(tripKey string, sectionID int) error {
 		return fmt.Errorf("authentication required for clearing section blocks")
 	}
 
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+	if sectionIdx < 0 {
+		return fmt.Errorf("section %d not found", sectionID)
+	}
+	oldBlocks := trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks
+
 	// Create an operation to replace the blocks array with an empty array
 	clearOp := ReplaceInObject(
-		[]any{"itinerary", "sections", sectionID, "blocks"},
-		[]any{}, // old value placeholder for ShareDB OD field
+		[]any{"itinerary", "sections", sectionIdx, "blocks"},
+		oldBlocks,
 		[]any{},
 	)
 
-	err := c.ApplyOperations(tripKey, []Operation{clearOp})
+	err = c.ApplyOperations(tripKey, []Operation{clearOp})
 	if err != nil {
 		return fmt.Errorf("failed to clear section blocks: %w", err)
 	}
@@ -163,14 +173,24 @@ func (c *Client) DeleteSection(tripKey string, sectionID int) error {
 		return fmt.Errorf("authentication required for deleting sections")
 	}
 
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+	if sectionIdx < 0 {
+		return fmt.Errorf("section %d not found", sectionID)
+	}
+	oldSection := trip.TripPlan.Itinerary.Sections[sectionIdx]
+
 	// Create an operation to remove the section
 	deleteOp := DeleteFromList(
 		[]any{"itinerary", "sections"},
-		sectionID,
-		map[string]interface{}{}, // old value placeholder for ShareDB LD field
+		sectionIdx,
+		oldSection,
 	)
 
-	err := c.ApplyOperations(tripKey, []Operation{deleteOp})
+	err = c.ApplyOperations(tripKey, []Operation{deleteOp})
 	if err != nil {
 		return fmt.Errorf("failed to delete section: %w", err)
 	}
