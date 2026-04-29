@@ -748,6 +748,72 @@ func verifyAddedPlacePersisted(client *wanderlog.Client, tripKey string, section
 	return fmt.Errorf("write request completed, but the place was not found when the trip was reloaded")
 }
 
+func findAddedPlaceBlockID(client *wanderlog.Client, tripKey string, sectionID int, name, placeID, text string) (int, error) {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+		}
+		trip, err := client.GetTrip(tripKey)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		sectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+		if sectionIdx < 0 {
+			return 0, fmt.Errorf("section %d not found", sectionID)
+		}
+		blocks := trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks
+		for i := len(blocks) - 1; i >= 0; i-- {
+			block := blocks[i]
+			if block.Place == nil {
+				continue
+			}
+			if placeMatches(name, placeID, block.Place.Name, block.Place.PlaceID) && flexibleTextContains(block.Text, text) {
+				return block.ID, nil
+			}
+		}
+	}
+	if lastErr != nil {
+		return 0, fmt.Errorf("write request completed, but verification failed while reloading trip: %w", lastErr)
+	}
+	return 0, fmt.Errorf("write request completed, but the added place block was not found when the trip was reloaded")
+}
+
+func verifyPlaceVisitTimePersisted(client *wanderlog.Client, tripKey string, sectionID, placeID int, startTime, endTime string) error {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+		}
+		trip, err := client.GetTrip(tripKey)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		sectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+		if sectionIdx < 0 {
+			return fmt.Errorf("section %d not found", sectionID)
+		}
+		for _, block := range trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks {
+			if block.ID != placeID {
+				continue
+			}
+			if startTime != "" && block.StartTime != startTime {
+				break
+			}
+			if endTime != "" && block.EndTime != endTime {
+				break
+			}
+			return nil
+		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("write request completed, but verification failed while reloading trip: %w", lastErr)
+	}
+	return fmt.Errorf("write request completed, but visit time was not found when the trip was reloaded")
+}
+
 func tripHasAddedFlight(trip *wanderlog.TripResponse, sectionID int, airlineIATA string, flightNumber int, departureDate string) bool {
 	if trip == nil {
 		return false
@@ -1158,6 +1224,9 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
+	if (startTime != "" || endTime != "") && sectionID <= 0 {
+		return mcp.NewToolResultError("start_time/end_time require an itinerary section; provide section_id or section_date"), nil
+	}
 
 	// CRITICAL FIX: If place_id is provided but coordinates are missing, fetch them first
 	// This prevents creating places without location data, which breaks trips with:
@@ -1230,6 +1299,18 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	}
 	if err := verifyAddedPlacePersisted(client, tripKey, sectionID, name, placeID, text); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place '%s' to trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
+	}
+	if startTime != "" || endTime != "" {
+		blockID, err := findAddedPlaceBlockID(client, tripKey, sectionID, name, placeID, text)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to set visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
+		}
+		if err := client.UpdatePlaceVisitTime(tripKey, sectionID, blockID, startTime, endTime); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to set visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
+		}
+		if err := verifyPlaceVisitTimePersisted(client, tripKey, sectionID, blockID, startTime, endTime); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to verify visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
+		}
 	}
 
 	result := fmt.Sprintf("📍 Successfully added place '%s' to trip %s (%s)", name, tripKey, sectionLabel)
@@ -3065,6 +3146,9 @@ func handleUpdatePlaceVisitTime(ctx context.Context, request mcp.CallToolRequest
 	}
 	if err := client.UpdatePlaceVisitTime(tripKey, sectionID, placeID, startTime, endTime); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to update visit time for place %d in trip %s: %v", placeID, tripKey, err)), nil
+	}
+	if err := verifyPlaceVisitTimePersisted(client, tripKey, sectionID, placeID, startTime, endTime); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify visit time for place %d in trip %s: %v", placeID, tripKey, err)), nil
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("Successfully updated visit time for place %d in section %d", placeID, sectionID)), nil
