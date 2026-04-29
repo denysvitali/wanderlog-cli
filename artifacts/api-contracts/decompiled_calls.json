@@ -1,0 +1,3096 @@
+{
+  "endpointStringCount": 124,
+  "endpointStrings": [
+    {
+      "kind": "endpointString",
+      "line": 170297,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/config/globalConfig\", method: \"GET\" });",
+      "url": "/api/config/globalConfig",
+      "url_expr": "\"/api/config/globalConfig\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 170303,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/analytics/firebaseAppInstanceId\", method: \"POST\", data: { firebaseAppInstanceId: arg0.firebaseAppInstanceId, firebaseAppInstanceIdPlatform: arg0.firebaseAppInstanceIdPlatform } };",
+      "url": "/api/analytics/firebaseAppInstanceId",
+      "url_expr": "\"/api/analytics/firebaseAppInstanceId\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 170311,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/analytics/googleAnalyticsClientId\", method: \"POST\" };",
+      "url": "/api/analytics/googleAnalyticsClientId",
+      "url_expr": "\"/api/analytics/googleAnalyticsClientId\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 170319,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/analytics/trackTestEvent\", method: \"POST\" });",
+      "url": "/api/analytics/trackTestEvent",
+      "url_expr": "\"/api/analytics/trackTestEvent\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261500,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/user\", data, method: \"POST\" };",
+      "url": "/api/user",
+      "url_expr": "\"/api/user\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261507,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { method: \"POST\", url: \"/api/user/profilePicture\", data: arg0, headers: { Content-Type: arg0.type } };",
+      "url": "/api/user/profilePicture",
+      "url_expr": "\"/api/user/profilePicture\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261515,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/user/login\", method: \"POST\" };",
+      "url": "/api/user/login",
+      "url_expr": "\"/api/user/login\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261524,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/user/loginFacebookAccessToken\", method: \"POST\" };",
+      "url": "/api/user/loginFacebookAccessToken",
+      "url_expr": "\"/api/user/loginFacebookAccessToken\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261535,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/loginGoogleAuthCode/v2\", method: \"POST\" };",
+      "url": "/api/user/loginGoogleAuthCode/v2",
+      "url_expr": "\"/api/user/loginGoogleAuthCode/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261546,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/user/loginGoogleIdToken\", method: \"POST\" };",
+      "url": "/api/user/loginGoogleIdToken",
+      "url_expr": "\"/api/user/loginGoogleIdToken\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261559,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/user/loginAppleAuthCode\", method: \"POST\" };",
+      "url": "/api/user/loginAppleAuthCode",
+      "url_expr": "\"/api/user/loginAppleAuthCode\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261568,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_27.wrappedAxios({ url: \"/api/user/createPendingUser\", method: \"POST\" });",
+      "url": "/api/user/createPendingUser",
+      "url_expr": "\"/api/user/createPendingUser\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261574,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/user/register\", method: \"POST\", data: Object.assign({}, arg0, await closure_68()) };",
+      "url": "/api/user/register",
+      "url_expr": "\"/api/user/register\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261581,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_27.wrappedAxios({ url: \"/api/user\" });",
+      "url": "/api/user",
+      "url_expr": "\"/api/user\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261587,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_27.wrappedAxios({ url: \"/api/user/logout\", method: \"POST\" });",
+      "url": "/api/user/logout",
+      "url_expr": "\"/api/user/logout\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 261592,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/loginToken/login\", method: \"POST\" };",
+      "url": "/api/user/loginToken/login",
+      "url_expr": "\"/api/user/loginToken/login\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284067,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/emails\" };",
+      "url": "/api/user/emails",
+      "url_expr": "\"/api/user/emails\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284083,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/following/list\", method: \"POST\" };",
+      "url": "/api/user/following/list",
+      "url_expr": "\"/api/user/following/list\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284098,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/followingMultiple\", method: \"POST\" };",
+      "url": "/api/user/followingMultiple",
+      "url_expr": "\"/api/user/followingMultiple\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284113,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/user/leaderboard\", method: \"GET\" });",
+      "url": "/api/user/leaderboard",
+      "url_expr": "\"/api/user/leaderboard\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284119,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/user/isDeleting\", method: \"GET\" });",
+      "url": "/api/user/isDeleting",
+      "url_expr": "\"/api/user/isDeleting\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284125,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/saveFlightDealSettings\", method: \"POST\" };",
+      "url": "/api/user/saveFlightDealSettings",
+      "url_expr": "\"/api/user/saveFlightDealSettings\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284141,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/mutuallyFollowing\", method: \"POST\" };",
+      "url": "/api/user/mutuallyFollowing",
+      "url_expr": "\"/api/user/mutuallyFollowing\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284156,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/block\", data: null, method: \"POST\" };",
+      "url": "/api/user/block",
+      "url_expr": "\"/api/user/block\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284177,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/createIncompleteUserSignup\", method: \"POST\" };",
+      "url": "/api/user/createIncompleteUserSignup",
+      "url_expr": "\"/api/user/createIncompleteUserSignup\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284201,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/user/notification/settings\", params });",
+      "url": "/api/user/notification/settings",
+      "url_expr": "\"/api/user/notification/settings\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284207,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/notifications\", method: \"GET\" };",
+      "url": "/api/user/notifications",
+      "url_expr": "\"/api/user/notifications\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284225,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/byEmail\" };",
+      "url": "/api/user/byEmail",
+      "url_expr": "\"/api/user/byEmail\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284235,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/isValidPasswordResetToken\" };",
+      "url": "/api/user/isValidPasswordResetToken",
+      "url_expr": "\"/api/user/isValidPasswordResetToken\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284245,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/notifications/markRead\", method: \"POST\" };",
+      "url": "/api/user/notifications/markRead",
+      "url_expr": "\"/api/user/notifications/markRead\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284254,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/resetPassword\", method: \"POST\" };",
+      "url": "/api/user/resetPassword",
+      "url_expr": "\"/api/user/resetPassword\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284264,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/fcmToken\", method: \"POST\" };",
+      "url": "/api/user/fcmToken",
+      "url_expr": "\"/api/user/fcmToken\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284273,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/user/isDeleting\", data, method: \"POST\" };",
+      "url": "/api/user/isDeleting",
+      "url_expr": "\"/api/user/isDeleting\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284289,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/notification/settings\", method: \"POST\" };",
+      "url": "/api/user/notification/settings",
+      "url_expr": "\"/api/user/notification/settings\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284300,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/startResetPassword\", method: \"POST\" };",
+      "url": "/api/user/startResetPassword",
+      "url_expr": "\"/api/user/startResetPassword\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284309,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/user/subscribeBlog\", method: \"POST\" });",
+      "url": "/api/user/subscribeBlog",
+      "url_expr": "\"/api/user/subscribeBlog\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284315,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/utcOffset\", data: null, method: \"POST\" };",
+      "url": "/api/user/utcOffset",
+      "url_expr": "\"/api/user/utcOffset\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 284357,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/user/loginToken\", method: \"POST\" });",
+      "url": "/api/user/loginToken",
+      "url_expr": "\"/api/user/loginToken\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 290864,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ method: \"GET\", url: \"/api/sessionStore\" });",
+      "url": "/api/sessionStore",
+      "url_expr": "\"/api/sessionStore\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 290870,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { method: \"POST\", url: \"/api/sessionStore\" };",
+      "url": "/api/sessionStore",
+      "url_expr": "\"/api/sessionStore\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 477291,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/directions/allDistanceInfoForPlace/v2\" };",
+      "url": "/api/directions/allDistanceInfoForPlace/v2",
+      "url_expr": "\"/api/directions/allDistanceInfoForPlace/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 477300,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/directions/distancesForMode\", method: \"POST\", data };",
+      "url": "/api/directions/distancesForMode",
+      "url_expr": "\"/api/directions/distancesForMode\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 477307,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/directions/optimizeRoute\", method: \"POST\", data };",
+      "url": "/api/directions/optimizeRoute",
+      "url_expr": "\"/api/directions/optimizeRoute\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511568,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/payments/changeStripeSubscription\", method: \"POST\" });",
+      "url": "/api/payments/changeStripeSubscription",
+      "url_expr": "\"/api/payments/changeStripeSubscription\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511575,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/payments/ensureStripeSubscriptionUpdated\", data: null, method: \"POST\" };",
+      "url": "/api/payments/ensureStripeSubscriptionUpdated",
+      "url_expr": "\"/api/payments/ensureStripeSubscriptionUpdated\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511584,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/payments/discountInfo/v2\", method: \"GET\" });",
+      "url": "/api/payments/discountInfo/v2",
+      "url_expr": "\"/api/payments/discountInfo/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511590,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/payments/latestSubscriptionPrice\", method: \"GET\" });",
+      "url": "/api/payments/latestSubscriptionPrice",
+      "url_expr": "\"/api/payments/latestSubscriptionPrice\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511596,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/payments/newStripeSubscriptionInfo\", data: null, method: \"POST\" };",
+      "url": "/api/payments/newStripeSubscriptionInfo",
+      "url_expr": "\"/api/payments/newStripeSubscriptionInfo\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511612,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/payments/logSubscriptionError\", method: \"POST\" };",
+      "url": "/api/payments/logSubscriptionError",
+      "url_expr": "\"/api/payments/logSubscriptionError\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511621,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/payments/maybeStartMobileSubscription\", data: null, method: \"POST\" };",
+      "url": "/api/payments/maybeStartMobileSubscription",
+      "url_expr": "\"/api/payments/maybeStartMobileSubscription\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511630,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/payments/startStripeTrial\", method: \"POST\" };",
+      "url": "/api/payments/startStripeTrial",
+      "url_expr": "\"/api/payments/startStripeTrial\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 511639,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/payments/updateSubscriptionCanceled\", method: \"POST\", data };",
+      "url": "/api/payments/updateSubscriptionCanceled",
+      "url_expr": "\"/api/payments/updateSubscriptionCanceled\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 519243,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/flights/flightStops\" };",
+      "url": "/api/flights/flightStops",
+      "url_expr": "\"/api/flights/flightStops\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 519252,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/flights/allAirlines\" });",
+      "url": "/api/flights/allAirlines",
+      "url_expr": "\"/api/flights/allAirlines\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 527291,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/mobileOnly/versionStatus\" };",
+      "url": "/api/mobileOnly/versionStatus",
+      "url_expr": "\"/api/mobileOnly/versionStatus\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641156,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/tripPlans/createExampleTripPlan\", method: \"POST\" });",
+      "url": "/api/tripPlans/createExampleTripPlan",
+      "url_expr": "\"/api/tripPlans/createExampleTripPlan\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641168,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans\" });",
+      "url": "/api/tripPlans",
+      "url_expr": "\"/api/tripPlans\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641209,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/tripPlans/likes\", method: \"POST\" };",
+      "url": "/api/tripPlans/likes",
+      "url_expr": "\"/api/tripPlans/likes\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641227,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/tripPlans/autofillDay\", method: \"POST\" };",
+      "url": "/api/tripPlans/autofillDay",
+      "url_expr": "\"/api/tripPlans/autofillDay\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641249,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/tripPlans/checklistSection\", method: \"POST\", data: { tripPlanId: arg0.tripPlanId, items: arg0.items } };",
+      "url": "/api/tripPlans/checklistSection",
+      "url_expr": "\"/api/tripPlans/checklistSection\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641307,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/tripPlans\", method: \"POST\" };",
+      "url": "/api/tripPlans",
+      "url_expr": "\"/api/tripPlans\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641316,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/tripPlans/flights\", method: \"POST\", data };",
+      "url": "/api/tripPlans/flights",
+      "url_expr": "\"/api/tripPlans/flights\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641331,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/tripPlans/journalStopPolylines\", method: \"POST\" };",
+      "url": "/api/tripPlans/journalStopPolylines",
+      "url_expr": "\"/api/tripPlans/journalStopPolylines\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641342,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/feed/v2\" });",
+      "url": "/api/tripPlans/feed/v2",
+      "url_expr": "\"/api/tripPlans/feed/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641348,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/feed/mostRecentlyEdited\" });",
+      "url": "/api/tripPlans/feed/mostRecentlyEdited",
+      "url_expr": "\"/api/tripPlans/feed/mostRecentlyEdited\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641362,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/myProfile/\" });",
+      "url": "/api/tripPlans/myProfile/",
+      "url_expr": "\"/api/tripPlans/myProfile/\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641400,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/tripPlans/getIfEdited\", method: \"POST\" };",
+      "url": "/api/tripPlans/getIfEdited",
+      "url_expr": "\"/api/tripPlans/getIfEdited\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641431,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/tripPlans/browse/guides\" });",
+      "url": "/api/tripPlans/browse/guides",
+      "url_expr": "\"/api/tripPlans/browse/guides\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641437,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/friendsPlans\" });",
+      "url": "/api/tripPlans/friendsPlans",
+      "url_expr": "\"/api/tripPlans/friendsPlans\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641449,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/feed\" });",
+      "url": "/api/tripPlans/feed",
+      "url_expr": "\"/api/tripPlans/feed\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641455,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/landingPage/guides\" });",
+      "url": "/api/tripPlans/landingPage/guides",
+      "url_expr": "\"/api/tripPlans/landingPage/guides\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641461,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/landingPage/stories\" });",
+      "url": "/api/tripPlans/landingPage/stories",
+      "url_expr": "\"/api/tripPlans/landingPage/stories\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641467,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/home\" });",
+      "url": "/api/tripPlans/home",
+      "url_expr": "\"/api/tripPlans/home\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641473,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/tripPlans/admin/recent/recommendations\" });",
+      "url": "/api/tripPlans/admin/recent/recommendations",
+      "url_expr": "\"/api/tripPlans/admin/recent/recommendations\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641479,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_1.wrappedAxios({ url: \"/api/tripPlans/admin/recent/plans\" });",
+      "url": "/api/tripPlans/admin/recent/plans",
+      "url_expr": "\"/api/tripPlans/admin/recent/plans\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 641613,
+      "method": null,
+      "method_expr": null,
+      "source": "arg5.tripPlanUrlPrefix = \"/api/tripPlans\";",
+      "url": "/api/tripPlans",
+      "url_expr": "\"/api/tripPlans\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642580,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/placesAPI/autocomplete\" };",
+      "url": "/api/placesAPI/autocomplete",
+      "url_expr": "\"/api/placesAPI/autocomplete\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642594,
+      "method": null,
+      "method_expr": null,
+      "source": "obj = { url: \"/api/placesAPI/autocomplete/v2\" };",
+      "url": "/api/placesAPI/autocomplete/v2",
+      "url_expr": "\"/api/placesAPI/autocomplete/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642604,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/placesAPI/findPlaceFromLngLat\" };",
+      "url": "/api/placesAPI/findPlaceFromLngLat",
+      "url_expr": "\"/api/placesAPI/findPlaceFromLngLat\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642616,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/placesAPI/mapLayerGroups\" };",
+      "url": "/api/placesAPI/mapLayerGroups",
+      "url_expr": "\"/api/placesAPI/mapLayerGroups\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642625,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/placesAPI/getMultiplePlaceDetails\" };",
+      "url": "/api/placesAPI/getMultiplePlaceDetails",
+      "url_expr": "\"/api/placesAPI/getMultiplePlaceDetails\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642634,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/placesAPI/getPlaceDetailsAndCardData\" };",
+      "url": "/api/placesAPI/getPlaceDetailsAndCardData",
+      "url_expr": "\"/api/placesAPI/getPlaceDetailsAndCardData\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642643,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/placesAPI/getPlaceDetails/v2\" };",
+      "url": "/api/placesAPI/getPlaceDetails/v2",
+      "url_expr": "\"/api/placesAPI/getPlaceDetails/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 642652,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/placesAPI/searchPlaces\" };",
+      "url": "/api/placesAPI/searchPlaces",
+      "url_expr": "\"/api/placesAPI/searchPlaces\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 657774,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/emails/rate\", method: \"POST\", data };",
+      "url": "/api/emails/rate",
+      "url_expr": "\"/api/emails/rate\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 657790,
+      "method": null,
+      "method_expr": null,
+      "source": "const combined = tmp2 + _callSuper.loginTokenQueryString + key + \"/\" + event + \"/api/events/subscribe/\";",
+      "url": "/api/events/subscribe/",
+      "url_expr": "\"/api/events/subscribe/\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 657800,
+      "method": null,
+      "method_expr": null,
+      "source": "const combined = tmp2 + _callSuper.loginTokenQueryString + onMessage.event + \"/api/events/subscribe/user/\";",
+      "url": "/api/events/subscribe/user/",
+      "url_expr": "\"/api/events/subscribe/user/\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668103,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/geosWithGoodGuides\" });",
+      "url": "/api/geo/geosWithGoodGuides",
+      "url_expr": "\"/api/geo/geosWithGoodGuides\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668109,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/popularAndNearby\" });",
+      "url": "/api/geo/popularAndNearby",
+      "url_expr": "\"/api/geo/popularAndNearby\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668122,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/findCountryForIP\" });",
+      "url": "/api/geo/findCountryForIP",
+      "url_expr": "\"/api/geo/findCountryForIP\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668128,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/nearestTripadvisorGeo\", params });",
+      "url": "/api/geo/nearestTripadvisorGeo",
+      "url_expr": "\"/api/geo/nearestTripadvisorGeo\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668134,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/findNearestGeosToIP\", params });",
+      "url": "/api/geo/findNearestGeosToIP",
+      "url_expr": "\"/api/geo/findNearestGeosToIP\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668141,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/geo/nearestKayakCity\", params: { longitude: place.longitude, latitude: place.latitude, cityNameToMatch: arg0.cityNameToMatch } };",
+      "url": "/api/geo/nearestKayakCity",
+      "url_expr": "\"/api/geo/nearestKayakCity\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668154,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/geo/clientGeos\" };",
+      "url": "/api/geo/clientGeos",
+      "url_expr": "\"/api/geo/clientGeos\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668203,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/tripPlannerGeos\" });",
+      "url": "/api/geo/tripPlannerGeos",
+      "url_expr": "\"/api/geo/tripPlannerGeos\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668209,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/geo/countries\" };",
+      "url": "/api/geo/countries",
+      "url_expr": "\"/api/geo/countries\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668218,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/geo/listGeoCategoriesForCategory\" };",
+      "url": "/api/geo/listGeoCategoriesForCategory",
+      "url_expr": "\"/api/geo/listGeoCategoriesForCategory\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668227,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/geo/listGeoCategoriesForGeo\" };",
+      "url": "/api/geo/listGeoCategoriesForGeo",
+      "url_expr": "\"/api/geo/listGeoCategoriesForGeo\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668236,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/geoInMonthGeos\" });",
+      "url": "/api/geo/geoInMonthGeos",
+      "url_expr": "\"/api/geo/geoInMonthGeos\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668248,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/listGeosWithSearchedCategories\" });",
+      "url": "/api/geo/listGeosWithSearchedCategories",
+      "url_expr": "\"/api/geo/listGeosWithSearchedCategories\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668254,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/geo/listKeywordCategories\" };",
+      "url": "/api/geo/listKeywordCategories",
+      "url_expr": "\"/api/geo/listKeywordCategories\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 668272,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/geo/search\", params });",
+      "url": "/api/geo/search",
+      "url_expr": "\"/api/geo/search\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 736226,
+      "method": null,
+      "method_expr": null,
+      "source": "const combined = tmp2 + obj.loginTokenQueryString + arg0 + \"/api/tripPlans/wsCursors/\";",
+      "url": "/api/tripPlans/wsCursors/",
+      "url_expr": "\"/api/tripPlans/wsCursors/\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 736272,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/places/metadata\" };",
+      "url": "/api/places/metadata",
+      "url_expr": "\"/api/places/metadata\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 736603,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/places/card\" };",
+      "url": "/api/places/card",
+      "url_expr": "\"/api/places/card\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 736622,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/places/placePageGeos\" });",
+      "url": "/api/places/placePageGeos",
+      "url_expr": "\"/api/places/placePageGeos\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 740745,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/misc/coronavirus\" });",
+      "url": "/api/misc/coronavirus",
+      "url_expr": "\"/api/misc/coronavirus\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 740751,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/misc/coronavirusStates\" });",
+      "url": "/api/misc/coronavirusStates",
+      "url_expr": "\"/api/misc/coronavirusStates\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 740767,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/misc/reportVulnerability\", method: \"POST\" };",
+      "url": "/api/misc/reportVulnerability",
+      "url_expr": "\"/api/misc/reportVulnerability\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 740777,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/misc/updateCookies\", method: \"POST\", data: { cookies: arg0.cookies, cookieType: arg0.cookieType } };",
+      "url": "/api/misc/updateCookies",
+      "url_expr": "\"/api/misc/updateCookies\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 793600,
+      "method": null,
+      "method_expr": null,
+      "source": "let body = await closure_0.wrappedStreamingFetch(\"/api/chat/tripPlanAssistant/getText/v2\", obj);",
+      "url": "/api/chat/tripPlanAssistant/getText/v2",
+      "url_expr": "\"/api/chat/tripPlanAssistant/getText/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 793643,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/chat/tripPlanAssistant/getHighlights/v2\", method: \"POST\", data: { assistantMessage: arg0.assistantMessage, tripPlanId: arg0.tripPlanId, selectedGeoId: arg0.selectedGeoId, chatId: arg0.chatId, ...",
+      "url": "/api/chat/tripPlanAssistant/getHighlights/v2",
+      "url_expr": "\"/api/chat/tripPlanAssistant/getHighlights/v2\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 793650,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/chat/tripPlanAssistant/history\", params });",
+      "url": "/api/chat/tripPlanAssistant/history",
+      "url_expr": "\"/api/chat/tripPlanAssistant/history\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 793656,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/chat/tripPlanAssistant/chats\" };",
+      "url": "/api/chat/tripPlanAssistant/chats",
+      "url_expr": "\"/api/chat/tripPlanAssistant/chats\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 793704,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/chat/tripPlanAssistant/initialChatWithItems\" };",
+      "url": "/api/chat/tripPlanAssistant/initialChatWithItems",
+      "url_expr": "\"/api/chat/tripPlanAssistant/initialChatWithItems\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 803989,
+      "method": null,
+      "method_expr": null,
+      "source": "await closure_0.wrappedAxios({ url: \"/api/deals\", method: \"GET\" });",
+      "url": "/api/deals",
+      "url_expr": "\"/api/deals\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 824119,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/lodging/registerPaymentAndBook\", method: \"POST\", data, timeout: closure_4 };",
+      "url": "/api/lodging/registerPaymentAndBook",
+      "url_expr": "\"/api/lodging/registerPaymentAndBook\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 824163,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/lodging/getGooglePriceRates\", method: \"GET\" };",
+      "url": "/api/lodging/getGooglePriceRates",
+      "url_expr": "\"/api/lodging/getGooglePriceRates\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 824173,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/lodging/checkoutData\", method: \"GET\", params };",
+      "url": "/api/lodging/checkoutData",
+      "url_expr": "\"/api/lodging/checkoutData\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 824218,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/lodging/searchLodgings\", method: \"POST\", data, timeout: 20000 };",
+      "url": "/api/lodging/searchLodgings",
+      "url_expr": "\"/api/lodging/searchLodgings\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 909939,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/visitGeos/importICloudPhotosPlaces/run\", method: \"POST\" };",
+      "url": "/api/user/visitGeos/importICloudPhotosPlaces/run",
+      "url_expr": "\"/api/user/visitGeos/importICloudPhotosPlaces/run\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 909949,
+      "method": null,
+      "method_expr": null,
+      "source": "let obj = { url: \"/api/user/visitGeos/importVisitedGeosFromLatLngs\", method: \"POST\" };",
+      "url": "/api/user/visitGeos/importVisitedGeosFromLatLngs",
+      "url_expr": "\"/api/user/visitGeos/importVisitedGeosFromLatLngs\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 959855,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/recommendations/notInterested\", method: \"POST\", data: { tripPlanId: arg0.tripPlanId, mapsPlaceId: arg0.mapsPlaceId } };",
+      "url": "/api/recommendations/notInterested",
+      "url_expr": "\"/api/recommendations/notInterested\""
+    },
+    {
+      "kind": "endpointString",
+      "line": 959862,
+      "method": null,
+      "method_expr": null,
+      "source": "const obj = { url: \"/api/recommendations/v2\", method: \"POST\", data: { tripPlanId: arg0.tripPlanId, geoId: arg0.geoId, input: arg0.input, excludingPlaceIds: arg0.excludingPlaceIds } };",
+      "url": "/api/recommendations/v2",
+      "url_expr": "\"/api/recommendations/v2\""
+    }
+  ],
+  "source": "artifacts/decompiled/wanderlog_decompiled.js",
+  "wrappedAxios": [
+    {
+      "kind": "wrappedAxios",
+      "line": 146361,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(arg0, arg1)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 170297,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"/api/config/globalConfig\", method: \"GET\" })",
+      "url": "/api/config/globalConfig",
+      "url_expr": "\"/api/config/globalConfig\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 170304,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 170313,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 170319,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/analytics/trackTestEvent\", method: \"POST\" })",
+      "url": "/api/analytics/trackTestEvent",
+      "url_expr": "\"/api/analytics/trackTestEvent\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261501,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261508,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261517,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261527,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261539,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261548,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261562,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261568,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/user/createPendingUser\", method: \"POST\" })",
+      "url": "/api/user/createPendingUser",
+      "url_expr": "\"/api/user/createPendingUser\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261575,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261581,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/user\" })",
+      "url": "/api/user",
+      "url_expr": "\"/api/user\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261587,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/user/logout\", method: \"POST\" })",
+      "url": "/api/user/logout",
+      "url_expr": "\"/api/user/logout\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 261595,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284060,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: encodeURIComponent(arg0) })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284070,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284086,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284092,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0, method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284101,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284107,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/follows\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/follows\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284113,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"/api/user/leaderboard\", method: \"GET\" })",
+      "url": "/api/user/leaderboard",
+      "url_expr": "\"/api/user/leaderboard\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284119,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"/api/user/isDeleting\", method: \"GET\" })",
+      "url": "/api/user/isDeleting",
+      "url_expr": "\"/api/user/isDeleting\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284128,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284135,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284144,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284150,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284159,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284165,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0, method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284171,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0, method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284180,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284187,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284195,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284201,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/user/notification/settings\", params })",
+      "url": "/api/user/notification/settings",
+      "url_expr": "\"/api/user/notification/settings\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284210,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284217,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/email\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/email\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284228,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284238,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284248,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284257,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284267,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284274,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284283,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284293,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284303,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284309,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/user/subscribeBlog\", method: \"POST\" })",
+      "url": "/api/user/subscribeBlog",
+      "url_expr": "\"/api/user/subscribeBlog\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284318,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 284357,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/user/loginToken\", method: \"POST\" })",
+      "url": "/api/user/loginToken",
+      "url_expr": "\"/api/user/loginToken\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 290858,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 290864,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/sessionStore\" })",
+      "url": "/api/sessionStore",
+      "url_expr": "\"/api/sessionStore\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 290873,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 477294,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 477301,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 477308,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511561,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511568,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/payments/changeStripeSubscription\", method: \"POST\" })",
+      "url": "/api/payments/changeStripeSubscription",
+      "url_expr": "\"/api/payments/changeStripeSubscription\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511578,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511584,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"/api/payments/discountInfo/v2\", method: \"GET\" })",
+      "url": "/api/payments/discountInfo/v2",
+      "url_expr": "\"/api/payments/discountInfo/v2\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511590,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"/api/payments/latestSubscriptionPrice\", method: \"GET\" })",
+      "url": "/api/payments/latestSubscriptionPrice",
+      "url_expr": "\"/api/payments/latestSubscriptionPrice\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511599,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511605,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0, method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511615,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511624,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511633,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 511640,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 519230,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: encodeURIComponent(arg0) })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 519236,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: encodeURIComponent(arg0) })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 519246,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 519252,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/flights/allAirlines\" })",
+      "url": "/api/flights/allAirlines",
+      "url_expr": "\"/api/flights/allAirlines\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 527294,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641156,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: \"/api/tripPlans/createExampleTripPlan\", method: \"POST\" })",
+      "url": "/api/tripPlans/createExampleTripPlan",
+      "url_expr": "\"/api/tripPlans/createExampleTripPlan\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641162,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: arg0 + \"/places\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/places\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641168,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans\" })",
+      "url": "/api/tripPlans",
+      "url_expr": "\"/api/tripPlans\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641174,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641180,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641187,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: join(\",\") })",
+      "url": null,
+      "url_expr": "join(\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641194,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641203,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641212,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641221,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641230,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641236,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641243,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641250,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641278,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641288,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641294,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0, method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641301,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0 + \"/createGuideFromTripPlan\", method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/createGuideFromTripPlan\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641310,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641317,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641323,
+      "method": "DELETE",
+      "method_expr": "\"DELETE\"",
+      "source": "wrappedAxios({ method: \"DELETE\", url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641334,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641342,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/feed/v2\" })",
+      "url": "/api/tripPlans/feed/v2",
+      "url_expr": "\"/api/tripPlans/feed/v2\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641348,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/feed/mostRecentlyEdited\" })",
+      "url": "/api/tripPlans/feed/mostRecentlyEdited",
+      "url_expr": "\"/api/tripPlans/feed/mostRecentlyEdited\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641354,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/likeCount\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/likeCount\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641362,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/myProfile/\" })",
+      "url": "/api/tripPlans/myProfile/",
+      "url_expr": "\"/api/tripPlans/myProfile/\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641369,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641380,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641386,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/distinction\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/distinction\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641392,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: arg0 + \"/images\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/images\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641403,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641412,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641431,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/tripPlans/browse/guides\" })",
+      "url": "/api/tripPlans/browse/guides",
+      "url_expr": "\"/api/tripPlans/browse/guides\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641437,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/friendsPlans\" })",
+      "url": "/api/tripPlans/friendsPlans",
+      "url_expr": "\"/api/tripPlans/friendsPlans\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641443,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641449,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/feed\" })",
+      "url": "/api/tripPlans/feed",
+      "url_expr": "\"/api/tripPlans/feed\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641455,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/landingPage/guides\" })",
+      "url": "/api/tripPlans/landingPage/guides",
+      "url_expr": "\"/api/tripPlans/landingPage/guides\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641461,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/landingPage/stories\" })",
+      "url": "/api/tripPlans/landingPage/stories",
+      "url_expr": "\"/api/tripPlans/landingPage/stories\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641467,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"/api/tripPlans/home\" })",
+      "url": "/api/tripPlans/home",
+      "url_expr": "\"/api/tripPlans/home\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641473,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/tripPlans/admin/recent/recommendations\" })",
+      "url": "/api/tripPlans/admin/recent/recommendations",
+      "url_expr": "\"/api/tripPlans/admin/recent/recommendations\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641479,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/tripPlans/admin/recent/plans\" })",
+      "url": "/api/tripPlans/admin/recent/plans",
+      "url_expr": "\"/api/tripPlans/admin/recent/plans\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641485,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: \"\" })",
+      "url": "",
+      "url_expr": "\"\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641491,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/invites\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/invites\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641512,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0 + \"/registerView\", method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/registerView\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641519,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641543,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ method: \"POST\", url: arg0 + \"/restore\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/restore\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641553,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641562,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641569,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0 + \"/updateTripPlanGeo/\" + arg1, method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/updateTripPlanGeo/\" + arg1"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 641576,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642583,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642597,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642607,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642619,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642628,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642637,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642646,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 642655,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 652934,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: shareMapPath.getShareMapPath(shareKey), method: \"GET\" })",
+      "url": null,
+      "url_expr": "shareMapPath.getShareMapPath(shareKey)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 656370,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 657749,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 657755,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 657762,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 657768,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/forwardedEmails\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/forwardedEmails\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 657775,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668097,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: encodeURIComponent(arg0), params })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668103,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/geosWithGoodGuides\" })",
+      "url": "/api/geo/geosWithGoodGuides",
+      "url_expr": "\"/api/geo/geosWithGoodGuides\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668109,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/popularAndNearby\" })",
+      "url": "/api/geo/popularAndNearby",
+      "url_expr": "\"/api/geo/popularAndNearby\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668116,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: encodeURIComponent(arg0), method: \"GET\" })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668122,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/findCountryForIP\" })",
+      "url": "/api/geo/findCountryForIP",
+      "url_expr": "\"/api/geo/findCountryForIP\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668128,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/nearestTripadvisorGeo\", params })",
+      "url": "/api/geo/nearestTripadvisorGeo",
+      "url_expr": "\"/api/geo/nearestTripadvisorGeo\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668134,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/findNearestGeosToIP\", params })",
+      "url": "/api/geo/findNearestGeosToIP",
+      "url_expr": "\"/api/geo/findNearestGeosToIP\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668142,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668148,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/clientGeo\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/clientGeo\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668157,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668164,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668171,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668177,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: encodeURIComponent(arg0) })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668184,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 + \"/minimalGeo\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/minimalGeo\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668190,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668197,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: geoId.geoId + \"/tripPlannerPage\" })",
+      "url": null,
+      "url_expr": "geoId.geoId + \"/tripPlannerPage\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668203,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/tripPlannerGeos\" })",
+      "url": "/api/geo/tripPlannerGeos",
+      "url_expr": "\"/api/geo/tripPlannerGeos\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668212,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668221,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668230,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668236,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/geoInMonthGeos\" })",
+      "url": "/api/geo/geoInMonthGeos",
+      "url_expr": "\"/api/geo/geoInMonthGeos\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668242,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668248,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/listGeosWithSearchedCategories\" })",
+      "url": "/api/geo/listGeosWithSearchedCategories",
+      "url_expr": "\"/api/geo/listGeosWithSearchedCategories\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668257,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668266,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668272,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/geo/search\", params })",
+      "url": "/api/geo/search",
+      "url_expr": "\"/api/geo/search\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668679,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668687,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0, method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668694,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0.fromGeoId + \"/\" + arg0.toGeoId, method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0.fromGeoId + \"/\" + arg0.toGeoId"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 668701,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"\", method: \"GET\" })",
+      "url": "",
+      "url_expr": "\"\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670420,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670426,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: encodeURIComponent(arg0) })",
+      "url": null,
+      "url_expr": "encodeURIComponent(arg0)"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670435,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670444,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670468,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ method: \"GET\", url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670474,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ method: \"POST\", url: arg0 + \"/\" + arg1 })",
+      "url": null,
+      "url_expr": "arg0 + \"/\" + arg1"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 670480,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ method: \"POST\", url: arg0 + \"/\" + arg1 })",
+      "url": null,
+      "url_expr": "arg0 + \"/\" + arg1"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 690176,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 736280,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 736606,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 736616,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 736622,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/places/placePageGeos\" })",
+      "url": "/api/places/placePageGeos",
+      "url_expr": "\"/api/places/placePageGeos\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 736628,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 740739,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: arg0 })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 740745,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/misc/coronavirus\" })",
+      "url": "/api/misc/coronavirus",
+      "url_expr": "\"/api/misc/coronavirus\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 740751,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/misc/coronavirusStates\" })",
+      "url": "/api/misc/coronavirusStates",
+      "url_expr": "\"/api/misc/coronavirusStates\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 740759,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 740770,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 740778,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 793644,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 793650,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: \"/api/chat/tripPlanAssistant/history\", params })",
+      "url": "/api/chat/tripPlanAssistant/history",
+      "url_expr": "\"/api/chat/tripPlanAssistant/history\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 793686,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 793707,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 793713,
+      "method": "DELETE",
+      "method_expr": "\"DELETE\"",
+      "source": "wrappedAxios({ url: arg0, method: \"DELETE\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 793727,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 803989,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: \"/api/deals\", method: \"GET\" })",
+      "url": "/api/deals",
+      "url_expr": "\"/api/deals\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 804599,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824113,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0, method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824120,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824126,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: closure_6, data, method: \"POST\", timeout: closure_4 })",
+      "url": null,
+      "url_expr": "closure_6"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824132,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios({ url: closure_7 })",
+      "url": null,
+      "url_expr": "closure_7"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824141,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824151,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824167,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824174,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824181,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824188,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824201,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824210,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: closure_3, method: \"GET\" })",
+      "url": null,
+      "url_expr": "closure_3"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 824219,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 890207,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0, method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 909942,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 909952,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 909960,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0 + \"/run\", method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/run\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 959856,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 959863,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 1039269,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0 + \"/comments\", method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/comments\""
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 1039284,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 1039296,
+      "method": "POST",
+      "method_expr": "\"POST\"",
+      "source": "wrappedAxios({ url: arg0.commentId + \"/vote/\" + arg0.direction, method: \"POST\" })",
+      "url": null,
+      "url_expr": "arg0.commentId + \"/vote/\" + arg0.direction"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 1039309,
+      "method": "GET",
+      "method_expr": null,
+      "source": "wrappedAxios(obj)",
+      "url": null,
+      "url_expr": null
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 1039321,
+      "method": "DELETE",
+      "method_expr": "\"DELETE\"",
+      "source": "wrappedAxios({ url: arg0, method: \"DELETE\" })",
+      "url": null,
+      "url_expr": "arg0"
+    },
+    {
+      "kind": "wrappedAxios",
+      "line": 1039333,
+      "method": "GET",
+      "method_expr": "\"GET\"",
+      "source": "wrappedAxios({ url: arg0 + \"/voters\", method: \"GET\" })",
+      "url": null,
+      "url_expr": "arg0 + \"/voters\""
+    }
+  ],
+  "wrappedAxiosCount": 219
+}

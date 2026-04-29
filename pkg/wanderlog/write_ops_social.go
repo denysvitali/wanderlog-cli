@@ -1,16 +1,14 @@
 package wanderlog
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Type aliases for backward compatibility
@@ -37,25 +35,20 @@ func (c *Client) CopyTrip(sourceKey string) (*CreateTripResponse, error) {
 		return nil, fmt.Errorf("authentication required for copying trips")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithField("sourceKey", sourceKey).Debug("Copying trip")
 
-	resp, err := api.CopyTripPlanWithResponse(context.Background(), sourceKey)
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/copy/"+url.PathEscape(sourceKey), nil, nil, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"status": resp.StatusCode(),
+		"status": resp.StatusCode,
 		"body":   string(resp.Body),
 	}).Debug("CopyTrip API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("CopyTrip: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("CopyTrip: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var copyResp models.CopyTripResponse
@@ -91,19 +84,14 @@ func (c *Client) RestoreTrip(tripKey string) error {
 		return fmt.Errorf("authentication required for restoring trips")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Restoring trip")
 
-	resp, err := api.RestoreTripPlanWithResponse(context.Background(), tripKey)
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/restore", nil, nil, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeOpenAPIBody("RestoreTrip", resp.StatusCode(), resp.Body, nil); err != nil {
+	if err := decodeAPIBody("RestoreTrip", resp.StatusCode, resp.Body, nil); err != nil {
 		return err
 	}
 
@@ -117,33 +105,21 @@ func (c *Client) SendTripInvites(tripKey string, req SendInvitesRequest) error {
 		return fmt.Errorf("authentication required for sending invites")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":  tripKey,
 		"invitees": req.Invitees,
 	}).Debug("Sending trip invites")
 
-	invitees := make([]openapi_types.Email, 0, len(req.Invitees))
-	for _, invitee := range req.Invitees {
-		invitees = append(invitees, openapi_types.Email(invitee))
-	}
-	var message *string
+	body := map[string]any{"invitees": req.Invitees}
 	if req.Message != "" {
-		message = &req.Message
+		body["message"] = req.Message
 	}
-	resp, err := api.SendTripPlanInvitesWithResponse(context.Background(), tripKey, openapi.SendTripPlanInvitesJSONRequestBody{
-		Invitees: &invitees,
-		Message:  message,
-	})
+	resp, err := c.apiJSON(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/invite", nil, body, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeOpenAPIBody("SendTripInvites", resp.StatusCode(), resp.Body, nil); err != nil {
+	if err := decodeAPIBody("SendTripInvites", resp.StatusCode, resp.Body, nil); err != nil {
 		return err
 	}
 
@@ -159,7 +135,6 @@ func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, erro
 
 	c.logger.WithField("tripKey", tripKey).Debug("Listing trip invites")
 
-	// Use DoAPI to avoid OpenAPI parsing issues
 	// DoAPI strips leading / and api/ prefix, so use "tripPlans/%s/invites"
 	statusCode, respBody, err := c.DoAPI("GET", fmt.Sprintf("tripPlans/%s/invites", tripKey), nil, nil, true)
 	if err != nil {
@@ -196,7 +171,6 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 		"liked":   liked,
 	}).Debug("Setting like status for trip")
 
-	// Use DoAPI to avoid OpenAPI parsing issues - the API returns data as boolean, not map
 	body, err := json.Marshal(map[string]bool{"liked": liked})
 	if err != nil {
 		return fmt.Errorf("marshaling request: %w", err)
@@ -239,22 +213,17 @@ func (c *Client) AddCollaborator(tripKey string, userID int) error {
 		return fmt.Errorf("authentication required for adding collaborators")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey": tripKey,
 		"userID":  userID,
 	}).Debug("Adding collaborator to trip")
 
-	resp, err := api.AddCollaboratorWithResponse(context.Background(), tripKey, openapi.AddCollaboratorJSONRequestBody{UserId: &userID})
+	resp, err := c.apiJSON(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/collaborator", nil, map[string]any{"userId": userID}, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeOpenAPIBody("AddCollaborator", resp.StatusCode(), resp.Body, nil); err != nil {
+	if err := decodeAPIBody("AddCollaborator", resp.StatusCode, resp.Body, nil); err != nil {
 		return err
 	}
 
@@ -272,22 +241,17 @@ func (c *Client) RemoveCollaborator(tripKey string, userID int) error {
 		return fmt.Errorf("authentication required for removing collaborators")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey": tripKey,
 		"userID":  userID,
 	}).Debug("Removing collaborator from trip")
 
-	resp, err := api.RemoveCollaboratorWithResponse(context.Background(), tripKey, openapi.RemoveCollaboratorJSONRequestBody{UserId: &userID})
+	resp, err := c.apiJSON(context.Background(), http.MethodDelete, "tripPlans/"+url.PathEscape(tripKey)+"/collaborator", nil, map[string]any{"userId": userID}, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeOpenAPIBody("RemoveCollaborator", resp.StatusCode(), resp.Body, nil); err != nil {
+	if err := decodeAPIBody("RemoveCollaborator", resp.StatusCode, resp.Body, nil); err != nil {
 		return err
 	}
 
@@ -305,31 +269,23 @@ func (c *Client) GetOrCreateShareKey(editKey string, permissions ShareKeyPermiss
 		return nil, fmt.Errorf("authentication required for creating share keys")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"editKey":     editKey,
 		"permissions": permissions,
 	}).Debug("Creating/getting share key")
 
-	resp, err := api.GetOrCreateTripPlanKeyWithResponse(context.Background(), editKey, openapi.GetOrCreateTripPlanKeyJSONRequestBody{
-		Permissions: &struct {
-			CanEdit *bool `json:"canEdit,omitempty"`
-			CanView *bool `json:"canView,omitempty"`
-		}{
-			CanEdit: &permissions.CanEdit,
-			CanView: &permissions.CanView,
+	resp, err := c.apiJSON(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(editKey)+"/shareKey", nil, map[string]any{
+		"permissions": map[string]bool{
+			"canEdit": permissions.CanEdit,
+			"canView": permissions.CanView,
 		},
-	})
+	}, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("GetOrCreateShareKey: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetOrCreateShareKey: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var shareKeyResp ShareKeyResponse
@@ -403,26 +359,21 @@ func (c *Client) ExportTrip(tripKey string) (*ExportTripResponse, error) {
 		return nil, fmt.Errorf("authentication required for exporting trips")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Exporting trip")
 
-	resp, err := api.ExportTripPlanWithResponse(context.Background(), tripKey)
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/export/v2", nil, nil, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey": tripKey,
-		"status":  resp.StatusCode(),
+		"status":  resp.StatusCode,
 		"body":    string(resp.Body),
 	}).Debug("ExportTrip API response")
 
 	var exportResp ExportTripResponse
-	if err := decodeOpenAPIBody("ExportTrip", resp.StatusCode(), resp.Body, &exportResp); err != nil {
+	if err := decodeAPIBody("ExportTrip", resp.StatusCode, resp.Body, &exportResp); err != nil {
 		return nil, err
 	}
 
@@ -471,18 +422,13 @@ func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*Auto
 		return nil, fmt.Errorf("marshaling autofill request: %w", err)
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
 		"sectionID": sectionID,
 		"query":     query,
 	}).Debug("Autofilling day with suggestions")
 
-	resp, err := api.AutofillDayWithBodyWithResponse(context.Background(), "application/json", bytes.NewReader(reqBody))
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/autofillDay", nil, reqBody, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
@@ -490,12 +436,12 @@ func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*Auto
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
 		"sectionID": sectionID,
-		"status":    resp.StatusCode(),
+		"status":    resp.StatusCode,
 		"body":      string(resp.Body),
 	}).Debug("AutofillDay API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("AutofillDay: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("AutofillDay: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var autofillResp AutofillDayResponse
@@ -537,18 +483,13 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 		return nil, fmt.Errorf("marshaling checklist request: %w", err)
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
 		"sectionID": sectionID,
 		"itemCount": len(items),
 	}).Debug("Adding checklist items")
 
-	resp, err := api.AddChecklistItemsWithBodyWithResponse(context.Background(), "application/json", bytes.NewReader(reqBody))
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/checklistSection", nil, reqBody, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
@@ -556,12 +497,12 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
 		"sectionID": sectionID,
-		"status":    resp.StatusCode(),
+		"status":    resp.StatusCode,
 		"body":      string(resp.Body),
 	}).Debug("AddChecklistItems API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("AddChecklistItems: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("AddChecklistItems: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var checklistResp ChecklistSectionResponse
@@ -593,11 +534,6 @@ func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, chec
 		return nil, fmt.Errorf("marshaling checklist request: %w", err)
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
 		"sectionID": sectionID,
@@ -605,13 +541,13 @@ func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, chec
 		"checked":   checked,
 	}).Debug("Toggling checklist item")
 
-	resp, err := api.AddChecklistItemsWithBodyWithResponse(context.Background(), "application/json", bytes.NewReader(reqBody))
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/checklistSection", nil, reqBody, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("ToggleChecklistItem: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ToggleChecklistItem: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var checklistResp ChecklistSectionResponse

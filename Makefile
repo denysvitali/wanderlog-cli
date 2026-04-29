@@ -3,15 +3,17 @@ MODULE := github.com/denysvitali/wanderlog-cli
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build generate test lint vet fmt clean install run help
+.PHONY: all build generate extract-api test lint vet fmt clean install run help
 
 all: lint test build ## Run lint, test, and build
 
 build: ## Build the binary
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) .
 
-generate: ## Generate Go OpenAPI client/types from API.openapi.yaml
-	go generate ./pkg/wanderlog/openapi
+generate: extract-api ## Generate extracted API call manifest
+
+extract-api: ## Extract API call sites from the decompiled JS bundle
+	python3 scripts/extract-api-calls.py
 
 install: ## Install the binary
 	go install -ldflags "$(LDFLAGS)" .

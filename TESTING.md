@@ -96,6 +96,18 @@ go test -v ./pkg/wanderlog
 go test -v -run TestCreateTrip ./pkg/wanderlog
 ```
 
+### API Request Contract Tests
+
+`TestAPIRequestContracts` captures Go client requests with a local test server
+and compares them against `artifacts/api-contracts/go_request_contracts.json`.
+It also checks that every contract maps back to an endpoint extracted from
+`artifacts/decompiled/wanderlog_decompiled.js`.
+
+```bash
+make generate
+go test -v -run TestAPIRequestContracts ./pkg/wanderlog
+```
+
 ### Test Organization
 
 ```

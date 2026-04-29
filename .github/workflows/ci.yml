@@ -41,16 +41,16 @@ jobs:
           path: coverage.out
           retention-days: 3
 
-  openapi-spec-sync:
-    name: OpenAPI Spec Sync
+  api-contract-sync:
+    name: API Contract Sync
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - name: Regenerate OpenAPI client
-        run: go generate ./pkg/wanderlog/openapi
+      - name: Regenerate extracted API call manifest
+        run: python3 scripts/extract-api-calls.py
       - name: Verify generated files are committed
         run: |
           git diff --exit-code
@@ -59,7 +59,7 @@ jobs:
   build:
     name: Build
     runs-on: self-hosted
-    needs: [lint, test, openapi-spec-sync]
+    needs: [lint, test, api-contract-sync]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
