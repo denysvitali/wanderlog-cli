@@ -87,10 +87,13 @@ wanderlog copy abc123xyz
 wanderlog edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
 
 # Add a place with coordinates
-wanderlog edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671
+wanderlog trips edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --start-time 09:30
 
 # Remove a place from a trip  
 wanderlog edit remove-place abc123xyz 12345
+
+# Set or change a place visit time
+wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30 --end-time 11:00
 
 # Delete a trip (careful!)
 wanderlog delete abc123xyz
@@ -279,7 +282,7 @@ wanderlog mcp --trip-id abc123xyz
 
 **Available MCP tools include:**
 - **Read-only:** `list_trips`, `get_trip`, `list_places`, `list_sections`, `get_flights`, `search_places`, `search_restaurants`, `search_places_wanderlog`, `search_hotels`, `get_place_details`, `get_flight_stops`, `get_like_count`, `list_trip_invites`, `get_me`, `get_user_profile`, `get_notifications`, `autocomplete_users`, `get_feed_home`, `browse_guides`, `search_geos`, `get_view_only_journal`, `get_trip_expenses_csv`, `get_global_config`
-- **Write-gated (need `--enable-write`):** `add_place`, `add_flight`, `add_lodging`, `remove_place`, `move_place`, `reorder_places`, `update_place_notes`, `set_trip_budget`, `add_trip_expense`, `update_trip_expense`, `delete_trip_expense`, `create_trip`, `delete_trip`, `restore_trip`, `copy_trip`, `update_trip`, `like_trip`, `send_trip_invites`, `create_guide_from_trip`
+- **Write-gated (need `--enable-write`):** `add_place`, `add_flight`, `add_lodging`, `remove_place`, `move_place`, `reorder_places`, `update_place_notes`, `update_place_visit_time`, `set_trip_budget`, `add_trip_expense`, `update_trip_expense`, `delete_trip_expense`, `create_trip`, `delete_trip`, `restore_trip`, `copy_trip`, `update_trip`, `like_trip`, `send_trip_invites`, `create_guide_from_trip`
 
 ### Using with Claude Code
 

@@ -19,6 +19,8 @@ var (
 	longitude     float64
 	sectionIDFlag int
 	placeText     string
+	startTimeFlag string
+	endTimeFlag   string
 )
 
 var editCmd = &cobra.Command{
@@ -37,7 +39,7 @@ var addPlaceCmd = &cobra.Command{
 Examples:
   wanderlog edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
   wanderlog edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --section 123
-  wanderlog edit add-place abc123xyz --name "Custom Place" --text "Great restaurant!"`,
+  wanderlog edit add-place abc123xyz --name "Custom Place" --text "Great restaurant!" --start-time 19:00`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		tripKey := args[0]
@@ -73,8 +75,10 @@ Examples:
 		}
 
 		req := wanderlog.AddPlaceRequest{
-			Place: placeInfo,
-			Text:  placeText,
+			Place:     placeInfo,
+			Text:      placeText,
+			StartTime: startTimeFlag,
+			EndTime:   endTimeFlag,
 		}
 
 		err := client.AddPlace(tripKey, sectionIDFlag, req)
@@ -266,6 +270,8 @@ func init() {
 	addPlaceCmd.Flags().Float64Var(&longitude, "lng", 0, "Longitude")
 	addPlaceCmd.Flags().IntVar(&sectionIDFlag, "section", 0, "Section ID")
 	addPlaceCmd.Flags().StringVar(&placeText, "text", "", "Additional text/notes")
+	addPlaceCmd.Flags().StringVar(&startTimeFlag, "start-time", "", "Visit start time (HH:MM, 24-hour)")
+	addPlaceCmd.Flags().StringVar(&endTimeFlag, "end-time", "", "Visit end time (HH:MM, 24-hour)")
 
 	// Remove place flags
 	removePlaceCmd.Flags().IntVar(&sectionIDFlag, "section", 0, "Section ID")

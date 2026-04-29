@@ -602,6 +602,29 @@ func TestValidateAddPlaceRequest(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "valid visit time",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+				},
+				StartTime: "09:30",
+				EndTime:   "11:00",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid visit time",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+				},
+				StartTime: "9am",
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
