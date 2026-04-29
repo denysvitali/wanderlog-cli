@@ -277,15 +277,16 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_lodging",
 				Arguments: map[string]interface{}{
-					"trip_key":            tripKey,
-					"name":                lodgingName,
-					"place_id":            placeID,
-					"latitude":            lat,
-					"longitude":           lng,
-					"check_in":            "2026-06-01",
-					"check_out":           "2026-06-07",
-					"confirmation_number": "CONF123456",
-					"notes":               "Added via add_lodging handler - Complete Feature Test",
+					"trip_key":           tripKey,
+					"name":               lodgingName,
+					"propertyPlaceId":    placeID,
+					"latitude":           lat,
+					"longitude":          lng,
+					"checkInDate":        "2026-06-01",
+					"checkOutDate":       "2026-06-07",
+					"confirmationNumber": "CONF123456",
+					"travelerNames":      []string{"Integration Traveler"},
+					"note":               "Added via add_lodging handler - Complete Feature Test",
 				},
 			},
 		}
@@ -294,6 +295,11 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, lodgingResult)
 		assert.False(t, lodgingResult.IsError, "add_lodging should not error: %s", getTextContent(lodgingResult))
+		structured, ok := lodgingResult.StructuredContent.(map[string]any)
+		require.True(t, ok, "add_lodging should return structured content")
+		assert.Equal(t, tripKey, structured["trip_key"])
+		assert.NotZero(t, structured["section_id"])
+		assert.NotZero(t, structured["block_id"])
 	})
 
 	// 8. UPDATE TRIP (title, dates, privacy)

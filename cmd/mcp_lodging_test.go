@@ -3,6 +3,7 @@ package cmd
 import (
 	"testing"
 
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,10 +62,38 @@ func TestCreateLodgingSectionShapeMatchesReactNativeBundle(t *testing.T) {
 	assert.Equal(t, "hotels", section["type"])
 	assert.Equal(t, "bed", section["placeMarkerIcon"])
 	assert.NotEqual(t, "lodging", section["type"])
+	assert.NotContains(t, section, "displayHeading")
+	assert.NotContains(t, section, "date")
 
 	text, ok := section["text"].(map[string]any)
 	require.True(t, ok)
 	ops, ok := text["ops"].([]any)
 	require.True(t, ok)
 	require.Len(t, ops, 1)
+}
+
+func TestSectionIndexToAddSectionTypeMatchesReactNativeBundleOrder(t *testing.T) {
+	sections := []wanderlog.ItSections{
+		{Type: "attachments"},
+		{Type: "normal"},
+		{Type: "normal"},
+	}
+
+	assert.Equal(t, 1, sectionIndexToAddSectionType("flights", sections))
+	assert.Equal(t, 1, sectionIndexToAddSectionType("hotels", sections))
+
+	sections = []wanderlog.ItSections{
+		{Type: "attachments"},
+		{Type: "flights"},
+		{Type: "normal"},
+	}
+	assert.Equal(t, 2, sectionIndexToAddSectionType("hotels", sections))
+
+	sections = []wanderlog.ItSections{
+		{Type: "attachments"},
+		{Type: "flights"},
+		{Type: "hotels"},
+		{Type: "normal"},
+	}
+	assert.Equal(t, 3, sectionIndexToAddSectionType("rentalCars", sections))
 }
