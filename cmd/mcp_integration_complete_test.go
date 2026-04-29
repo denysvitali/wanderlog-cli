@@ -277,15 +277,15 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_lodging",
 				Arguments: map[string]interface{}{
-					"trip_key":          tripKey,
-					"name":              lodgingName,
-					"place_id":         placeID,
-					"latitude":         lat,
-					"longitude":        lng,
-					"check_in":         "2026-06-01",
-					"check_out":        "2026-06-07",
+					"trip_key":            tripKey,
+					"name":                lodgingName,
+					"place_id":            placeID,
+					"latitude":            lat,
+					"longitude":           lng,
+					"check_in":            "2026-06-01",
+					"check_out":           "2026-06-07",
 					"confirmation_number": "CONF123456",
-					"notes":            "Added via add_lodging handler - Complete Feature Test",
+					"notes":               "Added via add_lodging handler - Complete Feature Test",
 				},
 			},
 		}
