@@ -424,12 +424,56 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		}
 	})
 
-	// 10. REORDER PLACES (skip - requires internal block IDs, not Google Place IDs)
+	// 10. REORDER PLACES
 	t.Run("reorder_places_in_section", func(t *testing.T) {
-		// The reorder_places API requires internal block IDs (integers), not Google Place IDs (strings).
-		// The placesAdded array contains Google Place IDs which cannot be used with reorder_places.
-		// This functionality is tested in other tests. Skip this specific test case.
-		t.Skip("Skipping reorder test - requires internal block IDs, not Google Place IDs")
+		require.NotZero(t, itinerarySectionID, "No itinerary section ID was recorded")
+
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+		require.NoError(t, client.EnsureAuthenticated("", ""))
+
+		trip, err := client.GetTrip(tripKey)
+		require.NoError(t, err, "Failed to reload trip before reorder")
+
+		originalIDs, originalNames := placeBlockOrderInSection(t, trip, itinerarySectionID)
+		require.GreaterOrEqual(t, len(originalIDs), 2, "Need at least two place blocks to test reorder")
+
+		reorderedIDs := make([]int, len(originalIDs))
+		reorderedNames := make([]string, len(originalNames))
+		for i := range originalIDs {
+			reverseIndex := len(originalIDs) - 1 - i
+			reorderedIDs[i] = originalIDs[reverseIndex]
+			reorderedNames[i] = originalNames[reverseIndex]
+		}
+
+		placeIDArgs := make([]string, len(reorderedIDs))
+		for i, id := range reorderedIDs {
+			placeIDArgs[i] = fmt.Sprintf("%d", id)
+		}
+
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "reorder_places",
+				Arguments: map[string]interface{}{
+					"trip_key":   tripKey,
+					"section_id": itinerarySectionID,
+					"place_ids":  strings.Join(placeIDArgs, ","),
+				},
+			},
+		}
+
+		result, err := handleReorderPlaces(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError, "reorder_places should not error: %s", getTextContent(result))
+
+		updatedTrip, err := client.GetTrip(tripKey)
+		require.NoError(t, err, "Failed to reload trip after reorder")
+		_, updatedNames := placeBlockOrderInSection(t, updatedTrip, itinerarySectionID)
+		require.GreaterOrEqual(t, len(updatedNames), len(reorderedNames))
+		assert.Equal(t, reorderedNames, updatedNames[:len(reorderedNames)], "Place order should match requested order")
+
+		t.Logf("Reordered section %d places: %s -> %s", itinerarySectionID, strings.Join(originalNames, ", "), strings.Join(updatedNames[:len(reorderedNames)], ", "))
 	})
 
 	// 11. LIKE TRIP
@@ -713,4 +757,22 @@ func getDatedItinerarySectionIDByDate(t *testing.T, tripKey string, date string)
 		}
 	}
 	return 0
+}
+
+func placeBlockOrderInSection(t *testing.T, trip *wanderlog.TripResponse, sectionID int) ([]int, []string) {
+	t.Helper()
+
+	sectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+	require.NotEqual(t, -1, sectionIdx, "section %d not found", sectionID)
+
+	ids := []int{}
+	names := []string{}
+	for _, block := range trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks {
+		if block.Place == nil {
+			continue
+		}
+		ids = append(ids, block.ID)
+		names = append(names, block.Place.Name)
+	}
+	return ids, names
 }
