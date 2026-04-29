@@ -203,15 +203,46 @@ type TripPlanKey struct {
 }
 
 type CurrencyAmount struct {
-	Amount       int    `json:"amount"`
-	CurrencyCode string `json:"currencyCode,omitzero"`
+	Amount       float64 `json:"amount"`
+	CurrencyCode string  `json:"currencyCode,omitzero"`
+}
+
+type BudgetUser struct {
+	Type string `json:"type"`
+	ID   int    `json:"id"`
+}
+
+type BudgetSplitWith struct {
+	Type  string       `json:"type"`
+	Users []BudgetUser `json:"users"`
+}
+
+type BudgetExpense struct {
+	ID             int             `json:"id"`
+	Amount         CurrencyAmount  `json:"amount"`
+	Category       string          `json:"category"`
+	Description    string          `json:"description"`
+	Date           string          `json:"date"`
+	BlockID        *int            `json:"blockId,omitempty"`
+	PaidByUserID   int             `json:"paidByUserId"`
+	PaidByUser     BudgetUser      `json:"paidByUser"`
+	SplitWith      BudgetSplitWith `json:"splitWith"`
+	AssociatedDate *string         `json:"associatedDate,omitempty"`
+}
+
+type BudgetPayment struct {
+	ID       int            `json:"id"`
+	Amount   CurrencyAmount `json:"amount"`
+	FromUser BudgetUser     `json:"fromUser"`
+	ToUser   BudgetUser     `json:"toUser"`
+	PaidAt   string         `json:"paidAt,omitzero"`
 }
 
 type Budget struct {
-	Amount       CurrencyAmount `json:"amount"`
-	Expenses     []any          `json:"expenses"`
-	Payments     []any          `json:"payments"`
-	SimplifyDebt bool           `json:"simplifyDebt"`
+	Amount       CurrencyAmount  `json:"amount"`
+	Expenses     []BudgetExpense `json:"expenses"`
+	Payments     []BudgetPayment `json:"payments"`
+	SimplifyDebt bool            `json:"simplifyDebt"`
 }
 
 type By struct {
@@ -556,6 +587,39 @@ type FlightStopAirport struct {
 type LodgingSearchResponse struct {
 	Success bool              `json:"success"`
 	Data    []LodgingProperty `json:"data"`
+	Offers  []LodgingProperty `json:"offers,omitempty"`
+}
+
+func (r *LodgingSearchResponse) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Success bool            `json:"success"`
+		Data    json.RawMessage `json:"data"`
+		Offers  json.RawMessage `json:"offers"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.Success = raw.Success
+	if len(raw.Data) > 0 && string(raw.Data) != "null" {
+		if err := json.Unmarshal(raw.Data, &r.Data); err != nil {
+			var wrapped struct {
+				Offers []LodgingProperty `json:"offers"`
+			}
+			if err2 := json.Unmarshal(raw.Data, &wrapped); err2 != nil {
+				return err
+			}
+			r.Data = wrapped.Offers
+		}
+	}
+	if len(raw.Offers) > 0 && string(raw.Offers) != "null" {
+		if err := json.Unmarshal(raw.Offers, &r.Offers); err != nil {
+			return err
+		}
+		if len(r.Data) == 0 {
+			r.Data = r.Offers
+		}
+	}
+	return nil
 }
 
 // LodgingProperty represents a single lodging/hotel result
@@ -570,6 +634,73 @@ type LodgingProperty struct {
 	Currency      string  `json:"currency,omitempty"`
 	ImageURL      string  `json:"imageUrl,omitempty"`
 	BookerType    string  `json:"bookerType,omitempty"` // e.g., "google", "expedia", "hotels.com"
+}
+
+func (p *LodgingProperty) UnmarshalJSON(data []byte) error {
+	type lodgingPropertyAlias LodgingProperty
+	var alias lodgingPropertyAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	*p = LodgingProperty(alias)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	readString := func(keys ...string) string {
+		for _, key := range keys {
+			if value, ok := raw[key]; ok {
+				var text string
+				if err := json.Unmarshal(value, &text); err == nil && text != "" {
+					return text
+				}
+			}
+		}
+		return ""
+	}
+	if p.PropertyID == "" {
+		p.PropertyID = readString("propertyId", "id", "placeId", "place_id")
+	}
+	if p.Name == "" {
+		p.Name = readString("name", "title", "displayName")
+	}
+	if p.Address == "" {
+		p.Address = readString("address", "formattedAddress", "formatted_address")
+	}
+
+	for _, key := range []string{"property", "lodging", "lodgingProperty", "hotel", "place"} {
+		nestedRaw, ok := raw[key]
+		if !ok || string(nestedRaw) == "null" {
+			continue
+		}
+		var nested LodgingProperty
+		if err := json.Unmarshal(nestedRaw, &nested); err != nil {
+			continue
+		}
+		if p.PropertyID == "" {
+			p.PropertyID = nested.PropertyID
+		}
+		if p.Name == "" {
+			p.Name = nested.Name
+		}
+		if p.Address == "" {
+			p.Address = nested.Address
+		}
+		if p.City == "" {
+			p.City = nested.City
+		}
+		if p.Country == "" {
+			p.Country = nested.Country
+		}
+		if p.Rating == 0 {
+			p.Rating = nested.Rating
+		}
+		if p.ImageURL == "" {
+			p.ImageURL = nested.ImageURL
+		}
+	}
+	return nil
 }
 
 // GooglePriceRatesResponse represents the response from the Google price rates API

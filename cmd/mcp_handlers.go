@@ -108,6 +108,77 @@ func stringSliceArg(request mcp.CallToolRequest, key string) []any {
 	return result
 }
 
+func optionalFloatArg(request mcp.CallToolRequest, key string) *float64 {
+	args := request.GetArguments()
+	if _, ok := args[key]; !ok {
+		return nil
+	}
+	value := request.GetFloat(key, 0)
+	return &value
+}
+
+func optionalIntArg(request mcp.CallToolRequest, key string) *int {
+	args := request.GetArguments()
+	if _, ok := args[key]; !ok {
+		return nil
+	}
+	value := request.GetInt(key, 0)
+	return &value
+}
+
+func optionalStringArg(request mcp.CallToolRequest, key string) *string {
+	args := request.GetArguments()
+	if _, ok := args[key]; !ok {
+		return nil
+	}
+	value := request.GetString(key, "")
+	return &value
+}
+
+func optionalBoolArg(request mcp.CallToolRequest, key string) bool {
+	args := request.GetArguments()
+	if _, ok := args[key]; !ok {
+		return false
+	}
+	return request.GetBool(key, false)
+}
+
+func tripKeyArg(ctx context.Context, request mcp.CallToolRequest) (string, string) {
+	tripKey := request.GetString("trip_key", "")
+	if tripKey == "" {
+		tripKey = request.GetString("trip_id", "")
+	}
+	if tripKey == "" {
+		if defaultTripID, ok := tripIDFromContext(ctx); ok {
+			tripKey = defaultTripID
+		}
+	}
+	if tripKey == "" {
+		return "", "trip_key is required (either as parameter or default trip ID must be set)"
+	}
+	return tripKey, ""
+}
+
+func intCSVArg(value string) ([]int, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	parts := strings.Split(value, ",")
+	result := make([]int, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		id, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID %q", part)
+		}
+		result = append(result, id)
+	}
+	return result, nil
+}
+
 func handleListTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	format := request.GetString("format", "default")
 
@@ -978,6 +1049,24 @@ func getGooglePlaceForAirport(client *wanderlog.Client, airportName, iataCode, c
 	return googlePlace
 }
 
+func airportString(airport map[string]any, key string) string {
+	value, _ := airport[key].(string)
+	return value
+}
+
+func ensureAirportDisplayFields(airport map[string]any) {
+	if airport == nil {
+		return
+	}
+	iata := airportString(airport, "iata")
+	if airportString(airport, "name") == "" {
+		airport["name"] = iata
+	}
+	if airportString(airport, "cityName") == "" {
+		airport["cityName"] = airportString(airport, "name")
+	}
+}
+
 // validateBlockSchema ensures block structures are compatible with the web/mobile app.
 // Flight blocks must not set depart.type="airport" or arrive.type="airport" without
 // providing a fully populated airport sub-object (with googlePlace), otherwise the
@@ -1217,6 +1306,8 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 			arrivalTime = firstLeg.Arrive.Time
 		}
 	}
+	ensureAirportDisplayFields(departAirport)
+	ensureAirportDisplayFields(arriveAirport)
 
 	// Apply user-provided airport IATA overrides. These take precedence
 	// over whatever the flight stops API resolved, and also handle the
@@ -1227,6 +1318,7 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		} else {
 			departAirport["iata"] = userDepartAirport
 		}
+		ensureAirportDisplayFields(departAirport)
 	}
 	if userArriveAirport != "" {
 		if arriveAirport == nil {
@@ -1234,6 +1326,7 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		} else {
 			arriveAirport["iata"] = userArriveAirport
 		}
+		ensureAirportDisplayFields(arriveAirport)
 	}
 
 	block := map[string]any{
@@ -1269,14 +1362,14 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	if departAirport != nil {
 		block["depart"].(map[string]any)["airport"] = departAirport
 		// Try to fetch googlePlace data for the departure airport
-		if googlePlace := getGooglePlaceForAirport(client, departAirport["name"].(string), departAirport["iata"].(string), departAirport["cityName"].(string)); googlePlace != nil {
+		if googlePlace := getGooglePlaceForAirport(client, airportString(departAirport, "name"), airportString(departAirport, "iata"), airportString(departAirport, "cityName")); googlePlace != nil {
 			departAirport["googlePlace"] = googlePlace
 		}
 	}
 	if arriveAirport != nil {
 		block["arrive"].(map[string]any)["airport"] = arriveAirport
 		// Try to fetch googlePlace data for the arrival airport
-		if googlePlace := getGooglePlaceForAirport(client, arriveAirport["name"].(string), arriveAirport["iata"].(string), arriveAirport["cityName"].(string)); googlePlace != nil {
+		if googlePlace := getGooglePlaceForAirport(client, airportString(arriveAirport, "name"), airportString(arriveAirport, "iata"), airportString(arriveAirport, "cityName")); googlePlace != nil {
 			arriveAirport["googlePlace"] = googlePlace
 		}
 	}
@@ -1459,6 +1552,9 @@ func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	if placeID != "" && latitude == 0 && longitude == 0 {
 		return mcp.NewToolResultError("Coordinates (latitude/longitude) are required when adding lodging with a place_id/propertyPlaceId. The place details lookup returned no geometry."), nil
 	}
+	if placeID == "" && latitude == 0 && longitude == 0 {
+		return mcp.NewToolResultError("latitude and longitude are required when adding lodging by name only. Use propertyPlaceId/place_id so full place details can be fetched."), nil
+	}
 
 	// Build the lodging block using the same shape as the React Native app's
 	// makeHotelBlock constructor: hotel data is a lower-case field on a place block.
@@ -1592,18 +1688,8 @@ func handleSearchPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 
 	format := request.GetString("format", "default")
 
-	// Parse optional coordinates
-	var lat, lng *float64
-	if latStr := request.GetString("latitude", ""); latStr != "" {
-		if latNum, err := strconv.ParseFloat(latStr, 64); err == nil {
-			lat = &latNum
-		}
-	}
-	if lngStr := request.GetString("longitude", ""); lngStr != "" {
-		if lngNum, err := strconv.ParseFloat(lngStr, 64); err == nil {
-			lng = &lngNum
-		}
-	}
+	lat := optionalFloatArg(request, "latitude")
+	lng := optionalFloatArg(request, "longitude")
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
@@ -1752,17 +1838,8 @@ func handleSearchRestaurants(ctx context.Context, request mcp.CallToolRequest) (
 
 	format := request.GetString("format", "default")
 
-	var lat, lng *float64
-	if latStr := request.GetString("latitude", ""); latStr != "" {
-		if latNum, err := strconv.ParseFloat(latStr, 64); err == nil {
-			lat = &latNum
-		}
-	}
-	if lngStr := request.GetString("longitude", ""); lngStr != "" {
-		if lngNum, err := strconv.ParseFloat(lngStr, 64); err == nil {
-			lng = &lngNum
-		}
-	}
+	lat := optionalFloatArg(request, "latitude")
+	lng := optionalFloatArg(request, "longitude")
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
@@ -2291,6 +2368,9 @@ func handleLikeTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	if tripKey == "" {
 		return mcp.NewToolResultError("trip_key is required"), nil
 	}
+	if _, ok := request.GetArguments()["liked"]; !ok {
+		return mcp.NewToolResultError("liked is required"), nil
+	}
 
 	liked := request.GetBool("liked", false)
 
@@ -2511,6 +2591,233 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	return mcp.NewToolResultText(result), nil
 }
 
+func handleUpdatePlaceNotes(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	sectionID, err := request.RequireInt("section_id")
+	if err != nil {
+		return mcp.NewToolResultError("section_id is required"), nil //nolint:nilerr
+	}
+	placeID, err := request.RequireInt("place_id")
+	if err != nil {
+		return mcp.NewToolResultError("place_id is required"), nil //nolint:nilerr
+	}
+	notes, err := request.RequireString("notes")
+	if err != nil {
+		return mcp.NewToolResultError("notes is required"), nil //nolint:nilerr
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip %s: %v", tripKey, err)), nil
+	}
+	sectionIdx := wanderlog.FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+	if sectionIdx < 0 {
+		return mcp.NewToolResultError(fmt.Sprintf("section %d not found", sectionID)), nil
+	}
+	blockIdx := -1
+	var oldText any
+	for i, block := range trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks {
+		if block.ID == placeID {
+			blockIdx = i
+			oldText = block.Text
+			break
+		}
+	}
+	if blockIdx < 0 {
+		return mcp.NewToolResultError(fmt.Sprintf("place %d not found in section %d", placeID, sectionID)), nil
+	}
+
+	op := wanderlog.ReplaceInObject(
+		[]any{"itinerary", "sections", sectionIdx, "blocks", blockIdx, "text"},
+		oldText,
+		quillTextForString(notes),
+	)
+	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update notes for place %d in trip %s: %v", placeID, tripKey, err)), nil
+	}
+	updatedTrip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify notes update for place %d in trip %s: %v", placeID, tripKey, err)), nil
+	}
+	verified := false
+	for _, section := range updatedTrip.TripPlan.Itinerary.Sections {
+		if section.ID != sectionID {
+			continue
+		}
+		for _, block := range section.Blocks {
+			if block.ID == placeID && flexibleTextContains(block.Text, notes) {
+				verified = true
+				break
+			}
+		}
+	}
+	if !verified {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify notes update for place %d in trip %s", placeID, tripKey)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Successfully updated notes for place %d in section %d", placeID, sectionID)), nil
+}
+
+func handleSetTripBudget(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, msg := tripKeyArg(ctx, request)
+	if msg != "" {
+		return mcp.NewToolResultError(msg), nil
+	}
+	amount := optionalFloatArg(request, "amount")
+	if amount == nil {
+		return mcp.NewToolResultError("amount is required"), nil
+	}
+	currency, err := request.RequireString("currency")
+	if err != nil {
+		return mcp.NewToolResultError("currency is required"), nil //nolint:nilerr
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.SetTripBudget(tripKey, *amount, currency); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to set trip budget: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"success":  true,
+		"trip_key": tripKey,
+		"amount":   *amount,
+		"currency": strings.ToUpper(strings.TrimSpace(currency)),
+	}), nil
+}
+
+func handleAddTripExpense(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, msg := tripKeyArg(ctx, request)
+	if msg != "" {
+		return mcp.NewToolResultError(msg), nil
+	}
+	description, err := request.RequireString("description")
+	if err != nil {
+		return mcp.NewToolResultError("description is required"), nil //nolint:nilerr
+	}
+	amount := optionalFloatArg(request, "amount")
+	if amount == nil {
+		return mcp.NewToolResultError("amount is required"), nil
+	}
+	currency, err := request.RequireString("currency")
+	if err != nil {
+		return mcp.NewToolResultError("currency is required"), nil //nolint:nilerr
+	}
+	splitWith, err := intCSVArg(request.GetString("split_with_user_ids", ""))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	req := wanderlog.AddExpenseRequest{
+		Description:      description,
+		Category:         request.GetString("category", "other"),
+		Amount:           *amount,
+		CurrencyCode:     currency,
+		Date:             request.GetString("date", ""),
+		PaidByUserID:     request.GetInt("paid_by_user_id", 0),
+		SplitWithUserIDs: splitWith,
+		AssociatedDate:   request.GetString("associated_date", ""),
+	}
+	if blockID := optionalIntArg(request, "block_id"); blockID != nil {
+		req.BlockID = blockID
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	expense, err := client.AddTripExpense(tripKey, req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add trip expense: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"success":  true,
+		"trip_key": tripKey,
+		"expense":  expense,
+	}), nil
+}
+
+func handleUpdateTripExpense(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, msg := tripKeyArg(ctx, request)
+	if msg != "" {
+		return mcp.NewToolResultError(msg), nil
+	}
+	expenseID, err := request.RequireInt("expense_id")
+	if err != nil {
+		return mcp.NewToolResultError("expense_id is required"), nil //nolint:nilerr
+	}
+	splitWithValue, hasSplitWith := request.GetArguments()["split_with_user_ids"]
+	splitWith, err := intCSVArg(fmt.Sprint(splitWithValue))
+	if err != nil && hasSplitWith {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	req := wanderlog.UpdateExpenseRequest{
+		Description:         optionalStringArg(request, "description"),
+		Category:            optionalStringArg(request, "category"),
+		Amount:              optionalFloatArg(request, "amount"),
+		CurrencyCode:        optionalStringArg(request, "currency"),
+		Date:                optionalStringArg(request, "date"),
+		BlockID:             optionalIntArg(request, "block_id"),
+		ClearBlockID:        optionalBoolArg(request, "clear_block_id"),
+		PaidByUserID:        optionalIntArg(request, "paid_by_user_id"),
+		SplitWithUserIDs:    splitWith,
+		SetSplitWith:        hasSplitWith,
+		AssociatedDate:      optionalStringArg(request, "associated_date"),
+		ClearAssociatedDate: optionalBoolArg(request, "clear_associated_date"),
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	expense, err := client.UpdateTripExpense(tripKey, expenseID, req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update trip expense: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"success":  true,
+		"trip_key": tripKey,
+		"expense":  expense,
+	}), nil
+}
+
+func handleDeleteTripExpense(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, msg := tripKeyArg(ctx, request)
+	if msg != "" {
+		return mcp.NewToolResultError(msg), nil
+	}
+	expenseID, err := request.RequireInt("expense_id")
+	if err != nil {
+		return mcp.NewToolResultError("expense_id is required"), nil //nolint:nilerr
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.DeleteTripExpense(tripKey, expenseID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete trip expense: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"success":    true,
+		"trip_key":   tripKey,
+		"expense_id": expenseID,
+	}), nil
+}
+
 func handleGetFlightStops(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	flightNumber, err := request.RequireString("flight_number")
 	if err != nil {
@@ -2573,6 +2880,16 @@ func handleSearchHotels(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	results, err := client.SearchLodgings(location, checkIn, checkOut, guests)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Hotel search failed for %s (%s to %s, %d guests): %v", location, checkIn, checkOut, guests, err)), nil
+	}
+	hasUsableResult := false
+	for _, lodging := range results.Data {
+		if lodging.Name != "" {
+			hasUsableResult = true
+			break
+		}
+	}
+	if !hasUsableResult {
+		return mcp.NewToolResultError("Wanderlog lodging search is currently failing server-side: response contained no usable lodging names"), nil
 	}
 
 	return mcp.NewToolResultStructuredOnly(results), nil

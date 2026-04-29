@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
@@ -242,6 +243,23 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 			req.EndDate,
 		))
 	}
+	nextStartDate := trip.TripPlan.StartDate
+	if req.StartDate != "" {
+		nextStartDate = req.StartDate
+	}
+	nextEndDate := trip.TripPlan.EndDate
+	if req.EndDate != "" {
+		nextEndDate = req.EndDate
+	}
+	if nextStartDate != "" && nextEndDate != "" {
+		if days, err := tripDays(nextStartDate, nextEndDate); err == nil && days != trip.TripPlan.Days {
+			ops = append(ops, models.ReplaceInObject(
+				[]interface{}{"days"},
+				trip.TripPlan.Days,
+				days,
+			))
+		}
+	}
 
 	if req.Privacy != "" && req.Privacy != trip.TripPlan.Privacy {
 		ops = append(ops, models.ReplaceInObject(
@@ -273,6 +291,22 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 	c.logger.WithField("tripKey", tripKey).Info("Successfully updated trip")
 
 	return nil
+}
+
+func tripDays(startDate, endDate string) (int, error) {
+	start, err := time.Parse("2006-01-02", startDate)
+	if err != nil {
+		return 0, err
+	}
+	end, err := time.Parse("2006-01-02", endDate)
+	if err != nil {
+		return 0, err
+	}
+	days := int(end.Sub(start).Hours()/24) + 1
+	if days < 1 {
+		return 0, fmt.Errorf("end date must be on or after start date")
+	}
+	return days, nil
 }
 
 // ValidateAddPlaceRequest validates the AddPlaceRequest structure

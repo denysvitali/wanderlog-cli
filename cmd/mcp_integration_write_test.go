@@ -770,6 +770,10 @@ func TestMCPIntegration_ServerCreation(t *testing.T) {
 	t.Run("read_only_server", func(t *testing.T) {
 		server := createMCPServer(true)
 		require.NotNil(t, server)
+		tools := server.ListTools()
+		assert.NotContains(t, tools, "add_place")
+		assert.NotContains(t, tools, "like_trip")
+		assert.NotContains(t, tools, "send_trip_invites")
 	})
 
 	t.Run("read_write_server", func(t *testing.T) {
