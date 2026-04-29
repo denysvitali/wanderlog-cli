@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"sort"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -12,6 +13,70 @@ import (
 const (
 	testTripID = "jdysvggpzbjwpnej"
 )
+
+func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
+	tools := createMCPServer(false).ListTools()
+	covered := map[string]bool{
+		"add_flight":                true,
+		"add_lodging":               true,
+		"add_place":                 true,
+		"autocomplete_users":        true,
+		"browse_guides":             true,
+		"copy_trip":                 true,
+		"create_guide_from_trip":    true,
+		"create_trip":               true,
+		"delete_trip":               true,
+		"delete_trips":              true,
+		"get_feed_friends":          true,
+		"get_feed_home":             true,
+		"get_feed_recent":           true,
+		"get_flights":               true,
+		"get_flight_stops":          true,
+		"get_global_config":         true,
+		"get_like_count":            true,
+		"get_me":                    true,
+		"get_notifications":         true,
+		"get_notification_settings": true,
+		"get_place_details":         true,
+		"get_trip":                  true,
+		"get_trip_distinction":      true,
+		"get_trip_expenses_csv":     true,
+		"get_trip_history":          true,
+		"get_trip_sections":         true,
+		"get_user_emails":           true,
+		"get_user_profile":          true,
+		"get_view_only_journal":     true,
+		"is_username_taken":         true,
+		"like_trip":                 true,
+		"list_places":               true,
+		"list_sections":             true,
+		"list_trip_invites":         true,
+		"list_trips":                true,
+		"mark_notifications_read":   true,
+		"move_place":                true,
+		"register_trip_view":        true,
+		"remove_place":              true,
+		"reorder_places":            true,
+		"restore_trip":              true,
+		"search_geos":               true,
+		"search_hotels":             true,
+		"search_places":             true,
+		"search_places_wanderlog":   true,
+		"search_restaurants":        true,
+		"send_trip_invites":         true,
+		"set_user_kv":               true,
+		"update_trip":               true,
+	}
+
+	missing := make([]string, 0)
+	for name := range tools {
+		if !covered[name] {
+			missing = append(missing, name)
+		}
+	}
+	sort.Strings(missing)
+	assert.Empty(t, missing, "registered MCP tools need integration coverage entries")
+}
 
 // TestMCPIntegration_ListTrips tests the list_trips tool
 func TestMCPIntegration_ListTrips(t *testing.T) {
@@ -188,6 +253,63 @@ func TestMCPIntegration_ListSections(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.False(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_GetTripSections tests the get_trip_sections tool
+func TestMCPIntegration_GetTripSections(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication but credentials are not available: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("with_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_trip_sections",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleGetTripSections(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("with_default_trip_id", func(t *testing.T) {
+		ctxWithTrip := withTripID(ctx, testTripID)
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "get_trip_sections",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleGetTripSections(ctxWithTrip, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError)
+	})
+
+	t.Run("missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "get_trip_sections",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleGetTripSections(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
 	})
 }
 
@@ -1655,6 +1777,79 @@ func TestMCPIntegration_RestoreTrip(t *testing.T) {
 		}
 
 		result, err := handleRestoreTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_ExtendedWriteTools covers write-gated tools registered by registerExtendedTools.
+func TestMCPIntegration_ExtendedWriteTools(t *testing.T) {
+	skipIntegrationTest(t)
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+
+	t.Run("mark_notifications_read_missing_ids", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "mark_notifications_read",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleMarkNotificationsRead(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("set_user_kv", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "set_user_kv",
+				Arguments: map[string]interface{}{
+					"key":   "codex_mcp_integration_test",
+					"value": `{"source":"mcp_integration","version":1}`,
+				},
+			},
+		}
+
+		result, err := handleSetUserKV(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError, "set_user_kv should not error: %s", getTextContent(result))
+	})
+
+	t.Run("register_trip_view", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "register_trip_view",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleRegisterTripView(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError, "register_trip_view should not error: %s", getTextContent(result))
+	})
+
+	t.Run("create_guide_from_trip_missing_trip_key", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "create_guide_from_trip",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleCreateGuideFromTrip(ctx, request)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.True(t, result.IsError)

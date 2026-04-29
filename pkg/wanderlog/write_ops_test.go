@@ -325,6 +325,26 @@ func TestAddPlace(t *testing.T) {
 					if nestedPlace["place_id"] != tt.req.Place.PlaceID {
 						t.Fatalf("expected nested place_id %q, got %v", tt.req.Place.PlaceID, nestedPlace["place_id"])
 					}
+					if tt.req.Text != "" {
+						text, ok := payload.Places[0]["text"].(map[string]any)
+						if !ok {
+							t.Fatalf("expected text to be a Quill object, got %T in %s", payload.Places[0]["text"], string(body))
+						}
+						ops, ok := text["ops"].([]any)
+						if !ok || len(ops) != 1 {
+							t.Fatalf("expected text.ops with one insert, got %#v", text["ops"])
+						}
+						op, ok := ops[0].(map[string]any)
+						if !ok {
+							t.Fatalf("expected first text op object, got %T", ops[0])
+						}
+						if op["insert"] != tt.req.Text+"\n" {
+							t.Fatalf("expected Quill insert %q, got %v", tt.req.Text+"\n", op["insert"])
+						}
+						if payload.Places[0]["placeNotes"] != tt.req.Text {
+							t.Fatalf("expected placeNotes %q, got %v", tt.req.Text, payload.Places[0]["placeNotes"])
+						}
+					}
 				}
 
 				w.WriteHeader(tt.serverStatus)
