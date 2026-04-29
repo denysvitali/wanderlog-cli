@@ -1116,6 +1116,158 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	return mcp.NewToolResultText(fmt.Sprintf("✈️ Successfully added flight %s to trip %s (%s)", flightNumber, tripKey, sectionLabel)), nil
 }
 
+// Lodging section helpers
+
+func findLodgingSectionID(trip *wanderlog.TripResponse) int {
+	if trip == nil {
+		return 0
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.Type == "lodging" {
+			return section.ID
+		}
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if strings.EqualFold(section.Heading, "Lodging") || strings.EqualFold(section.Heading, "Hotels") || section.PlaceMarkerIcon == "bed" {
+			return section.ID
+		}
+	}
+	return 0
+}
+
+func createLodgingSection(client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
+	if trip == nil {
+		return 0, fmt.Errorf("trip response is nil")
+	}
+	sectionID := maxItineraryItemID(trip) + 1
+	section := map[string]any{
+		"id":               sectionID,
+		"heading":          "Lodging",
+		"displayHeading":   "",
+		"date":             nil,
+		"type":             "lodging",
+		"mode":             "placeList",
+		"placeMarkerColor": "#9b59b6",
+		"placeMarkerIcon":  "bed",
+		"text": map[string]any{
+			"ops": []any{map[string]any{"insert": "\n"}},
+		},
+		"blocks": []any{},
+	}
+	position := len(trip.TripPlan.Itinerary.Sections)
+	op := wanderlog.InsertInList([]interface{}{"itinerary", "sections"}, position, section)
+	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+		return 0, err
+	}
+	return sectionID, nil
+}
+
+func ensureLodgingSectionID(client *wanderlog.Client, tripKey string) (int, string, error) {
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return 0, "", fmt.Errorf("getting current trip: %w", err)
+	}
+	if sectionID := findLodgingSectionID(trip); sectionID > 0 {
+		return sectionID, fmt.Sprintf("Lodging section ID %d", sectionID), nil
+	}
+	sectionID, err := createLodgingSection(client, tripKey, trip)
+	if err != nil {
+		return 0, "", fmt.Errorf("creating Lodging section: %w", err)
+	}
+	return sectionID, fmt.Sprintf("Lodging section ID %d", sectionID), nil
+}
+
+func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	placeName := request.GetString("name", "")
+	if placeName == "" {
+		return mcp.NewToolResultError("name is required"), nil
+	}
+
+	placeID := request.GetString("place_id", "")
+	latitude := request.GetFloat("latitude", 0)
+	longitude := request.GetFloat("longitude", 0)
+	checkIn := request.GetString("check_in", "")
+	checkOut := request.GetString("check_out", "")
+	confirmationNumber := request.GetString("confirmation_number", "")
+	notes := request.GetString("notes", "")
+
+	// Validate dates
+	if checkIn != "" {
+		if _, err := validateDateArgument("check_in", checkIn, false); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+	}
+	if checkOut != "" {
+		if _, err := validateDateArgument("check_out", checkOut, false); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	sectionID, sectionLabel, err := ensureLodgingSectionID(client, tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve Lodging section for trip %s: %v", tripKey, err)), nil
+	}
+
+	// Auto-fetch coordinates if place_id is provided but lat/lng are not
+	if placeID != "" && (latitude == 0 && longitude == 0) {
+		details, err := client.GetPlaceDetails(placeID)
+		if err == nil && details.Success && details.Data.Details.Geometry.Location.Lat != 0 {
+			latitude = details.Data.Details.Geometry.Location.Lat
+			longitude = details.Data.Details.Geometry.Location.Lng
+		}
+	}
+
+	// Build the lodging block
+	block := map[string]any{
+		"type":    "lodging",
+		"Hotel": map[string]any{
+			"checkIn":    checkIn,
+			"checkOut":   checkOut,
+			"TravelerNames": []any{},
+		},
+		"Place": map[string]any{
+			"name": placeName,
+		},
+		"text": map[string]any{
+			"ops": []any{
+				map[string]any{"insert": notes + "\n"},
+			},
+		},
+	}
+
+	if placeID != "" {
+		block["Place"].(map[string]any)["place_id"] = placeID
+	}
+	if confirmationNumber != "" {
+		block["Hotel"].(map[string]any)["confirmationNumber"] = confirmationNumber
+	}
+	if latitude != 0 && longitude != 0 {
+		block["Place"].(map[string]any)["Geometry"] = map[string]any{
+			"location": map[string]any{
+				"lat": latitude,
+				"lng": longitude,
+			},
+		}
+	}
+
+	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add lodging %s to trip %s (%s): %v", placeName, tripKey, sectionLabel, err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("🏨 Successfully added lodging %s to trip %s (%s)", placeName, tripKey, sectionLabel)), nil
+}
+
 func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey := request.GetString("trip_key", "")
 	if tripKey == "" {
