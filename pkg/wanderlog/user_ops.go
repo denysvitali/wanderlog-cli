@@ -129,26 +129,30 @@ func (c *Client) GetNotifications(offset int) (*NotificationsResponse, error) {
 	if err := c.requireAuth("GetNotifications"); err != nil {
 		return nil, err
 	}
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	editors := []openapi.RequestEditorFn{}
+
+	c.logger.WithField("offset", offset).Debug("Getting notifications")
+
+	// Build URL with optional offset parameter
+	path := "/user/notifications"
 	if offset > 0 {
-		editors = append(editors, func(_ context.Context, req *http.Request) error {
-			values := req.URL.Query()
-			values.Set("offset", fmt.Sprintf("%d", offset))
-			req.URL.RawQuery = values.Encode()
-			return nil
-		})
+		path = fmt.Sprintf("/user/notifications?offset=%d", offset)
 	}
-	apiResp, err := api.GetNotificationsWithResponse(context.Background(), editors...)
+
+	statusCode, respBody, err := c.DoAPI("GET", path, nil, nil, true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetNotifications: %w", err)
 	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetNotifications: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
+	}
+
 	var result NotificationsResponse
-	if err := decodeOpenAPIBody("GetNotifications", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
-		return nil, err
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("GetNotifications: decoding response: %w", err)
+	}
+	if !result.Success {
+		return nil, fmt.Errorf("GetNotifications: API returned success=false")
 	}
 	return &result, nil
 }

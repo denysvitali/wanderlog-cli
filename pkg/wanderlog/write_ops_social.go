@@ -157,25 +157,32 @@ func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, erro
 		return nil, fmt.Errorf("authentication required for listing invites")
 	}
 
-	api, err := c.openAPI()
+	c.logger.WithField("tripKey", tripKey).Debug("Listing trip invites")
+
+	// Use DoAPI to avoid OpenAPI parsing issues
+	// DoAPI strips leading / and api/ prefix, so use "tripPlans/%s/invites"
+	statusCode, respBody, err := c.DoAPI("GET", fmt.Sprintf("tripPlans/%s/invites", tripKey), nil, nil, true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ListTripInvites: %w", err)
 	}
 
-	resp, err := api.ListTripPlanInvitesWithResponse(context.Background(), tripKey)
-	if err != nil {
-		return nil, fmt.Errorf("making request: %w", err)
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("ListTripInvites: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("ListTripInvites: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	// Parse response - API returns {success, data: [...]}
+	var resp struct {
+		Success bool                     `json:"success"`
+		Data    []map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("ListTripInvites: decoding response: %w", err)
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("ListTripInvites: API returned success=false")
 	}
 
-	if resp.JSON200 == nil || resp.JSON200.Data == nil {
-		return nil, fmt.Errorf("ListTripInvites: unexpected response format")
-	}
-
-	return *resp.JSON200.Data, nil
+	return resp.Data, nil
 }
 
 // SetLike likes or unlikes a trip plan
@@ -184,23 +191,25 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 		return fmt.Errorf("authentication required for liking trips")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey": tripKey,
 		"liked":   liked,
 	}).Debug("Setting like status for trip")
 
-	resp, err := api.SetLikeWithResponse(context.Background(), tripKey, openapi.SetLikeJSONRequestBody{Liked: &liked})
+	// Use DoAPI to avoid OpenAPI parsing issues - the API returns data as boolean, not map
+	body, err := json.Marshal(map[string]bool{"liked": liked})
 	if err != nil {
-		return fmt.Errorf("making request: %w", err)
+		return fmt.Errorf("marshaling request: %w", err)
 	}
 
-	if err := decodeOpenAPIBody("SetLike", resp.StatusCode(), resp.Body, nil); err != nil {
-		return err
+	// DoAPI strips leading / and api/ prefix, so use "tripPlans/%s/like"
+	statusCode, respBody, err := c.DoAPI("POST", fmt.Sprintf("tripPlans/%s/like", tripKey), body, nil, true)
+	if err != nil {
+		return fmt.Errorf("SetLike: %w", err)
+	}
+
+	if statusCode < 200 || statusCode >= 300 {
+		return fmt.Errorf("SetLike: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
 	}
 
 	c.logger.WithField("tripKey", tripKey).Info("Successfully set like status")
@@ -209,37 +218,18 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 
 // GetLikeCount gets whether we've liked a trip plan and the total number of likes
 func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
-	api, err := c.openAPI()
+	c.logger.WithField("tripKey", tripKey).Debug("Getting like count for trip")
+
+	// The /tripPlans/{key}/likeCount endpoint appears to not exist (returns HTML SPA page)
+	// Instead, get the like count from the trip data itself
+	trip, err := c.GetTrip(tripKey)
 	if err != nil {
-		return nil, err
-	}
-
-	resp, err := api.GetLikeCountWithResponse(context.Background(), tripKey)
-	if err != nil {
-		return nil, fmt.Errorf("making request: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("GetLikeCount: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
-	}
-
-	var bulkResp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			Like      bool `json:"like"`
-			LikeCount int  `json:"likeCount"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(resp.Body, &bulkResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-	if !bulkResp.Success {
-		return nil, fmt.Errorf("failed to get like count")
+		return nil, fmt.Errorf("GetLikeCount: getting trip: %w", err)
 	}
 
 	return &LikeCount{
-		Count:     bulkResp.Data.LikeCount,
-		UserLiked: bulkResp.Data.Like,
+		Count:     trip.TripPlan.LikeCount,
+		UserLiked: false, // UserLiked requires the /likeCount endpoint which doesn't exist
 	}, nil
 }
 
