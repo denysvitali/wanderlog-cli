@@ -1,13 +1,11 @@
 package wanderlog
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
+	"net/url"
 )
 
 // RemovePlace removes a place from a trip section
@@ -16,33 +14,28 @@ func (c *Client) RemovePlace(tripKey string, sectionID, placeID int) error {
 		return fmt.Errorf("authentication required for removing places")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":   tripKey,
 		"sectionID": sectionID,
 		"placeID":   placeID,
 	}).Debug("Removing place from trip")
 
-	body := openapi.RemovePlacesRequest{PlaceIds: []int{placeID}}
+	body := map[string]any{"placeIds": []int{placeID}}
 	var statusCode int
 	var respBody []byte
 	if sectionID > 0 {
-		resp, err := api.RemovePlacesFromTripPlanWithResponse(context.Background(), tripKey, sectionID, body)
+		resp, err := c.apiJSON(context.Background(), http.MethodDelete, fmt.Sprintf("tripPlans/%s/sections/%d/places", url.PathEscape(tripKey), sectionID), nil, body, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
-		statusCode = resp.StatusCode()
+		statusCode = resp.StatusCode
 		respBody = resp.Body
 	} else {
-		resp, err := api.RemovePlacesFromTripPlanWithoutSectionWithResponse(context.Background(), tripKey, body)
+		resp, err := c.apiJSON(context.Background(), http.MethodDelete, "tripPlans/"+url.PathEscape(tripKey)+"/sections/places", nil, body, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
-		statusCode = resp.StatusCode()
+		statusCode = resp.StatusCode
 		respBody = resp.Body
 	}
 
@@ -69,17 +62,12 @@ func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
 	if err != nil {
 		return fmt.Errorf("marshaling operations request: %w", err)
 	}
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":    tripKey,
 		"operations": len(ops),
 	}).Debug("Applying operations to trip")
 
-	resp, err := api.ApplyOpsToTripPlanWithBodyWithResponse(context.Background(), tripKey, "application/json", bytes.NewReader(reqBody))
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/applyOps", nil, reqBody, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
@@ -87,12 +75,12 @@ func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey":      tripKey,
 		"operations":   len(ops),
-		"statusCode":   resp.StatusCode(),
+		"statusCode":   resp.StatusCode,
 		"responseBody": string(resp.Body),
 	}).Debug("ApplyOperations API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("ApplyOperations: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ApplyOperations: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	// Try to parse the response to check for API-level errors

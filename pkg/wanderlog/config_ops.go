@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
@@ -17,16 +19,12 @@ type (
 
 // GetGlobalConfig fetches the server's global client configuration.
 func (c *Client) GetGlobalConfig() (*GlobalConfig, error) {
-	api, err := c.openAPI()
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "config/globalConfig", nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := api.GetGlobalConfigWithResponse(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode() < 200 || resp.StatusCode() >= 300 {
-		return nil, fmt.Errorf("GetGlobalConfig: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("GetGlobalConfig: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 	var cfg GlobalConfig
 	if err := json.Unmarshal(resp.Body, &cfg); err != nil {
@@ -38,16 +36,12 @@ func (c *Client) GetGlobalConfig() (*GlobalConfig, error) {
 
 // GetSessionStore returns the authenticated session's key-value store.
 func (c *Client) GetSessionStore() (*SessionStore, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	apiResp, err := api.GetSessionStoreWithResponse(context.Background())
+	apiResp, err := c.apiRequest(context.Background(), http.MethodGet, "sessionStore", nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
 	var result SessionStore
-	if err := decodeOpenAPIBody("GetSessionStore", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetSessionStore", apiResp.StatusCode, apiResp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -59,33 +53,21 @@ func (c *Client) SetSessionStoreValue(key string, value any) error {
 		return err
 	}
 	body := SessionStoreRequest{Key: key, Value: value}
-	editor, err := jsonBodyEditor(body)
-	if err != nil {
-		return fmt.Errorf("SetSessionStoreValue: marshaling request: %w", err)
-	}
-	api, err := c.openAPI()
+	resp, err := c.apiJSON(context.Background(), http.MethodPost, "sessionStore", nil, body, true)
 	if err != nil {
 		return err
 	}
-	resp, err := api.SetSessionStoreValueWithResponse(context.Background(), editor)
-	if err != nil {
-		return err
-	}
-	return decodeOpenAPIBody("SetSessionStoreValue", resp.StatusCode(), resp.Body, nil)
+	return decodeAPIBody("SetSessionStoreValue", resp.StatusCode, resp.Body, nil)
 }
 
 // GetSessionPreferences returns the locale-scoped session preferences.
 func (c *Client) GetSessionPreferences(locale string) (*SessionPreferences, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	apiResp, err := api.GetSessionPreferencesWithResponse(context.Background(), locale)
+	apiResp, err := c.apiRequest(context.Background(), http.MethodGet, "sessionStore/preferences/"+url.PathEscape(locale), nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
 	var result SessionPreferences
-	if err := decodeOpenAPIBody("GetSessionPreferences", apiResp.StatusCode(), apiResp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetSessionPreferences", apiResp.StatusCode, apiResp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

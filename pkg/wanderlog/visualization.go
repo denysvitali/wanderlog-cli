@@ -3,6 +3,8 @@ package wanderlog
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 )
 
 // UserTripsResponse represents the response from getting user's trips
@@ -93,20 +95,15 @@ type TripStatsResponse struct {
 
 // GetUserTrips retrieves all trips for the authenticated user
 func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.Debug("Fetching user trips")
 
-	resp, err := api.ListUserTripPlansWithResponse(context.Background())
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans", nil, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	var result UserTripsResponse
-	if err := decodeOpenAPIBody("GetUserTrips", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetUserTrips", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 
@@ -117,20 +114,15 @@ func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
 
 // GetTripImages retrieves images for a trip
 func (c *Client) GetTripImages(tripKey string) (*TripImagesResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Fetching trip images")
 
-	resp, err := api.GetTripPlanImagesWithResponse(context.Background(), tripKey)
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(tripKey)+"/images", nil, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	var result TripImagesResponse
-	if err := decodeOpenAPIBody("GetTripImages", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetTripImages", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 
@@ -144,20 +136,15 @@ func (c *Client) GetTripImages(tripKey string) (*TripImagesResponse, error) {
 
 // GetTripPlaces retrieves places for a trip with additional details
 func (c *Client) GetTripPlaces(tripKey string) (*TripResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Fetching trip places")
 
-	resp, err := api.GetTripPlanPlacesWithResponse(context.Background(), tripKey)
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(tripKey)+"/places", nil, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	var result TripResponse
-	if err := decodeOpenAPIBody("GetTripPlaces", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetTripPlaces", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 

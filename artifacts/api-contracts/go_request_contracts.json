@@ -1,0 +1,128 @@
+[
+  {
+    "name": "Login",
+    "method": "POST",
+    "path": "/api/user/login",
+    "referencePath": "/api/user/login",
+    "auth": false,
+    "body": {
+      "email": "user@example.com",
+      "password": "secret"
+    }
+  },
+  {
+    "name": "GetTrip",
+    "method": "GET",
+    "path": "/api/tripPlans/trip-key",
+    "referencePath": "/api/tripPlans",
+    "auth": false,
+    "query": {
+      "clientSchemaVersion": "2"
+    }
+  },
+  {
+    "name": "GetTripSections",
+    "method": "GET",
+    "path": "/api/tripPlans/trip-key/sections",
+    "referencePath": "/api/tripPlans",
+    "auth": false
+  },
+  {
+    "name": "GetPlaceDetails",
+    "method": "GET",
+    "path": "/api/placesAPI/getPlaceDetailsAndCardData",
+    "referencePath": "/api/placesAPI/getPlaceDetailsAndCardData",
+    "auth": false,
+    "query": {
+      "language": "en",
+      "placeId": "place-123"
+    }
+  },
+  {
+    "name": "GetFlightStops",
+    "method": "GET",
+    "path": "/api/flights/flightStops",
+    "referencePath": "/api/flights/flightStops",
+    "auth": false,
+    "query": {
+      "airlineIata": "MU",
+      "departDate": "2026-05-11",
+      "flightNumber": "244"
+    }
+  },
+  {
+    "name": "CreateTrip",
+    "method": "POST",
+    "path": "/api/tripPlans",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "endDate": "2026-06-04",
+      "geoIds": [
+        123
+      ],
+      "initialEmailId": null,
+      "initialMapsPlaceIds": [],
+      "isMapEmbed": false,
+      "privacy": "private",
+      "startDate": "2026-06-01",
+      "title": "API Contract Trip",
+      "type": "plan"
+    }
+  },
+  {
+    "name": "AddPlace",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/sections/7/places",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "addDuplicates": false,
+      "places": [
+        {
+          "name": "Tokyo Station",
+          "place": {
+            "geometry": null,
+            "name": "Tokyo Station",
+            "placeId": "place-123",
+            "place_id": "place-123"
+          },
+          "placeId": "place-123",
+          "place_id": "place-123"
+        }
+      ]
+    }
+  },
+  {
+    "name": "RemovePlace",
+    "method": "DELETE",
+    "path": "/api/tripPlans/trip-key/sections/7/places",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "placeIds": [
+        123
+      ]
+    }
+  },
+  {
+    "name": "ApplyOperations",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/applyOps",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "ops": []
+    }
+  },
+  {
+    "name": "SetLike",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/like",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "liked": true
+    }
+  }
+]

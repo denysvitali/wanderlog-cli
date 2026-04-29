@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/sirupsen/logrus"
-
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
 )
 
 const (
@@ -46,31 +44,6 @@ func (c *Client) SetLogger(logger *logrus.Logger) {
 	c.logger = logger
 }
 
-func (c *Client) openAPI() (*openapi.ClientWithResponses, error) {
-	return openapi.NewClientWithResponses(
-		BaseURL,
-		openapi.WithHTTPClient(c.httpClient),
-		openapi.WithRequestEditorFn(c.openAPIRequestEditor),
-	)
-}
-
-func decodeOpenAPIBody(opName string, statusCode int, body []byte, out any) error {
-	if statusCode < 200 || statusCode >= 300 {
-		bodyText := string(body)
-		if msg, ok := knownWanderlogServerError(opName, bodyText); ok {
-			return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, msg)
-		}
-		return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, truncateForLog(bodyText, 500))
-	}
-	if out == nil || len(body) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(body, out); err != nil {
-		return fmt.Errorf("%s: decoding response: %w", opName, err)
-	}
-	return nil
-}
-
 func knownWanderlogServerError(opName, body string) (string, bool) {
 	if opName == "SearchLodgings" && strings.Contains(body, "Cannot read properties of undefined (reading 'length')") {
 		return "Wanderlog lodging search is currently failing server-side before returning hotel results", true
@@ -79,14 +52,6 @@ func knownWanderlogServerError(opName, body string) (string, bool) {
 		return "Wanderlog add-place is currently failing server-side while processing the place_id payload", true
 	}
 	return "", false
-}
-
-func parseOpenAPIDate(value, fieldName string) (openapi_types.Date, error) {
-	parsed, err := time.Parse(openapi_types.DateFormat, value)
-	if err != nil {
-		return openapi_types.Date{}, fmt.Errorf("parsing %s date: %w", fieldName, err)
-	}
-	return openapi_types.Date{Time: parsed}, nil
 }
 
 func truncateForLog(s string, max int) string {
@@ -154,19 +119,13 @@ func (c *Client) DoAPI(method, path string, body []byte, headers map[string]stri
 }
 
 func (c *Client) GetTrip(key string) (*TripResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	version := openapi.ClientSchemaVersion(2)
-
 	c.logger.WithFields(logrus.Fields{
 		"tripKey": key,
 	}).Debug("GetTrip request details")
 
-	resp, err := api.GetTripPlanWithResponse(context.Background(), key, &openapi.GetTripPlanParams{
-		ClientSchemaVersion: &version,
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(key), apiQuery(map[string]string{
+		"clientSchemaVersion": ClientVersion,
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -178,12 +137,12 @@ func (c *Client) GetTrip(key string) (*TripResponse, error) {
 
 	c.logger.WithFields(logrus.Fields{
 		"tripKey":      key,
-		"statusCode":   resp.StatusCode(),
+		"statusCode":   resp.StatusCode,
 		"responseBody": debugBody,
 	}).Debug("GetTrip API response")
 
 	var trip TripResponse
-	if err := decodeOpenAPIBody("GetTrip", resp.StatusCode(), resp.Body, &trip); err != nil {
+	if err := decodeAPIBody("GetTrip", resp.StatusCode, resp.Body, &trip); err != nil {
 		return nil, err
 	}
 
@@ -197,21 +156,15 @@ func (c *Client) GetTrip(key string) (*TripResponse, error) {
 // GetTripRaw retrieves a trip as raw JSON-compatible maps. This is useful for
 // JSON0 operations where old values must match the server document exactly.
 func (c *Client) GetTripRaw(key string) (map[string]any, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	version := openapi.ClientSchemaVersion(2)
-
-	resp, err := api.GetTripPlanWithResponse(context.Background(), key, &openapi.GetTripPlanParams{
-		ClientSchemaVersion: &version,
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(key), apiQuery(map[string]string{
+		"clientSchemaVersion": ClientVersion,
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
 
 	var trip map[string]any
-	if err := decodeOpenAPIBody("GetTrip", resp.StatusCode(), resp.Body, &trip); err != nil {
+	if err := decodeAPIBody("GetTrip", resp.StatusCode, resp.Body, &trip); err != nil {
 		return nil, err
 	}
 	if msg, ok := trip["error"].(string); ok && msg != "" {
@@ -222,28 +175,23 @@ func (c *Client) GetTripRaw(key string) (map[string]any, error) {
 
 // GetTripSections retrieves only the sections of a trip without the full trip data
 func (c *Client) GetTripSections(key string) ([]ItSections, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithFields(logrus.Fields{
 		"tripKey": key,
 	}).Debug("GetTripSections request details")
 
-	resp, err := api.GetTripPlanSectionsWithResponse(context.Background(), key, nil)
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(key)+"/sections", nil, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	c.logger.WithFields(logrus.Fields{
 		"tripKey":    key,
-		"statusCode": resp.StatusCode(),
+		"statusCode": resp.StatusCode,
 		"bodySize":   len(resp.Body),
 	}).Debug("GetTripSections API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("GetTripSections: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetTripSections: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var response struct {
@@ -488,21 +436,16 @@ type WanderlogAutocompleteResponse struct {
 
 // GetPlaceDetails fetches detailed information about a place from Wanderlog's place details API
 func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	language := "en"
-	resp, err := api.GetPlaceDetailsAndCardDataWithResponse(context.Background(), &openapi.GetPlaceDetailsAndCardDataParams{
-		PlaceId:  placeID,
-		Language: &language,
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "placesAPI/getPlaceDetailsAndCardData", apiQuery(map[string]string{
+		"placeId":  placeID,
+		"language": "en",
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
 
 	var result PlaceDetailsResponse
-	if err := decodeOpenAPIBody("GetPlaceDetails", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetPlaceDetails", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 
@@ -515,16 +458,12 @@ func (c *Client) GetPlaceDetails(placeID string) (*PlaceDetailsResponse, error) 
 
 // GetAllAirlines retrieves all available airlines
 func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	resp, err := api.GetAllAirlinesInternalWithResponse(context.Background())
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "flights/allAirlines", nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
 	var result AirlinesResponse
-	if err := decodeOpenAPIBody("GetAllAirlines", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetAllAirlines", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -532,16 +471,12 @@ func (c *Client) GetAllAirlines() (*AirlinesResponse, error) {
 
 // AutocompleteAirport searches for airports by query (path-based)
 func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	resp, err := api.AutocompleteAirportWithResponse(context.Background(), query)
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "flights/autocompleteAirport/"+url.PathEscape(query), nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
 	var result AirportAutocompleteResponse
-	if err := decodeOpenAPIBody("AutocompleteAirport", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("AutocompleteAirport", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -549,22 +484,15 @@ func (c *Client) AutocompleteAirport(query string) (*AirportAutocompleteResponse
 
 // AutocompleteAirportWithLocation searches for airports by query with location bias (query is path-based)
 func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64) (*AirportAutocompleteResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	resp, err := api.AutocompleteAirportWithLocationWithResponse(context.Background(), query, func(_ context.Context, req *http.Request) error {
-		values := req.URL.Query()
-		values.Set("latitude", fmt.Sprintf("%f", lat))
-		values.Set("longitude", fmt.Sprintf("%f", lng))
-		req.URL.RawQuery = values.Encode()
-		return nil
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "flights/autocompleteAirportWithLocation/"+url.PathEscape(query), apiQuery(map[string]string{
+		"latitude":  fmt.Sprintf("%f", lat),
+		"longitude": fmt.Sprintf("%f", lng),
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
 	var result AirportAutocompleteResponse
-	if err := decodeOpenAPIBody("AutocompleteAirportWithLocation", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("AutocompleteAirportWithLocation", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -573,33 +501,25 @@ func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64)
 // GetFlightStops retrieves flight stops for a given flight.
 // The API requires flightNumber (integer string), airline IATA code (airlineIata), and departure date (departDate).
 func (c *Client) GetFlightStops(flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	date, err := parseOpenAPIDate(departureDate, "departure")
+	date, err := parseAPIDate(departureDate, "departure")
 	if err != nil {
 		return nil, fmt.Errorf("get flight stops: parsing departure date: %w", err)
 	}
-	httpResp, err := api.GetFlightStops(context.Background(), &openapi.GetFlightStopsParams{
-		FlightNumber: flightNumber,
-		AirlineIata:  airlineIata,
-		DepartDate:   date,
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "flights/flightStops", apiQuery(map[string]string{
+		"flightNumber": flightNumber,
+		"airlineIata":  airlineIata,
+		"departDate":   date.Format(apiDateFormat),
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
-	defer httpResp.Body.Close()
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("get flight stops: reading response: %w", err)
-	}
+	body := resp.Body
 	if len(body) > 0 && body[0] == '<' {
 		return nil, fmt.Errorf("API returned HTML instead of JSON (endpoint may be unavailable)")
 	}
 
 	var result FlightStopsResponse
-	if err := decodeOpenAPIBody("GetFlightStops", httpResp.StatusCode, body, &result); err != nil {
+	if err := decodeAPIBody("GetFlightStops", resp.StatusCode, body, &result); err != nil {
 		return nil, err
 	}
 
@@ -639,19 +559,15 @@ func (c *Client) SearchPlacesWithWanderlog(query string, lat, lng float64) (*Wan
 		return nil, err
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	resp, err := api.AutocompletePlacesAndSuggestionsWithResponse(context.Background(), &openapi.AutocompletePlacesAndSuggestionsParams{
-		Request: string(reqJSON),
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "placesAPI/autocomplete/v2", apiQuery(map[string]string{
+		"request": string(reqJSON),
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
 
 	var result WanderlogAutocompleteResponse
-	if err := decodeOpenAPIBody("SearchPlacesWithWanderlog", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("SearchPlacesWithWanderlog", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 
@@ -665,15 +581,11 @@ func (c *Client) SearchPlacesWithWanderlog(query string, lat, lng float64) (*Wan
 // SearchLodgings searches for hotels/lodgings for given dates and guest count.
 // The request body matches the React Native app: bounds, dates, and nested guests.
 func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*LodgingSearchResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	startDate, err := parseOpenAPIDate(checkIn, "check-in")
+	startDate, err := parseAPIDate(checkIn, "check-in")
 	if err != nil {
 		return nil, fmt.Errorf("search lodgings: %w", err)
 	}
-	endDate, err := parseOpenAPIDate(checkOut, "check-out")
+	endDate, err := parseAPIDate(checkOut, "check-out")
 	if err != nil {
 		return nil, fmt.Errorf("search lodgings: %w", err)
 	}
@@ -688,8 +600,8 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 	reqBody, err := json.Marshal(map[string]any{
 		"bounds": bounds,
 		"dates": map[string]string{
-			"startDate": startDate.Format(openapi_types.DateFormat),
-			"endDate":   endDate.Format(openapi_types.DateFormat),
+			"startDate": startDate.Format(apiDateFormat),
+			"endDate":   endDate.Format(apiDateFormat),
 		},
 		"guests": map[string]any{
 			"adultCount":   guests,
@@ -714,18 +626,14 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 		return nil, fmt.Errorf("search lodgings: marshaling request: %w", err)
 	}
 
-	httpResp, err := api.SearchLodgingsWithBody(context.Background(), "application/json", bytes.NewReader(reqBody))
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "lodging/searchLodgings", nil, reqBody, false)
 	if err != nil {
 		return nil, err
 	}
-	defer httpResp.Body.Close()
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("search lodgings: reading response: %w", err)
-	}
+	body := resp.Body
 
 	var result LodgingSearchResponse
-	if err := decodeOpenAPIBody("SearchLodgings", httpResp.StatusCode, body, &result); err != nil {
+	if err := decodeAPIBody("SearchLodgings", resp.StatusCode, body, &result); err != nil {
 		return nil, err
 	}
 
@@ -808,20 +716,16 @@ func (c *Client) lookupPlaceBounds(query string) ([]float64, error) {
 
 // GetGooglePriceRates retrieves Google price rates for a specific lodging property
 func (c *Client) GetGooglePriceRates(propertyID string) (*GooglePriceRatesResponse, error) {
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-	resp, err := api.GetGooglePriceRatesWithResponse(context.Background(), &openapi.GetGooglePriceRatesParams{
-		Id:     propertyID,
-		Dates:  "{}",
-		Guests: "{}",
-	})
+	resp, err := c.apiRequest(context.Background(), http.MethodGet, "lodging/getGooglePriceRates", apiQuery(map[string]string{
+		"id":     propertyID,
+		"dates":  "{}",
+		"guests": "{}",
+	}), nil, false)
 	if err != nil {
 		return nil, err
 	}
 	var result GooglePriceRatesResponse
-	if err := decodeOpenAPIBody("GetGooglePriceRates", resp.StatusCode(), resp.Body, &result); err != nil {
+	if err := decodeAPIBody("GetGooglePriceRates", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
 

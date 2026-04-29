@@ -1,15 +1,14 @@
 package wanderlog
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
-	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/openapi"
 )
 
 // Type aliases for backward compatibility
@@ -66,29 +65,24 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 	if err != nil {
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.WithFields(map[string]interface{}{
 		"title":  req.Title,
 		"geoIDs": req.GeoIDs,
 		"type":   req.Type,
 	}).Debug("Creating trip")
 
-	resp, err := api.CreateTripPlanWithBodyWithResponse(context.Background(), "application/json", bytes.NewReader(jsonData))
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans", nil, jsonData, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"status": resp.StatusCode(),
+		"status": resp.StatusCode,
 		"body":   string(resp.Body),
 	}).Debug("CreateTrip API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("CreateTrip: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("CreateTrip: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	var createResp struct {
@@ -128,25 +122,20 @@ func (c *Client) CreateExampleTrip() (*CreateTripResponse, error) {
 		return nil, fmt.Errorf("authentication required for creating trips")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	c.logger.Debug("Creating example trip")
 
-	resp, err := api.CreateExampleTripPlanWithResponse(context.Background())
+	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/createExampleTripPlan", nil, nil, true)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"status": resp.StatusCode(),
+		"status": resp.StatusCode,
 		"body":   string(resp.Body),
 	}).Debug("CreateExampleTrip API response")
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("CreateExampleTrip: HTTP %d: %s", resp.StatusCode(), truncateForLog(string(resp.Body), 500))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("CreateExampleTrip: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
 
 	// The createExampleTripPlan response uses "data" with viewKey (like CopyTripResponse)
@@ -185,19 +174,14 @@ func (c *Client) DeleteTrip(tripKey string) error {
 		return fmt.Errorf("authentication required for deleting trips")
 	}
 
-	api, err := c.openAPI()
-	if err != nil {
-		return err
-	}
-
 	c.logger.WithField("tripKey", tripKey).Debug("Deleting trip")
 
-	resp, err := api.DeleteTripPlanWithResponse(context.Background(), tripKey)
+	resp, err := c.apiRequest(context.Background(), http.MethodDelete, "tripPlans/"+url.PathEscape(tripKey), nil, nil, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeOpenAPIBody("DeleteTrip", resp.StatusCode(), resp.Body, nil); err != nil {
+	if err := decodeAPIBody("DeleteTrip", resp.StatusCode, resp.Body, nil); err != nil {
 		return err
 	}
 
@@ -389,16 +373,12 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	}
 
 	addDuplicates := false
-	reqBody, err := json.Marshal(openapi.AddPlacesRequest{
-		Places:        []map[string]any{place},
-		AddDuplicates: &addDuplicates,
+	reqBody, err := json.Marshal(map[string]any{
+		"places":        []map[string]any{place},
+		"addDuplicates": addDuplicates,
 	})
 	if err != nil {
 		return fmt.Errorf("marshaling add place request: %w", err)
-	}
-	api, err := c.openAPI()
-	if err != nil {
-		return err
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -416,18 +396,18 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	var statusCode int
 	var respBody []byte
 	if sectionID > 0 {
-		resp, err := api.AddPlacesToTripPlanWithBodyWithResponse(context.Background(), tripKey, sectionID, "application/json", bytes.NewReader(reqBody))
+		resp, err := c.apiRequest(context.Background(), http.MethodPost, fmt.Sprintf("tripPlans/%s/sections/%d/places", url.PathEscape(tripKey), sectionID), nil, reqBody, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
-		statusCode = resp.StatusCode()
+		statusCode = resp.StatusCode
 		respBody = resp.Body
 	} else {
-		resp, err := api.AddPlacesToTripPlanWithoutSectionWithBodyWithResponse(context.Background(), tripKey, "application/json", bytes.NewReader(reqBody))
+		resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/sections/places", nil, reqBody, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
-		statusCode = resp.StatusCode()
+		statusCode = resp.StatusCode
 		respBody = resp.Body
 	}
 
