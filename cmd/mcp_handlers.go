@@ -1230,10 +1230,10 @@ func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 
 	// Build the lodging block
 	block := map[string]any{
-		"type":    "lodging",
+		"type": "lodging",
 		"Hotel": map[string]any{
-			"checkIn":    checkIn,
-			"checkOut":   checkOut,
+			"checkIn":       checkIn,
+			"checkOut":      checkOut,
 			"TravelerNames": []any{},
 		},
 		"Place": map[string]any{
