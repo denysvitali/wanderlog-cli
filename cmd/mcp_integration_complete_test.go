@@ -520,12 +520,26 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 
 		// Find and verify places in itinerary
 		hasPlaces := false
+		hasLodging := false
+		hasHotelsSection := false
 		for _, section := range trip.TripPlan.Itinerary.Sections {
+			if section.Type == "hotels" {
+				hasHotelsSection = true
+			}
 			if len(section.Blocks) > 0 {
 				for _, block := range section.Blocks {
 					if block.Place != nil {
 						hasPlaces = true
 						t.Logf("  Place in section %d (%s): %s", section.ID, section.Type, block.Place.Name)
+					}
+					if block.Hotel != nil {
+						hasLodging = true
+						assert.Equal(t, "place", block.Type, "Lodging must use the app's place block type")
+						lodgingName := "<missing place>"
+						if block.Place != nil {
+							lodgingName = block.Place.Name
+						}
+						t.Logf("  Lodging in section %d (%s): %s (%s to %s)", section.ID, section.Type, lodgingName, block.Hotel.CheckIn, block.Hotel.CheckOut)
 					}
 					if block.FlightInfo != nil {
 						t.Logf("  Flight in section %d: %s%d", section.ID, block.FlightInfo.Airline.Iata, block.FlightInfo.Number)
@@ -534,6 +548,8 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			}
 		}
 		assert.True(t, hasPlaces, "Trip should have places in itinerary sections")
+		assert.True(t, hasHotelsSection, "Trip should have a Hotels and lodging section")
+		assert.True(t, hasLodging, "Trip should have a lodging block")
 	})
 
 	// 16. CLEANUP - Delete the trip

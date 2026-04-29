@@ -318,7 +318,8 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 		place["geometry"] = req.Place.Geometry
 	}
 	if req.Text != "" {
-		place["text"] = req.Text
+		place["text"] = quillTextForString(req.Text)
+		place["placeNotes"] = req.Text
 	}
 	// The native add-places endpoint expects autocomplete/detail-shaped rows.
 	// Keep the legacy flat fields, but also include the nested shape used by
@@ -415,4 +416,14 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	}).Info("Successfully added place to trip")
 
 	return nil
+}
+
+func quillTextForString(text string) map[string]any {
+	if text == "" {
+		return map[string]any{"ops": []any{map[string]any{"insert": "\n"}}}
+	}
+	if text[len(text)-1] != '\n' {
+		text += "\n"
+	}
+	return map[string]any{"ops": []any{map[string]any{"insert": text}}}
 }
