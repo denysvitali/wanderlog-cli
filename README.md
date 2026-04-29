@@ -169,6 +169,12 @@ wanderlog journal <journal-key>
 # Download expenses for a trip
 wanderlog expenses <trip-key> > expenses.csv
 
+# Set a budget and add ticket/expense costs
+wanderlog trips budget set <trip-key> --amount 2500 --currency USD
+wanderlog trips expenses add <trip-key> --description "Museum tickets" --amount 80 --currency USD --category activities
+wanderlog trips expenses update <trip-key> <expense-id> --amount 95
+wanderlog trips expenses delete <trip-key> <expense-id>
+
 # Register a view, check whether the client needs an upgrade
 wanderlog register-view <trip-key>
 wanderlog update-required <trip-key>
@@ -271,9 +277,9 @@ wanderlog mcp --enable-write
 wanderlog mcp --trip-id abc123xyz
 ```
 
-**Available MCP tools (35 total):**
-- **Read-only (24):** `list_trips`, `get_trip`, `list_places`, `list_sections`, `get_flights`, `search_places`, `search_restaurants`, `search_places_wanderlog`, `search_hotels`, `get_place_details`, `get_flight_stops`, `like_trip`, `get_like_count`, `send_trip_invites`, `list_trip_invites`, `get_me`, `get_user_profile`, `get_notifications`, `autocomplete_users`, `get_feed_home`, `browse_guides`, `search_geos`, `get_view_only_journal`, `get_global_config`
-- **Write-gated (11, need `--enable-write`):** `add_place`, `add_flight`, `remove_place`, `move_place`, `reorder_places`, `create_trip`, `delete_trip`, `restore_trip`, `copy_trip`, `update_trip`, `create_guide_from_trip`
+**Available MCP tools include:**
+- **Read-only:** `list_trips`, `get_trip`, `list_places`, `list_sections`, `get_flights`, `search_places`, `search_restaurants`, `search_places_wanderlog`, `search_hotels`, `get_place_details`, `get_flight_stops`, `get_like_count`, `list_trip_invites`, `get_me`, `get_user_profile`, `get_notifications`, `autocomplete_users`, `get_feed_home`, `browse_guides`, `search_geos`, `get_view_only_journal`, `get_trip_expenses_csv`, `get_global_config`
+- **Write-gated (need `--enable-write`):** `add_place`, `add_flight`, `add_lodging`, `remove_place`, `move_place`, `reorder_places`, `update_place_notes`, `set_trip_budget`, `add_trip_expense`, `update_trip_expense`, `delete_trip_expense`, `create_trip`, `delete_trip`, `restore_trip`, `copy_trip`, `update_trip`, `like_trip`, `send_trip_invites`, `create_guide_from_trip`
 
 ### Using with Claude Code
 
@@ -435,7 +441,7 @@ This format allows you to easily:
 - 🔄 **Trip analytics** - distance, duration, cost analysis
 
 **Partially implemented:**
-- 🔄 **Budget tracking** - CSV expense export via `wanderlog expenses <trip-key>`
+- 🔄 **Budget tracking** - budget and expense writes plus CSV export
 - 🔄 **Export features** - Google Maps export via `wanderlog export <trip-key>`
 
 **Already implemented:**
