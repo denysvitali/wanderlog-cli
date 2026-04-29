@@ -298,6 +298,45 @@ func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) er
 	return nil
 }
 
+// UpdatePlaceVisitTime sets the displayed visit time for a place block.
+func (c *Client) UpdatePlaceVisitTime(tripKey string, sectionID, placeID int, startTime, endTime string) error {
+	if c.auth == nil {
+		return fmt.Errorf("authentication required for updating place visit time")
+	}
+	if startTime == "" && endTime == "" {
+		return fmt.Errorf("start time or end time is required")
+	}
+	if err := ValidateVisitTime(startTime); err != nil {
+		return fmt.Errorf("start_time: %w", err)
+	}
+	if err := ValidateVisitTime(endTime); err != nil {
+		return fmt.Errorf("end_time: %w", err)
+	}
+
+	trip, err := c.GetTrip(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+
+	ops, err := updatePlaceVisitTimeOperations(trip.TripPlan.Itinerary.Sections, sectionID, placeID, startTime, endTime)
+	if err != nil {
+		return err
+	}
+	if err := c.ApplyOperations(tripKey, ops); err != nil {
+		return fmt.Errorf("applying visit time operations: %w", err)
+	}
+
+	c.logger.WithFields(map[string]interface{}{
+		"tripKey":   tripKey,
+		"sectionID": sectionID,
+		"placeID":   placeID,
+		"startTime": startTime,
+		"endTime":   endTime,
+	}).Info("Successfully updated place visit time")
+
+	return nil
+}
+
 func movePlaceOperations(sections []ItSections, placeID, fromSectionID, toSectionID, position int) ([]Operation, error) {
 	fromIdx := FindSectionIndex(sections, fromSectionID)
 	if fromIdx < 0 {
@@ -342,6 +381,39 @@ func movePlaceOperations(sections []ItSections, placeID, fromSectionID, toSectio
 			[]any{"itinerary", "sections", toIdx, "blocks"},
 			insertPosition,
 			blockData,
+		),
+	}, nil
+}
+
+func updatePlaceVisitTimeOperations(sections []ItSections, sectionID, placeID int, startTime, endTime string) ([]Operation, error) {
+	sectionIdx := FindSectionIndex(sections, sectionID)
+	if sectionIdx < 0 {
+		return nil, fmt.Errorf("section %d not found", sectionID)
+	}
+
+	blockIdx := -1
+	var oldBlock any
+	var newBlock any
+	for i, block := range sections[sectionIdx].Blocks {
+		if block.ID == placeID {
+			blockIdx = i
+			oldBlock = block
+			block.StartTime = startTime
+			block.EndTime = endTime
+			newBlock = block
+			break
+		}
+	}
+	if blockIdx < 0 {
+		return nil, fmt.Errorf("place %d not found in section %d", placeID, sectionID)
+	}
+
+	return []Operation{
+		ReplaceInList(
+			[]any{"itinerary", "sections", sectionIdx, "blocks"},
+			blockIdx,
+			oldBlock,
+			newBlock,
 		),
 	}, nil
 }

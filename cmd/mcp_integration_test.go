@@ -69,6 +69,7 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"set_trip_budget":           true,
 		"set_user_kv":               true,
 		"update_place_notes":        true,
+		"update_place_visit_time":   true,
 		"update_trip_expense":       true,
 		"update_trip":               true,
 	}

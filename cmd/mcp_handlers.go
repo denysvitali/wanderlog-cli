@@ -1143,6 +1143,8 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	latitude := request.GetFloat("latitude", 0)
 	longitude := request.GetFloat("longitude", 0)
 	text := request.GetString("text", "")
+	startTime := request.GetString("start_time", "")
+	endTime := request.GetString("end_time", "")
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
@@ -1216,8 +1218,10 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	}
 
 	req := wanderlog.AddPlaceRequest{
-		Place: placeInfo,
-		Text:  text,
+		Place:     placeInfo,
+		Text:      text,
+		StartTime: startTime,
+		EndTime:   endTime,
 	}
 
 	err = client.AddPlace(tripKey, sectionID, req)
@@ -2663,6 +2667,34 @@ func handleUpdatePlaceNotes(ctx context.Context, request mcp.CallToolRequest) (*
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify notes update for place %d in trip %s", placeID, tripKey)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Successfully updated notes for place %d in section %d", placeID, sectionID)), nil
+}
+
+func handleUpdatePlaceVisitTime(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	sectionID, err := request.RequireInt("section_id")
+	if err != nil {
+		return mcp.NewToolResultError("section_id is required"), nil //nolint:nilerr
+	}
+	placeID, err := request.RequireInt("place_id")
+	if err != nil {
+		return mcp.NewToolResultError("place_id is required"), nil //nolint:nilerr
+	}
+	startTime := request.GetString("start_time", "")
+	endTime := request.GetString("end_time", "")
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.UpdatePlaceVisitTime(tripKey, sectionID, placeID, startTime, endTime); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update visit time for place %d in trip %s: %v", placeID, tripKey, err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Successfully updated visit time for place %d in section %d", placeID, sectionID)), nil
 }
 
 func handleSetTripBudget(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

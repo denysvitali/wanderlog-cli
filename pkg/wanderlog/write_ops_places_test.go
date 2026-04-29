@@ -62,3 +62,23 @@ func TestReorderPlacesOperationsPreservesUnlistedBlocks(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdatePlaceVisitTimeOperationsReplacesBlock(t *testing.T) {
+	ops, err := updatePlaceVisitTimeOperations(testSections(t), 10, 1, "09:30", "11:00")
+	if err != nil {
+		t.Fatalf("updatePlaceVisitTimeOperations: %v", err)
+	}
+	if len(ops) != 1 {
+		t.Fatalf("ops length = %d, want 1", len(ops))
+	}
+	if got, want := ops[0].P, []interface{}{"itinerary", "sections", 0, "blocks", 0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("path = %v, want %v", got, want)
+	}
+	newBlock := reflect.ValueOf(ops[0].LI)
+	if got, want := newBlock.FieldByName("StartTime").String(), "09:30"; got != want {
+		t.Fatalf("start time = %q, want %q", got, want)
+	}
+	if got, want := newBlock.FieldByName("EndTime").String(), "11:00"; got != want {
+		t.Fatalf("end time = %q, want %q", got, want)
+	}
+}

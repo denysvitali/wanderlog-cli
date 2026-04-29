@@ -327,6 +327,23 @@ func ValidateAddPlaceRequest(req AddPlaceRequest) error {
 			return fmt.Errorf("longitude must be between -180 and 180, got %f", lng)
 		}
 	}
+	if err := ValidateVisitTime(req.StartTime); err != nil {
+		return fmt.Errorf("start_time: %w", err)
+	}
+	if err := ValidateVisitTime(req.EndTime); err != nil {
+		return fmt.Errorf("end_time: %w", err)
+	}
+	return nil
+}
+
+// ValidateVisitTime validates the HH:MM visit time format used by itinerary blocks.
+func ValidateVisitTime(value string) error {
+	if value == "" {
+		return nil
+	}
+	if _, err := time.Parse("15:04", value); err != nil {
+		return fmt.Errorf("must use HH:MM 24-hour format")
+	}
 	return nil
 }
 
@@ -354,6 +371,12 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	if req.Text != "" {
 		place["text"] = quillTextForString(req.Text)
 		place["placeNotes"] = req.Text
+	}
+	if req.StartTime != "" {
+		place["startTime"] = req.StartTime
+	}
+	if req.EndTime != "" {
+		place["endTime"] = req.EndTime
 	}
 	// The native add-places endpoint expects autocomplete/detail-shaped rows.
 	// Keep the legacy flat fields, but also include the nested shape used by

@@ -186,6 +186,12 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.WithString("text",
 				mcp.Description("Additional text/notes for the place (optional)"),
 			),
+			mcp.WithString("start_time",
+				mcp.Description("Visit start time in HH:MM 24-hour format (optional)"),
+			),
+			mcp.WithString("end_time",
+				mcp.Description("Visit end time in HH:MM 24-hour format (optional)"),
+			),
 		)
 		s.AddTool(addPlaceTool, handleAddPlace)
 
@@ -367,6 +373,28 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			),
 		)
 		s.AddTool(updatePlaceNotesTool, handleUpdatePlaceNotes)
+
+		updatePlaceVisitTimeTool := mcp.NewTool("update_place_visit_time",
+			mcp.WithDescription("Set the visit start and/or end time on an existing itinerary place block"),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Required(),
+				mcp.Description("Section ID containing the place block"),
+			),
+			mcp.WithNumber("place_id",
+				mcp.Required(),
+				mcp.Description("Internal Wanderlog place block ID, not a Google Place ID"),
+			),
+			mcp.WithString("start_time",
+				mcp.Description("Visit start time in HH:MM 24-hour format"),
+			),
+			mcp.WithString("end_time",
+				mcp.Description("Visit end time in HH:MM 24-hour format"),
+			),
+		)
+		s.AddTool(updatePlaceVisitTimeTool, handleUpdatePlaceVisitTime)
 
 		setTripBudgetTool := mcp.NewTool("set_trip_budget",
 			mcp.WithDescription("Set or update the total trip budget amount and currency."),

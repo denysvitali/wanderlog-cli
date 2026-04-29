@@ -2,8 +2,10 @@ package models
 
 // AddPlaceRequest represents a request to add a place to a trip
 type AddPlaceRequest struct {
-	Place AddPlaceInfo `json:"place"`
-	Text  string       `json:"text"`
+	Place     AddPlaceInfo `json:"place"`
+	Text      string       `json:"text"`
+	StartTime string       `json:"startTime,omitempty"`
+	EndTime   string       `json:"endTime,omitempty"`
 }
 
 // AddPlaceInfo represents the place information when adding a place

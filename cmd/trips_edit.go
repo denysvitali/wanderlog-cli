@@ -27,7 +27,7 @@ var tripsEditAddPlaceCmd = &cobra.Command{
 
 Examples:
   wanderlog trips edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
-  wanderlog trips edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --section 123`,
+  wanderlog trips edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --section 123 --start-time 09:30`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		tripKey := args[0]
@@ -60,8 +60,10 @@ Examples:
 		}
 
 		req := wanderlog.AddPlaceRequest{
-			Place: placeInfo,
-			Text:  tripsEditPlaceText,
+			Place:     placeInfo,
+			Text:      tripsEditPlaceText,
+			StartTime: tripsEditStartTime,
+			EndTime:   tripsEditEndTime,
 		}
 
 		err := client.AddPlace(tripKey, tripsEditSectionID, req)
@@ -286,6 +288,39 @@ Examples:
 	},
 }
 
+var tripsEditSetPlaceTimeCmd = &cobra.Command{
+	Use:   "set-place-time [trip-key] [place-id]",
+	Short: "Set a place visit time",
+	Long: `Set the visit time shown on a place in an itinerary section.
+
+Examples:
+  wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30
+  wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30 --end-time 11:00`,
+	Args: cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+
+		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
+			logger.WithError(err).Error("Authentication required")
+			os.Exit(1)
+		}
+
+		placeID := parseRequiredInt(args[1], "place ID")
+		if err := client.UpdatePlaceVisitTime(args[0], tripsEditSectionID, placeID, tripsEditStartTime, tripsEditEndTime); err != nil {
+			logger.WithError(err).Error("Failed to update place visit time")
+			os.Exit(1)
+		}
+		printSuccess(outputFormat, "Updated place visit time", map[string]interface{}{
+			"tripKey":   args[0],
+			"sectionId": tripsEditSectionID,
+			"placeId":   placeID,
+			"startTime": tripsEditStartTime,
+			"endTime":   tripsEditEndTime,
+		})
+	},
+}
+
 var (
 	tripsEditPlaceName       string
 	tripsEditPlaceID         string
@@ -297,6 +332,8 @@ var (
 	tripsEditMoveToSection   int
 	tripsEditMovePosition    int
 	tripsEditReorderPlaceIDs string
+	tripsEditStartTime       string
+	tripsEditEndTime         string
 )
 
 func init() {
@@ -305,6 +342,7 @@ func init() {
 		tripsEditAddPlaceCmd, tripsEditRemovePlaceCmd,
 		tripsEditClearSectionCmd, tripsEditDeleteSectionCmd,
 		tripsEditNukePlacesCmd, tripsEditMovePlaceCmd, tripsEditReorderPlacesCmd,
+		tripsEditSetPlaceTimeCmd,
 	)
 
 	// add-place flags
@@ -314,6 +352,8 @@ func init() {
 	tripsEditAddPlaceCmd.Flags().Float64Var(&tripsEditLongitude, "lng", 0, "Longitude")
 	tripsEditAddPlaceCmd.Flags().IntVar(&tripsEditSectionID, "section", 0, "Section ID")
 	tripsEditAddPlaceCmd.Flags().StringVar(&tripsEditPlaceText, "text", "", "Additional text/notes")
+	tripsEditAddPlaceCmd.Flags().StringVar(&tripsEditStartTime, "start-time", "", "Visit start time (HH:MM, 24-hour)")
+	tripsEditAddPlaceCmd.Flags().StringVar(&tripsEditEndTime, "end-time", "", "Visit end time (HH:MM, 24-hour)")
 
 	// remove-place flags
 	tripsEditRemovePlaceCmd.Flags().IntVar(&tripsEditSectionID, "section", 0, "Section ID")
@@ -329,11 +369,18 @@ func init() {
 	tripsEditReorderPlacesCmd.Flags().StringVar(&tripsEditReorderPlaceIDs, "place-ids", "", "Comma-separated place IDs in the desired order")
 	_ = tripsEditReorderPlacesCmd.MarkFlagRequired("place-ids")
 
+	// set-place-time flags
+	tripsEditSetPlaceTimeCmd.Flags().IntVar(&tripsEditSectionID, "section", 0, "Section ID")
+	tripsEditSetPlaceTimeCmd.Flags().StringVar(&tripsEditStartTime, "start-time", "", "Visit start time (HH:MM, 24-hour)")
+	tripsEditSetPlaceTimeCmd.Flags().StringVar(&tripsEditEndTime, "end-time", "", "Visit end time (HH:MM, 24-hour)")
+	_ = tripsEditSetPlaceTimeCmd.MarkFlagRequired("section")
+
 	// auth flags
 	for _, c := range []*cobra.Command{
 		tripsEditAddPlaceCmd, tripsEditRemovePlaceCmd,
 		tripsEditClearSectionCmd, tripsEditDeleteSectionCmd,
 		tripsEditNukePlacesCmd, tripsEditMovePlaceCmd, tripsEditReorderPlacesCmd,
+		tripsEditSetPlaceTimeCmd,
 	} {
 		c.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		c.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
