@@ -43,8 +43,14 @@ func TestSearchLodgings(t *testing.T) {
 			if _, ok := guests["childrenAges"]; !ok {
 				t.Fatalf("expected guests.childrenAges in request body: %s", string(body))
 			}
+			if payload["sources"] != nil {
+				t.Fatalf("expected app-compatible sources=null in request body: %s", string(body))
+			}
+			if payload["sortBy"] != "ratings" {
+				t.Fatalf("expected app-compatible sortBy=ratings in request body: %s", string(body))
+			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"success":true,"offers":[{"propertyId":"prop-1","name":"Tokyo Hotel"}]}`))
+			_, _ = w.Write([]byte(`{"success":true,"data":{"isComplete":true,"offers":[{"offerId":"offer-1","source":"google","priceRate":{"amount":367,"currencyCode":"CHF"},"lodging":{"id":{"lodgingId":"prop-1","type":"google"},"name":"Tokyo Hotel","rating":{"source":"Google","value":4.8},"images":[{"url":"https://example.com/hotel.jpg"}]}}]}}`))
 		}))
 		defer server.Close()
 
@@ -56,8 +62,11 @@ func TestSearchLodgings(t *testing.T) {
 		if !result.Success {
 			t.Error("expected success")
 		}
-		if len(result.Data) != 1 || result.Data[0].PropertyID != "prop-1" {
+		if len(result.Data) != 1 || result.Data[0].PropertyID != "prop-1" || result.Data[0].Name != "Tokyo Hotel" {
 			t.Fatalf("expected offers to be normalized into data, got %+v", result.Data)
+		}
+		if result.Data[0].Rating != 4.8 || result.Data[0].PricePerNight != "367" || result.Data[0].Currency != "CHF" {
+			t.Fatalf("expected nested lodging fields to parse, got %+v", result.Data[0])
 		}
 	})
 

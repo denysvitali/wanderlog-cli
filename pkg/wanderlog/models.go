@@ -609,6 +609,7 @@ func (r *LodgingSearchResponse) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			r.Data = wrapped.Offers
+			r.Offers = wrapped.Offers
 		}
 	}
 	if len(raw.Offers) > 0 && string(raw.Offers) != "null" {
@@ -637,17 +638,11 @@ type LodgingProperty struct {
 }
 
 func (p *LodgingProperty) UnmarshalJSON(data []byte) error {
-	type lodgingPropertyAlias LodgingProperty
-	var alias lodgingPropertyAlias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return err
-	}
-	*p = LodgingProperty(alias)
-
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	*p = LodgingProperty{}
 	readString := func(keys ...string) string {
 		for _, key := range keys {
 			if value, ok := raw[key]; ok {
@@ -659,14 +654,142 @@ func (p *LodgingProperty) UnmarshalJSON(data []byte) error {
 		}
 		return ""
 	}
+	readFloat := func(keys ...string) float64 {
+		for _, key := range keys {
+			value, ok := raw[key]
+			if !ok {
+				continue
+			}
+			var number float64
+			if err := json.Unmarshal(value, &number); err == nil {
+				return number
+			}
+			var wrapped map[string]json.RawMessage
+			if err := json.Unmarshal(value, &wrapped); err != nil {
+				continue
+			}
+			for _, nestedKey := range []string{"value", "rating", "score"} {
+				if nestedValue, ok := wrapped[nestedKey]; ok {
+					if err := json.Unmarshal(nestedValue, &number); err == nil {
+						return number
+					}
+				}
+			}
+		}
+		return 0
+	}
+	readID := func() string {
+		if id := readString("propertyId", "id", "placeId", "place_id"); id != "" {
+			return id
+		}
+		value, ok := raw["id"]
+		if !ok {
+			return ""
+		}
+		var idNumber float64
+		if err := json.Unmarshal(value, &idNumber); err == nil {
+			return fmt.Sprintf("%.0f", idNumber)
+		}
+		var idObject map[string]json.RawMessage
+		if err := json.Unmarshal(value, &idObject); err != nil {
+			return ""
+		}
+		for _, key := range []string{"propertyId", "lodgingId", "placeId", "id"} {
+			if nestedValue, ok := idObject[key]; ok {
+				var nestedString string
+				if err := json.Unmarshal(nestedValue, &nestedString); err == nil && nestedString != "" {
+					return nestedString
+				}
+				if err := json.Unmarshal(nestedValue, &idNumber); err == nil {
+					return fmt.Sprintf("%.0f", idNumber)
+				}
+			}
+		}
+		return ""
+	}
+	readImageURL := func() string {
+		if imageURL := readString("imageUrl", "imageURL"); imageURL != "" {
+			return imageURL
+		}
+		value, ok := raw["images"]
+		if !ok {
+			return ""
+		}
+		var images []map[string]json.RawMessage
+		if err := json.Unmarshal(value, &images); err != nil || len(images) == 0 {
+			return ""
+		}
+		for _, key := range []string{"url", "thumbnailUrl"} {
+			if imageValue, ok := images[0][key]; ok {
+				var imageURL string
+				if err := json.Unmarshal(imageValue, &imageURL); err == nil && imageURL != "" {
+					return imageURL
+				}
+			}
+		}
+		return ""
+	}
+	readPriceRate := func() (string, string) {
+		value, ok := raw["priceRate"]
+		if !ok {
+			return "", ""
+		}
+		var priceRate map[string]json.RawMessage
+		if err := json.Unmarshal(value, &priceRate); err != nil {
+			return "", ""
+		}
+		var amount float64
+		var currency string
+		if amountValue, ok := priceRate["amount"]; ok {
+			_ = json.Unmarshal(amountValue, &amount)
+		}
+		if currencyValue, ok := priceRate["currencyCode"]; ok {
+			_ = json.Unmarshal(currencyValue, &currency)
+		}
+		price := ""
+		if amount > 0 {
+			price = fmt.Sprintf("%.0f", amount)
+		}
+		return price, currency
+	}
 	if p.PropertyID == "" {
-		p.PropertyID = readString("propertyId", "id", "placeId", "place_id")
+		p.PropertyID = readID()
 	}
 	if p.Name == "" {
 		p.Name = readString("name", "title", "displayName")
 	}
 	if p.Address == "" {
 		p.Address = readString("address", "formattedAddress", "formatted_address")
+	}
+	if p.City == "" {
+		p.City = readString("city")
+	}
+	if p.Country == "" {
+		p.Country = readString("country", "countryName")
+	}
+	if p.Rating == 0 {
+		p.Rating = readFloat("rating", "wanderlogRating")
+	}
+	if p.ImageURL == "" {
+		p.ImageURL = readImageURL()
+	}
+	if p.BookerType == "" {
+		p.BookerType = readString("bookerType", "source")
+	}
+	if p.PricePerNight == "" {
+		p.PricePerNight = readString("pricePerNight")
+	}
+	if p.Currency == "" {
+		p.Currency = readString("currency", "currencyCode")
+	}
+	if p.PricePerNight == "" || p.Currency == "" {
+		price, currency := readPriceRate()
+		if p.PricePerNight == "" {
+			p.PricePerNight = price
+		}
+		if p.Currency == "" {
+			p.Currency = currency
+		}
 	}
 
 	for _, key := range []string{"property", "lodging", "lodgingProperty", "hotel", "place"} {
