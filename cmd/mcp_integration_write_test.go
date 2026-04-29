@@ -782,6 +782,122 @@ func TestMCPIntegration_ServerCreation(t *testing.T) {
 	})
 }
 
+func TestMCPIntegration_BudgetExpenseWorkflow(t *testing.T) {
+	skipIntegrationTest(t)
+
+	auth, err := loadAuthFromEnvOrKeychain()
+	require.NoError(t, err)
+	require.NotNil(t, auth)
+
+	ctx := context.Background()
+	geoID := searchGeoIDForLifecycleTest(t, ctx, "Paris")
+	tripTitle := fmt.Sprintf("MCP Budget Test - %d", time.Now().UnixNano())
+	createReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "create_trip",
+			Arguments: map[string]interface{}{
+				"title":      tripTitle,
+				"geo_id":     geoID,
+				"start_date": "2026-07-01",
+				"end_date":   "2026-07-03",
+				"privacy":    "private",
+			},
+		},
+	}
+	createResult, err := handleCreateTrip(ctx, createReq)
+	require.NoError(t, err)
+	require.NotNil(t, createResult)
+	if createResult.IsError {
+		t.Skipf("cannot create disposable budget test trip: %s", getTextContent(createResult))
+	}
+	tripKey := extractTripKey(getTextContent(createResult))
+	require.NotEmpty(t, tripKey)
+	defer func() {
+		deleteReq := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "delete_trip",
+				Arguments: map[string]interface{}{
+					"trip_key": tripKey,
+				},
+			},
+		}
+		_, _ = handleDeleteTrip(ctx, deleteReq)
+	}()
+
+	setBudgetReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "set_trip_budget",
+			Arguments: map[string]interface{}{
+				"trip_key": tripKey,
+				"amount":   1200,
+				"currency": "USD",
+			},
+		},
+	}
+	setBudgetResult, err := handleSetTripBudget(ctx, setBudgetReq)
+	require.NoError(t, err)
+	require.NotNil(t, setBudgetResult)
+	require.False(t, setBudgetResult.IsError, "set_trip_budget failed: %s", getTextContent(setBudgetResult))
+
+	addExpenseReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "add_trip_expense",
+			Arguments: map[string]interface{}{
+				"trip_key":    tripKey,
+				"description": "Museum tickets",
+				"category":    "activities",
+				"amount":      80,
+				"currency":    "USD",
+				"date":        "2026-07-01",
+			},
+		},
+	}
+	addExpenseResult, err := handleAddTripExpense(ctx, addExpenseReq)
+	require.NoError(t, err)
+	require.NotNil(t, addExpenseResult)
+	require.False(t, addExpenseResult.IsError, "add_trip_expense failed: %s", getTextContent(addExpenseResult))
+
+	var addParsed struct {
+		Expense struct {
+			ID int `json:"id"`
+		} `json:"expense"`
+	}
+	addRaw, err := json.Marshal(addExpenseResult.StructuredContent)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(addRaw, &addParsed))
+	require.NotZero(t, addParsed.Expense.ID)
+
+	updateExpenseReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "update_trip_expense",
+			Arguments: map[string]interface{}{
+				"trip_key":    tripKey,
+				"expense_id":  addParsed.Expense.ID,
+				"amount":      95,
+				"description": "Museum tickets and audio guide",
+			},
+		},
+	}
+	updateExpenseResult, err := handleUpdateTripExpense(ctx, updateExpenseReq)
+	require.NoError(t, err)
+	require.NotNil(t, updateExpenseResult)
+	require.False(t, updateExpenseResult.IsError, "update_trip_expense failed: %s", getTextContent(updateExpenseResult))
+
+	deleteExpenseReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "delete_trip_expense",
+			Arguments: map[string]interface{}{
+				"trip_key":   tripKey,
+				"expense_id": addParsed.Expense.ID,
+			},
+		},
+	}
+	deleteExpenseResult, err := handleDeleteTripExpense(ctx, deleteExpenseReq)
+	require.NoError(t, err)
+	require.NotNil(t, deleteExpenseResult)
+	require.False(t, deleteExpenseResult.IsError, "delete_trip_expense failed: %s", getTextContent(deleteExpenseResult))
+}
+
 // TestMCPIntegration_CompleteTripLifecycle tests the complete trip lifecycle:
 // Create a trip, verify it exists, add a place, get trip details, then clean up
 func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
