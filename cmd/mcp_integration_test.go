@@ -29,6 +29,9 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"delete_trip_expense":       true,
 		"delete_trip":               true,
 		"delete_trips":              true,
+		"delete_flight":             true,
+		"delete_itinerary_block":    true,
+		"delete_lodging":            true,
 		"get_feed_friends":          true,
 		"get_feed_home":             true,
 		"get_feed_recent":           true,
@@ -70,6 +73,8 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"set_user_kv":               true,
 		"update_place_notes":        true,
 		"update_place_visit_time":   true,
+		"update_flight":             true,
+		"update_lodging":            true,
 		"update_trip_expense":       true,
 		"update_trip":               true,
 	}

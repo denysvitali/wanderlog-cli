@@ -195,6 +195,24 @@ func TestClearSectionBlocks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == "GET" && r.URL.Path == "/tripPlans/test-trip" {
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte(`{
+						"success": true,
+						"tripPlan": {
+							"key": "test-trip",
+							"itinerary": {
+								"sections": [
+									{"id": 99, "heading": "Other", "blocks": []},
+									{"id": 1, "heading": "Day 1", "blocks": [{"id": 10, "type": "place", "text": {"ops": [{"insert": "\n"}]}}]}
+								]
+							}
+						},
+						"resources": {"placeMetadata": []}
+					}`))
+					return
+				}
+
 				// Verify it's a POST to applyOps
 				if r.Method != "POST" {
 					t.Errorf("Expected POST, got %s", r.Method)
@@ -264,6 +282,24 @@ func TestDeleteSection(t *testing.T) {
 	sectionID := 2
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/tripPlans/test-trip" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"success": true,
+				"tripPlan": {
+					"key": "test-trip",
+					"itinerary": {
+						"sections": [
+							{"id": 99, "heading": "Other", "blocks": []},
+							{"id": 2, "heading": "Day 2", "blocks": []}
+						]
+					}
+				},
+				"resources": {"placeMetadata": []}
+			}`))
+			return
+		}
+
 		// Parse operations
 		body, _ := io.ReadAll(r.Body)
 		var opReq OperationRequest
@@ -284,7 +320,7 @@ func TestDeleteSection(t *testing.T) {
 				t.Error("Expected remove operation with LD field")
 			}
 			// Verify path structure
-			expectedPath := []interface{}{"itinerary", "sections", 2}
+			expectedPath := []interface{}{"itinerary", "sections", 1}
 			if len(op.P) != len(expectedPath) {
 				t.Errorf("Expected path length %d, got %d", len(expectedPath), len(op.P))
 			}

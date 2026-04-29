@@ -1601,6 +1601,379 @@ func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	return mcp.NewToolResultStructured(result, fmt.Sprintf("🏨 Successfully added lodging %s to trip %s (%s)", placeName, tripKey, sectionLabel)), nil
 }
 
+func findRawItineraryBlock(trip map[string]any, sectionID, blockID int) (int, int, map[string]any, error) {
+	tripPlan, _ := trip["tripPlan"].(map[string]any)
+	itinerary, _ := tripPlan["itinerary"].(map[string]any)
+	sections, _ := itinerary["sections"].([]any)
+	for sectionIdx, sectionAny := range sections {
+		section, _ := sectionAny.(map[string]any)
+		if section == nil {
+			continue
+		}
+		if sectionID > 0 && intFromAny(section["id"]) != sectionID {
+			continue
+		}
+		blocks, _ := section["blocks"].([]any)
+		for blockIdx, blockAny := range blocks {
+			block, _ := blockAny.(map[string]any)
+			if block == nil || intFromAny(block["id"]) != blockID {
+				continue
+			}
+			return sectionIdx, blockIdx, block, nil
+		}
+	}
+	if sectionID > 0 {
+		return 0, 0, nil, fmt.Errorf("block %d not found in section %d", blockID, sectionID)
+	}
+	return 0, 0, nil, fmt.Errorf("block %d not found", blockID)
+}
+
+func intFromAny(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		i, _ := v.Int64()
+		return int(i)
+	default:
+		return 0
+	}
+}
+
+func cloneMap(value map[string]any) (map[string]any, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	var cloned map[string]any
+	if err := json.Unmarshal(data, &cloned); err != nil {
+		return nil, err
+	}
+	return cloned, nil
+}
+
+func deleteItineraryBlock(client *wanderlog.Client, tripKey string, sectionID, blockID int, expectedType string, requireHotel bool) error {
+	trip, err := client.GetTripRaw(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+	sectionIdx, blockIdx, oldBlock, err := findRawItineraryBlock(trip, sectionID, blockID)
+	if err != nil {
+		return err
+	}
+	if expectedType != "" && oldBlock["type"] != expectedType {
+		return fmt.Errorf("block %d has type %q, expected %q", blockID, oldBlock["type"], expectedType)
+	}
+	if requireHotel {
+		if _, ok := oldBlock["hotel"]; !ok {
+			return fmt.Errorf("block %d is not a lodging block", blockID)
+		}
+	}
+	op := wanderlog.DeleteFromList(
+		[]any{"itinerary", "sections", sectionIdx, "blocks"},
+		blockIdx,
+		oldBlock,
+	)
+	return client.ApplyOperations(tripKey, []wanderlog.Operation{op})
+}
+
+func replaceItineraryBlock(client *wanderlog.Client, tripKey string, sectionID, blockID int, update func(map[string]any) error) error {
+	trip, err := client.GetTripRaw(tripKey)
+	if err != nil {
+		return fmt.Errorf("getting current trip: %w", err)
+	}
+	sectionIdx, blockIdx, oldBlock, err := findRawItineraryBlock(trip, sectionID, blockID)
+	if err != nil {
+		return err
+	}
+	newBlock, err := cloneMap(oldBlock)
+	if err != nil {
+		return fmt.Errorf("copying block %d: %w", blockID, err)
+	}
+	if err := update(newBlock); err != nil {
+		return err
+	}
+	op := wanderlog.ReplaceInList(
+		[]any{"itinerary", "sections", sectionIdx, "blocks"},
+		blockIdx,
+		oldBlock,
+		newBlock,
+	)
+	return client.ApplyOperations(tripKey, []wanderlog.Operation{op})
+}
+
+func handleDeleteItineraryBlock(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	blockID, err := request.RequireInt("block_id")
+	if err != nil {
+		return mcp.NewToolResultError("block_id is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+	expectedType := request.GetString("expected_type", "")
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, expectedType, false); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete block %d from trip %s: %v", blockID, tripKey, err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Deleted block %d from trip %s", blockID, tripKey)), nil
+}
+
+func handleDeleteFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	blockID, err := request.RequireInt("block_id")
+	if err != nil {
+		return mcp.NewToolResultError("block_id is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, "flight", false); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete flight block %d from trip %s: %v", blockID, tripKey, err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Deleted flight block %d from trip %s", blockID, tripKey)), nil
+}
+
+func handleDeleteLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	blockID, err := request.RequireInt("block_id")
+	if err != nil {
+		return mcp.NewToolResultError("block_id is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, "place", true); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete lodging block %d from trip %s: %v", blockID, tripKey, err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Deleted lodging block %d from trip %s", blockID, tripKey)), nil
+}
+
+func handleUpdateFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	blockID, err := request.RequireInt("block_id")
+	if err != nil {
+		return mcp.NewToolResultError("block_id is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	err = replaceItineraryBlock(client, tripKey, sectionID, blockID, func(block map[string]any) error {
+		if block["type"] != "flight" {
+			return fmt.Errorf("block %d is not a flight block", blockID)
+		}
+		if flightNumber := request.GetString("flight_number", ""); flightNumber != "" {
+			airlineIATA, flightNum, err := validateFlightNumber(flightNumber)
+			if err != nil {
+				return err
+			}
+			flightInfo, _ := block["flightInfo"].(map[string]any)
+			if flightInfo == nil {
+				flightInfo = map[string]any{}
+				block["flightInfo"] = flightInfo
+			}
+			airline, _ := flightInfo["airline"].(map[string]any)
+			if airline == nil {
+				airline = map[string]any{}
+				flightInfo["airline"] = airline
+			}
+			airline["iata"] = airlineIATA
+			flightInfo["number"] = flightNum
+		}
+		if v := request.GetString("departure_date", ""); v != "" {
+			depart, _ := block["depart"].(map[string]any)
+			if depart == nil {
+				depart = map[string]any{"type": "depart"}
+				block["depart"] = depart
+			}
+			depart["date"] = v
+		}
+		if v := request.GetString("departure_time", ""); v != "" {
+			block["startTime"] = v
+			depart, _ := block["depart"].(map[string]any)
+			if depart == nil {
+				depart = map[string]any{"type": "depart"}
+				block["depart"] = depart
+			}
+			depart["time"] = v
+		}
+		if v := request.GetString("arrival_date", ""); v != "" {
+			arrive, _ := block["arrive"].(map[string]any)
+			if arrive == nil {
+				arrive = map[string]any{"type": "arrive"}
+				block["arrive"] = arrive
+			}
+			arrive["date"] = v
+		}
+		if v := request.GetString("arrival_time", ""); v != "" {
+			block["endTime"] = v
+			arrive, _ := block["arrive"].(map[string]any)
+			if arrive == nil {
+				arrive = map[string]any{"type": "arrive"}
+				block["arrive"] = arrive
+			}
+			arrive["time"] = v
+		}
+		if v := request.GetString("confirmation_number", ""); v != "" {
+			block["confirmationNumber"] = v
+		}
+		if notes := request.GetString("notes", ""); notes != "" {
+			block["text"] = quillTextForString(notes)
+		}
+		if v := strings.ToUpper(strings.TrimSpace(request.GetString("departure_airport", ""))); v != "" {
+			depart, _ := block["depart"].(map[string]any)
+			if depart == nil {
+				depart = map[string]any{"type": "depart"}
+				block["depart"] = depart
+			}
+			airport, _ := depart["airport"].(map[string]any)
+			if airport == nil {
+				airport = map[string]any{}
+				depart["airport"] = airport
+			}
+			airport["iata"] = v
+			ensureAirportDisplayFields(airport)
+		}
+		if v := strings.ToUpper(strings.TrimSpace(request.GetString("arrival_airport", ""))); v != "" {
+			arrive, _ := block["arrive"].(map[string]any)
+			if arrive == nil {
+				arrive = map[string]any{"type": "arrive"}
+				block["arrive"] = arrive
+			}
+			airport, _ := arrive["airport"].(map[string]any)
+			if airport == nil {
+				airport = map[string]any{}
+				arrive["airport"] = airport
+			}
+			airport["iata"] = v
+			ensureAirportDisplayFields(airport)
+		}
+		return nil
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update flight block %d in trip %s: %v", blockID, tripKey, err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Updated flight block %d in trip %s", blockID, tripKey)), nil
+}
+
+func handleUpdateLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	blockID, err := request.RequireInt("block_id")
+	if err != nil {
+		return mcp.NewToolResultError("block_id is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	err = replaceItineraryBlock(client, tripKey, sectionID, blockID, func(block map[string]any) error {
+		if block["type"] != "place" {
+			return fmt.Errorf("block %d is not a place/lodging block", blockID)
+		}
+		if _, ok := block["hotel"]; !ok {
+			return fmt.Errorf("block %d is not a lodging block", blockID)
+		}
+		hotel, _ := block["hotel"].(map[string]any)
+		if hotel == nil {
+			hotel = map[string]any{}
+			block["hotel"] = hotel
+		}
+		placeID := stringArg(request, "place_id", "propertyPlaceId")
+		placeName := request.GetString("name", "")
+		latitude := request.GetFloat("latitude", 0)
+		longitude := request.GetFloat("longitude", 0)
+		if placeID != "" {
+			details, err := client.GetPlaceDetails(placeID)
+			if err != nil {
+				return fmt.Errorf("fetching lodging place details for %s: %w", placeID, err)
+			}
+			place := placeDetailsForBlock(details)
+			if place == nil {
+				return fmt.Errorf("failed to fetch lodging place details for %s", placeID)
+			}
+			if placeName != "" {
+				place["name"] = placeName
+			}
+			block["place"] = place
+		} else if placeName != "" || latitude != 0 || longitude != 0 {
+			place, _ := block["place"].(map[string]any)
+			if place == nil {
+				place = map[string]any{}
+				block["place"] = place
+			}
+			if placeName != "" {
+				place["name"] = placeName
+			}
+			if latitude != 0 || longitude != 0 {
+				place["geometry"] = map[string]any{"location": map[string]any{"lat": latitude, "lng": longitude}}
+			}
+		}
+		if v := stringArg(request, "check_in", "checkInDate"); v != "" {
+			hotel["checkIn"] = v
+		}
+		if v := stringArg(request, "check_out", "checkOutDate"); v != "" {
+			hotel["checkOut"] = v
+		}
+		confirmationNumber := request.GetString("confirmation_number", "")
+		if confirmationNumber == "" {
+			confirmationNumber = request.GetString("confirmationNumber", "")
+		}
+		if confirmationNumber != "" {
+			hotel["confirmationNumber"] = confirmationNumber
+		}
+		if travelers := stringSliceArg(request, "traveler_names"); len(travelers) > 0 {
+			hotel["travelerNames"] = travelers
+		} else if travelers := stringSliceArg(request, "travelerNames"); len(travelers) > 0 {
+			hotel["travelerNames"] = travelers
+		}
+		if notes := stringArg(request, "notes", "note"); notes != "" {
+			block["text"] = quillTextForString(notes)
+		}
+		return nil
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update lodging block %d in trip %s: %v", blockID, tripKey, err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Updated lodging block %d in trip %s", blockID, tripKey)), nil
+}
+
 func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey := request.GetString("trip_key", "")
 	if tripKey == "" {

@@ -194,6 +194,32 @@ func (c *Client) GetTrip(key string) (*TripResponse, error) {
 	return &trip, nil
 }
 
+// GetTripRaw retrieves a trip as raw JSON-compatible maps. This is useful for
+// JSON0 operations where old values must match the server document exactly.
+func (c *Client) GetTripRaw(key string) (map[string]any, error) {
+	api, err := c.openAPI()
+	if err != nil {
+		return nil, err
+	}
+	version := openapi.ClientSchemaVersion(2)
+
+	resp, err := api.GetTripPlanWithResponse(context.Background(), key, &openapi.GetTripPlanParams{
+		ClientSchemaVersion: &version,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var trip map[string]any
+	if err := decodeOpenAPIBody("GetTrip", resp.StatusCode(), resp.Body, &trip); err != nil {
+		return nil, err
+	}
+	if msg, ok := trip["error"].(string); ok && msg != "" {
+		return nil, fmt.Errorf("API error: %s", msg)
+	}
+	return trip, nil
+}
+
 // GetTripSections retrieves only the sections of a trip without the full trip data
 func (c *Client) GetTripSections(key string) ([]ItSections, error) {
 	api, err := c.openAPI()

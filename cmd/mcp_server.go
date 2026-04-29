@@ -242,6 +242,45 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		)
 		s.AddTool(addFlightTool, handleAddFlight)
 
+		updateFlightTool := mcp.NewTool("update_flight",
+			mcp.WithDescription("Edit an existing flight reservation block using the app's applyOps block edit path."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key (optional if default trip key is set)"),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Required(),
+				mcp.Description("Flight block ID from get_flights/get_trip JSON"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID containing the flight block (optional)"),
+			),
+			mcp.WithString("flight_number", mcp.Description("New flight number with airline code, e.g. MU244")),
+			mcp.WithString("departure_date", mcp.Description("New departure date (YYYY-MM-DD)")),
+			mcp.WithString("departure_time", mcp.Description("New departure time")),
+			mcp.WithString("arrival_date", mcp.Description("New arrival date (YYYY-MM-DD)")),
+			mcp.WithString("arrival_time", mcp.Description("New arrival time")),
+			mcp.WithString("confirmation_number", mcp.Description("New confirmation number")),
+			mcp.WithString("notes", mcp.Description("Replacement notes")),
+			mcp.WithString("departure_airport", mcp.Description("Departure airport IATA override")),
+			mcp.WithString("arrival_airport", mcp.Description("Arrival airport IATA override")),
+		)
+		s.AddTool(updateFlightTool, handleUpdateFlight)
+
+		deleteFlightTool := mcp.NewTool("delete_flight",
+			mcp.WithDescription("Delete an existing flight reservation block from the itinerary."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key (optional if default trip key is set)"),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Required(),
+				mcp.Description("Flight block ID from get_flights/get_trip JSON"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID containing the flight block (optional)"),
+			),
+		)
+		s.AddTool(deleteFlightTool, handleDeleteFlight)
+
 		// Add lodging to trip tool
 		addLodgingTool := mcp.NewTool("add_lodging",
 			mcp.WithDescription("Add a lodging/hotel reservation to the trip's Hotels and lodging section, creating that section when needed. Accepts CLI snake_case fields and the app assistant's camelCase lodging fields."),
@@ -295,6 +334,51 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			),
 		)
 		s.AddTool(addLodgingTool, handleAddLodging)
+
+		updateLodgingTool := mcp.NewTool("update_lodging",
+			mcp.WithDescription("Edit an existing lodging/hotel reservation block using the app's applyOps block edit path."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key (optional if default trip key is set)"),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Required(),
+				mcp.Description("Lodging block ID from add_lodging/get_trip JSON"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID containing the lodging block (optional)"),
+			),
+			mcp.WithString("name", mcp.Description("New lodging name")),
+			mcp.WithString("place_id", mcp.Description("New Google Place ID")),
+			mcp.WithString("propertyPlaceId", mcp.Description("App-compatible alias for place_id")),
+			mcp.WithNumber("latitude", mcp.Description("New latitude")),
+			mcp.WithNumber("longitude", mcp.Description("New longitude")),
+			mcp.WithString("check_in", mcp.Description("New check-in date (YYYY-MM-DD)")),
+			mcp.WithString("checkInDate", mcp.Description("App-compatible alias for check_in")),
+			mcp.WithString("check_out", mcp.Description("New check-out date (YYYY-MM-DD)")),
+			mcp.WithString("checkOutDate", mcp.Description("App-compatible alias for check_out")),
+			mcp.WithString("confirmation_number", mcp.Description("New confirmation number")),
+			mcp.WithString("confirmationNumber", mcp.Description("App-compatible alias for confirmation_number")),
+			mcp.WithArray("traveler_names", mcp.Description("Replacement traveler names")),
+			mcp.WithArray("travelerNames", mcp.Description("App-compatible alias for traveler_names")),
+			mcp.WithString("notes", mcp.Description("Replacement notes")),
+			mcp.WithString("note", mcp.Description("App-compatible alias for notes")),
+		)
+		s.AddTool(updateLodgingTool, handleUpdateLodging)
+
+		deleteLodgingTool := mcp.NewTool("delete_lodging",
+			mcp.WithDescription("Delete an existing lodging/hotel reservation block from the itinerary."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key (optional if default trip key is set)"),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Required(),
+				mcp.Description("Lodging block ID from add_lodging/get_trip JSON"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID containing the lodging block (optional)"),
+			),
+		)
+		s.AddTool(deleteLodgingTool, handleDeleteLodging)
 
 		// Remove place from trip tool
 		removePlaceTool := mcp.NewTool("remove_place",
@@ -395,6 +479,24 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			),
 		)
 		s.AddTool(updatePlaceVisitTimeTool, handleUpdatePlaceVisitTime)
+
+		deleteItineraryBlockTool := mcp.NewTool("delete_itinerary_block",
+			mcp.WithDescription("Delete any itinerary block by block ID. Use expected_type to guard the delete for notes, checklists, flights, places, lodging, or other reservation blocks."),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Required(),
+				mcp.Description("Itinerary block ID"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Description("Section ID containing the block (optional)"),
+			),
+			mcp.WithString("expected_type",
+				mcp.Description("Optional guard, e.g. flight, place, note, checklist"),
+			),
+		)
+		s.AddTool(deleteItineraryBlockTool, handleDeleteItineraryBlock)
 
 		setTripBudgetTool := mcp.NewTool("set_trip_budget",
 			mcp.WithDescription("Set or update the total trip budget amount and currency."),
