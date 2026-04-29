@@ -2614,6 +2614,9 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	privacy := request.GetString("privacy", "private")
+	if privacy != "public" && privacy != "private" && privacy != "friends" {
+		return mcp.NewToolResultError("privacy must be one of: public, private, friends"), nil
+	}
 	geoID := int(request.GetFloat("geo_id", 0))
 	if geoID == 0 {
 		return mcp.NewToolResultError("geo_id is required"), nil
@@ -2886,9 +2889,14 @@ func handleSendInvites(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	message := request.GetString("message", "")
 
 	// Parse comma-separated invitees
-	invitees := strings.Split(inviteesStr, ",")
-	for i := range invitees {
-		invitees[i] = strings.TrimSpace(invitees[i])
+	invitees := []string{}
+	for _, invitee := range strings.Split(inviteesStr, ",") {
+		if trimmed := strings.TrimSpace(invitee); trimmed != "" {
+			invitees = append(invitees, trimmed)
+		}
+	}
+	if len(invitees) == 0 {
+		return mcp.NewToolResultError("invitees must contain at least one email address or username"), nil
 	}
 
 	client := wanderlog.NewClient()

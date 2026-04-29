@@ -89,6 +89,91 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 	assert.Empty(t, missing, "registered MCP tools need integration coverage entries")
 }
 
+func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
+	writeTools := []string{
+		"add_flight",
+		"add_lodging",
+		"add_place",
+		"add_trip_expense",
+		"copy_trip",
+		"create_guide_from_trip",
+		"create_trip",
+		"delete_flight",
+		"delete_itinerary_block",
+		"delete_lodging",
+		"delete_trip",
+		"delete_trip_expense",
+		"delete_trips",
+		"like_trip",
+		"mark_notifications_read",
+		"move_place",
+		"register_trip_view",
+		"remove_place",
+		"reorder_places",
+		"restore_trip",
+		"send_trip_invites",
+		"set_trip_budget",
+		"set_user_kv",
+		"update_flight",
+		"update_lodging",
+		"update_place_notes",
+		"update_place_visit_time",
+		"update_trip",
+		"update_trip_expense",
+	}
+
+	readOnlyTools := createMCPServer(true).ListTools()
+	readWriteTools := createMCPServer(false).ListTools()
+	for _, name := range writeTools {
+		assert.NotContains(t, readOnlyTools, name, "%s should not be registered in read-only mode", name)
+		assert.Contains(t, readWriteTools, name, "%s should be registered when writes are enabled", name)
+	}
+}
+
+func TestMCPIntegration_WriteHandlerValidationBeforeAuth(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("create_trip_invalid_privacy", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "create_trip",
+				Arguments: map[string]interface{}{
+					"title":      "Invalid privacy",
+					"geo_id":     1,
+					"start_date": "2026-07-01",
+					"end_date":   "2026-07-03",
+					"privacy":    "secret",
+				},
+			},
+		}
+
+		result, err := handleCreateTrip(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "privacy must be one of")
+	})
+
+	t.Run("send_trip_invites_blank_invitees", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "send_trip_invites",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"invitees": " , ",
+					"message":  "hello",
+				},
+			},
+		}
+
+		result, err := handleSendInvites(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "invitees must contain")
+	})
+}
+
 // TestMCPIntegration_ListTrips tests the list_trips tool
 func TestMCPIntegration_ListTrips(t *testing.T) {
 	skipIntegrationTest(t)
