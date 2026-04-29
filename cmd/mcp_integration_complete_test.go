@@ -25,9 +25,9 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 2. Search for geo and create a trip
-	geoID := searchGeoIDForLifecycleTest(t, ctx, "Paris")
-	tripTitle := lifecycleTripTitle()
+	// 2. Search for geo and create a Japan trip
+	geoID := searchGeoIDForLifecycleTest(t, ctx, "Japan")
+	tripTitle := "MCP Japan Trip - Complete Feature Test"
 
 	createReq := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -35,8 +35,8 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			Arguments: map[string]interface{}{
 				"title":      tripTitle,
 				"geo_id":     geoID,
-				"start_date": "2026-06-01",
-				"end_date":   "2026-06-07",
+				"start_date": "2026-05-11",
+				"end_date":   "2026-05-17",
 				"privacy":    "private",
 			},
 		},
@@ -60,6 +60,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 	var (
 		itinerarySectionID int
 		placesAdded        []PlaceData
+		copiedTripKeys     []string
 	)
 
 	// 3. TEST READ OPERATIONS with created trip
@@ -105,7 +106,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			t.Skip("No unscheduled Places to visit section found")
 		}
 
-		placeData := searchAndGetPlaceData(t, "Senso-ji Temple")
+		placeData := searchAndGetPlaceData(t, "Senso-ji Temple Tokyo")
 		placesAdded = append(placesAdded, placeData)
 
 		request := mcp.CallToolRequest{
@@ -131,7 +132,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 
 	// 5. ADD PLACES TO ITINERARY (Dated sections for multiple days)
 	t.Run("add_places_to_day_1_itinerary", func(t *testing.T) {
-		sectionID := getDatedItinerarySectionIDByDate(t, tripKey, "2026-06-01")
+		sectionID := getDatedItinerarySectionIDByDate(t, tripKey, "2026-05-11")
 		if sectionID == 0 {
 			// Try getting any dated section
 			sectionID = getDatedItinerarySectionID(t, tripKey)
@@ -141,7 +142,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		}
 		itinerarySectionID = sectionID
 
-		places := []string{"Eiffel Tower", "Louvre Museum"}
+		places := []string{"Tokyo Tower", "Meiji Jingu Tokyo"}
 		for _, query := range places {
 			placeData := searchAndGetPlaceData(t, query)
 			placesAdded = append(placesAdded, placeData)
@@ -169,12 +170,13 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 	})
 
 	t.Run("add_places_to_day_2_itinerary", func(t *testing.T) {
-		sectionID := getDatedItinerarySectionIDByDate(t, tripKey, "2026-06-02")
+		sectionID := getDatedItinerarySectionIDByDate(t, tripKey, "2026-05-12")
 		if sectionID == 0 {
-			t.Skip("No dated itinerary section for 2026-06-02")
+			sectionID = getDatedItinerarySectionID(t, tripKey)
 		}
+		require.NotZero(t, sectionID, "No dated itinerary section found")
 
-		placeData := searchAndGetPlaceData(t, "Notre-Dame de Paris")
+		placeData := searchAndGetPlaceData(t, "Fushimi Inari Taisha Kyoto")
 		placesAdded = append(placesAdded, placeData)
 
 		request := mcp.CallToolRequest{
@@ -187,7 +189,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 					"latitude":   placeData.Lat,
 					"longitude":  placeData.Lng,
 					"section_id": sectionID,
-					"text":       "Medieval Catholic cathedral",
+					"text":       "Iconic Kyoto shrine with torii gates",
 				},
 			},
 		}
@@ -204,9 +206,11 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_flight",
 				Arguments: map[string]interface{}{
-					"trip_key":       tripKey,
-					"flight_number":  "AF128",
-					"departure_date": "2026-06-01",
+					"trip_key":          tripKey,
+					"flight_number":     "NH109",
+					"departure_date":    "2026-05-11",
+					"departure_airport": "JFK",
+					"arrival_airport":   "HND",
 				},
 			},
 		}
@@ -222,9 +226,11 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "add_flight",
 				Arguments: map[string]interface{}{
-					"trip_key":       tripKey,
-					"flight_number":  "AF129",
-					"departure_date": "2026-06-07",
+					"trip_key":          tripKey,
+					"flight_number":     "NH110",
+					"departure_date":    "2026-05-17",
+					"departure_airport": "HND",
+					"arrival_airport":   "JFK",
 				},
 			},
 		}
@@ -242,9 +248,9 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "search_hotels",
 				Arguments: map[string]interface{}{
-					"location":  "Paris",
-					"check_in":  "2026-06-01",
-					"check_out": "2026-06-07",
+					"location":  "Tokyo",
+					"check_in":  "2026-05-11",
+					"check_out": "2026-05-17",
 					"guests":    2,
 				},
 			},
@@ -253,7 +259,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		hotelResult, err := handleSearchHotels(ctx, searchReq)
 		require.NoError(t, err)
 
-		lodgingName := "Hôtel du Louvre"
+		lodgingName := "Hotel Metropolitan Tokyo Marunouchi"
 		var placeID string
 		var lat, lng float64
 
@@ -267,7 +273,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		}
 
 		// Get place details for coordinates
-		placeData := searchAndGetPlaceData(t, lodgingName+" Paris")
+		placeData := searchAndGetPlaceData(t, lodgingName+" Tokyo")
 		placeID = placeData.PlaceID
 		lat = placeData.Lat
 		lng = placeData.Lng
@@ -282,11 +288,11 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 					"propertyPlaceId":    placeID,
 					"latitude":           lat,
 					"longitude":          lng,
-					"checkInDate":        "2026-06-01",
-					"checkOutDate":       "2026-06-07",
+					"checkInDate":        "2026-05-11",
+					"checkOutDate":       "2026-05-17",
 					"confirmationNumber": "CONF123456",
 					"travelerNames":      []string{"Integration Traveler"},
-					"note":               "Added via add_lodging handler - Complete Feature Test",
+					"note":               "Tokyo stay for Japan complete feature test",
 				},
 			},
 		}
@@ -309,7 +315,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 				Name: "update_trip",
 				Arguments: map[string]interface{}{
 					"trip_key": tripKey,
-					"title":    "Paris Adventure 2026 - Complete Feature Test",
+					"title":    "Japan Adventure 2026 - Complete Feature Test",
 				},
 			},
 		}
@@ -326,8 +332,8 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 				Name: "update_trip",
 				Arguments: map[string]interface{}{
 					"trip_key":   tripKey,
-					"start_date": "2026-06-02",
-					"end_date":   "2026-06-08",
+					"start_date": "2026-05-11",
+					"end_date":   "2026-05-17",
 				},
 			},
 		}
@@ -355,7 +361,70 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		assert.False(t, result.IsError, "update_trip privacy should not error: %s", getTextContent(result))
 	})
 
-	// 9. REORDER PLACES (skip - requires internal block IDs, not Google Place IDs)
+	// 9. ADD BUDGET AND EXPENSES
+	t.Run("set_trip_budget", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "set_trip_budget",
+				Arguments: map[string]interface{}{
+					"trip_key": tripKey,
+					"amount":   450000,
+					"currency": "JPY",
+				},
+			},
+		}
+
+		result, err := handleSetTripBudget(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.IsError, "set_trip_budget should not error: %s", getTextContent(result))
+	})
+
+	t.Run("add_trip_expenses", func(t *testing.T) {
+		expenses := []map[string]interface{}{
+			{
+				"description":     "Tokyo hotel deposit",
+				"category":        "lodging",
+				"amount":          120000,
+				"currency":        "JPY",
+				"date":            "2026-05-11",
+				"associated_date": "2026-05-11",
+			},
+			{
+				"description":     "JR Pass and local transit",
+				"category":        "publicTransit",
+				"amount":          80000,
+				"currency":        "JPY",
+				"date":            "2026-05-12",
+				"associated_date": "2026-05-12",
+			},
+			{
+				"description":     "Museums and shrines",
+				"category":        "sightseeing",
+				"amount":          30000,
+				"currency":        "JPY",
+				"date":            "2026-05-13",
+				"associated_date": "2026-05-13",
+			},
+		}
+
+		for _, expense := range expenses {
+			expense["trip_key"] = tripKey
+			request := mcp.CallToolRequest{
+				Params: mcp.CallToolParams{
+					Name:      "add_trip_expense",
+					Arguments: expense,
+				},
+			}
+
+			result, err := handleAddTripExpense(ctx, request)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.False(t, result.IsError, "add_trip_expense should not error: %s", getTextContent(result))
+		}
+	})
+
+	// 10. REORDER PLACES (skip - requires internal block IDs, not Google Place IDs)
 	t.Run("reorder_places_in_section", func(t *testing.T) {
 		// The reorder_places API requires internal block IDs (integers), not Google Place IDs (strings).
 		// The placesAdded array contains Google Place IDs which cannot be used with reorder_places.
@@ -363,7 +432,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		t.Skip("Skipping reorder test - requires internal block IDs, not Google Place IDs")
 	})
 
-	// 10. LIKE TRIP
+	// 11. LIKE TRIP
 	t.Run("like_trip", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
@@ -425,7 +494,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		assert.False(t, result.IsError, "unlike_trip should not error: %s", getTextContent(result))
 	})
 
-	// 11. SEND TRIP INVITES
+	// 12. SEND TRIP INVITES
 	t.Run("send_trip_invites_error_case", func(t *testing.T) {
 		// This tests the error case - missing invitees
 		request := mcp.CallToolRequest{
@@ -444,7 +513,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		assert.True(t, result.IsError, "send_trip_invites should error without invitees")
 	})
 
-	// 12. COPY TRIP
+	// 13. COPY TRIP
 	t.Run("copy_trip", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
@@ -464,11 +533,11 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		copiedTripKey := extractTripKey(getTextContent(result))
 		if copiedTripKey != "" {
 			t.Logf("Copied trip to: %s", copiedTripKey)
-			// Don't delete the original, keep both for verification
+			copiedTripKeys = append(copiedTripKeys, copiedTripKey)
 		}
 	})
 
-	// 13. GET FLIGHTS
+	// 14. GET FLIGHTS
 	t.Run("get_flights_shows_added_flights", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
@@ -486,7 +555,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		assert.False(t, result.IsError, "get_flights should not error")
 	})
 
-	// 14. GET EXPENSES CSV (empty but should work)
+	// 15. GET EXPENSES CSV
 	t.Run("get_trip_expenses_csv", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
@@ -500,11 +569,10 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		result, err := handleGetTripExpensesCSV(ctx, request)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		// Expenses will be empty but should not error
 		assert.False(t, result.IsError, "get_trip_expenses_csv should not error")
 	})
 
-	// 15. FINAL VERIFICATION - Get trip and verify all contents
+	// 16. FINAL VERIFICATION - Get trip and verify all contents
 	t.Run("final_trip_verification", func(t *testing.T) {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
@@ -523,6 +591,9 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 
 		// Verify sections exist
 		assert.NotEmpty(t, trip.TripPlan.Itinerary.Sections, "Trip should have sections")
+		assert.Equal(t, float64(450000), trip.TripPlan.Itinerary.Budget.Amount.Amount)
+		assert.Equal(t, "JPY", trip.TripPlan.Itinerary.Budget.Amount.CurrencyCode)
+		assert.GreaterOrEqual(t, len(trip.TripPlan.Itinerary.Budget.Expenses), 3)
 
 		// Find and verify places in itinerary
 		hasPlaces := false
@@ -558,7 +629,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		assert.True(t, hasLodging, "Trip should have a lodging block")
 	})
 
-	// 16. CLEANUP - Delete the trip
+	// 17. CLEANUP - Delete the trip
 	t.Run("cleanup_delete_trip", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
@@ -574,6 +645,22 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		require.NotNil(t, result)
 		assert.False(t, result.IsError, "delete_trip should not error: %s", getTextContent(result))
 		t.Logf("Cleaned up trip: %s", tripKey)
+
+		for _, copiedTripKey := range copiedTripKeys {
+			copyDeleteReq := mcp.CallToolRequest{
+				Params: mcp.CallToolParams{
+					Name: "delete_trip",
+					Arguments: map[string]interface{}{
+						"trip_key": copiedTripKey,
+					},
+				},
+			}
+			copyDeleteResult, err := handleDeleteTrip(ctx, copyDeleteReq)
+			require.NoError(t, err)
+			require.NotNil(t, copyDeleteResult)
+			assert.False(t, copyDeleteResult.IsError, "delete copied trip should not error: %s", getTextContent(copyDeleteResult))
+			t.Logf("Cleaned up copied trip: %s", copiedTripKey)
+		}
 	})
 
 	t.Logf("=== COMPLETE FEATURE TEST SUMMARY ===")
@@ -600,8 +687,7 @@ func getUnscheduledPlacesSectionID(t *testing.T, tripKey string) int {
 	}
 
 	for _, section := range trip.TripPlan.Itinerary.Sections {
-		// Unscheduled sections have ID < 1000000000 and type "placeList"
-		if section.ID < 1000000000 && section.Type == "placeList" && section.Heading == "Places to visit" {
+		if section.Heading == "Places to visit" && section.Date == nil {
 			return section.ID
 		}
 	}

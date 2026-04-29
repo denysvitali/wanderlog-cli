@@ -130,11 +130,21 @@ func searchAndGetPlaceData(t *testing.T, query string) PlaceData {
 	require.True(t, result.Success, "Search API returned success=false")
 	require.NotEmpty(t, result.Data, "No search results found for: %s", query)
 
-	// Get the first result's place_id
-	placeID := result.Data[0].PlaceID
-	require.NotEmpty(t, placeID, "First search result has empty place_id")
+	// Use the first result that can be resolved to place details. The live
+	// autocomplete endpoint can return hotel/search suggestions without a
+	// Google place_id, which are not usable by add_place/add_lodging.
+	var resultIndex int
+	var placeID string
+	for i, candidate := range result.Data {
+		if strings.TrimSpace(candidate.PlaceID) != "" {
+			resultIndex = i
+			placeID = candidate.PlaceID
+			break
+		}
+	}
+	require.NotEmpty(t, placeID, "No search result with a usable place_id found for: %s", query)
 
-	t.Logf("Found place_id for '%s': %s (Description: %s)", query, placeID, result.Data[0].Description)
+	t.Logf("Found place_id for '%s': %s (Description: %s)", query, placeID, result.Data[resultIndex].Description)
 
 	// Fetch full place details to get coordinates
 	details, err := client.GetPlaceDetails(placeID)
