@@ -4,6 +4,7 @@
     "method": "POST",
     "path": "/api/user/login",
     "referencePath": "/api/user/login",
+    "referenceMethod": "POST",
     "auth": false,
     "body": {
       "email": "user@example.com",
@@ -15,6 +16,7 @@
     "method": "GET",
     "path": "/api/tripPlans/trip-key",
     "referencePath": "/api/tripPlans",
+    "referenceMethod": "GET",
     "auth": false,
     "query": {
       "clientSchemaVersion": "2"
@@ -51,6 +53,99 @@
     }
   },
   {
+    "name": "GetAllAirlines",
+    "method": "GET",
+    "path": "/api/flights/allAirlines",
+    "referencePath": "/api/flights/allAirlines",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetGooglePriceRates",
+    "method": "GET",
+    "path": "/api/lodging/getGooglePriceRates",
+    "referencePath": "/api/lodging/getGooglePriceRates",
+    "referenceMethod": "GET",
+    "auth": false,
+    "query": {
+      "dates": "{}",
+      "guests": "{}",
+      "id": "property-123"
+    }
+  },
+  {
+    "name": "GetGlobalConfig",
+    "method": "GET",
+    "path": "/api/config/globalConfig",
+    "referencePath": "/api/config/globalConfig",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetSessionStore",
+    "method": "GET",
+    "path": "/api/sessionStore",
+    "referencePath": "/api/sessionStore",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetFeedHome",
+    "method": "GET",
+    "path": "/api/tripPlans/home",
+    "referencePath": "/api/tripPlans/home",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetFeed",
+    "method": "GET",
+    "path": "/api/tripPlans/feed",
+    "referencePath": "/api/tripPlans/feed",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetFeedV2",
+    "method": "GET",
+    "path": "/api/tripPlans/feed/v2",
+    "referencePath": "/api/tripPlans/feed/v2",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetFeedMostRecent",
+    "method": "GET",
+    "path": "/api/tripPlans/feed/mostRecentlyEdited",
+    "referencePath": "/api/tripPlans/feed/mostRecentlyEdited",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetFriendsPlans",
+    "method": "GET",
+    "path": "/api/tripPlans/friendsPlans",
+    "referencePath": "/api/tripPlans/friendsPlans",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "BrowseGuides",
+    "method": "GET",
+    "path": "/api/tripPlans/browse/guides",
+    "referencePath": "/api/tripPlans/browse/guides",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "GetUserTrips",
+    "method": "GET",
+    "path": "/api/tripPlans",
+    "referencePath": "/api/tripPlans",
+    "referenceMethod": "GET",
+    "auth": false
+  },
+  {
     "name": "CreateTrip",
     "method": "POST",
     "path": "/api/tripPlans",
@@ -69,6 +164,21 @@
       "title": "API Contract Trip",
       "type": "plan"
     }
+  },
+  {
+    "name": "CreateExampleTrip",
+    "method": "POST",
+    "path": "/api/tripPlans/createExampleTripPlan",
+    "referencePath": "/api/tripPlans/createExampleTripPlan",
+    "referenceMethod": "POST",
+    "auth": true
+  },
+  {
+    "name": "DeleteTrip",
+    "method": "DELETE",
+    "path": "/api/tripPlans/trip-key",
+    "referencePath": "/api/tripPlans",
+    "auth": true
   },
   {
     "name": "AddPlace",
@@ -123,6 +233,245 @@
     "auth": true,
     "body": {
       "liked": true
+    }
+  },
+  {
+    "name": "CopyTrip",
+    "method": "POST",
+    "path": "/api/tripPlans/copy/source-key",
+    "referencePath": "/api/tripPlans",
+    "auth": true
+  },
+  {
+    "name": "RestoreTrip",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/restore",
+    "referencePath": "/api/tripPlans",
+    "auth": true
+  },
+  {
+    "name": "SendTripInvites",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/invite",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "invitees": [
+        "friend@example.com"
+      ],
+      "message": "Join this trip"
+    }
+  },
+  {
+    "name": "ListTripInvites",
+    "method": "GET",
+    "path": "/api/tripPlans/trip-key/invites",
+    "referencePath": "/api/tripPlans",
+    "auth": true
+  },
+  {
+    "name": "AddCollaborator",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/collaborator",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "userId": 42
+    }
+  },
+  {
+    "name": "RemoveCollaborator",
+    "method": "DELETE",
+    "path": "/api/tripPlans/trip-key/collaborator",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "userId": 42
+    }
+  },
+  {
+    "name": "ExportTrip",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/export/v2",
+    "referencePath": "/api/tripPlans",
+    "auth": true
+  },
+  {
+    "name": "ToggleChecklistItem",
+    "method": "POST",
+    "path": "/api/tripPlans/checklistSection",
+    "referencePath": "/api/tripPlans/checklistSection",
+    "referenceMethod": "POST",
+    "auth": true,
+    "body": {
+      "action": "toggleItem",
+      "checked": true,
+      "itemId": 99,
+      "sectionId": 7
+    }
+  },
+  {
+    "name": "GetMe",
+    "method": "GET",
+    "path": "/api/user",
+    "referencePath": "/api/user",
+    "referenceMethod": "GET",
+    "auth": true
+  },
+  {
+    "name": "ServerLogout",
+    "method": "POST",
+    "path": "/api/user/logout",
+    "referencePath": "/api/user/logout",
+    "referenceMethod": "POST",
+    "auth": true
+  },
+  {
+    "name": "GetNotifications",
+    "method": "GET",
+    "path": "/api/user/notifications",
+    "referencePath": "/api/user/notifications",
+    "referenceMethod": "GET",
+    "auth": true,
+    "query": {
+      "offset": "25"
+    }
+  },
+  {
+    "name": "MarkNotificationsRead",
+    "method": "POST",
+    "path": "/api/user/notifications/markRead",
+    "referencePath": "/api/user/notifications/markRead",
+    "referenceMethod": "POST",
+    "auth": true,
+    "body": {
+      "notificationIds": [
+        "notification-1"
+      ]
+    }
+  },
+  {
+    "name": "GetNotificationSettings",
+    "method": "GET",
+    "path": "/api/user/notification/settings",
+    "referencePath": "/api/user/notification/settings",
+    "referenceMethod": "GET",
+    "auth": true
+  },
+  {
+    "name": "UpdateNotificationSettings",
+    "method": "POST",
+    "path": "/api/user/notification/settings",
+    "referencePath": "/api/user/notification/settings",
+    "auth": true,
+    "body": {
+      "notificationSettings": {
+        "email": true
+      }
+    }
+  },
+  {
+    "name": "FindUserByEmail",
+    "method": "GET",
+    "path": "/api/user/byEmail",
+    "referencePath": "/api/user/byEmail",
+    "auth": true,
+    "query": {
+      "email": "friend@example.com"
+    }
+  },
+  {
+    "name": "BlockUser",
+    "method": "POST",
+    "path": "/api/user/block",
+    "referencePath": "/api/user/block",
+    "referenceMethod": "POST",
+    "auth": true,
+    "body": {
+      "userId": "42"
+    }
+  },
+  {
+    "name": "SetUTCOffset",
+    "method": "POST",
+    "path": "/api/user/utcOffset",
+    "referencePath": "/api/user/utcOffset",
+    "referenceMethod": "POST",
+    "auth": true,
+    "body": {
+      "utcOffset": 120
+    }
+  },
+  {
+    "name": "GetTripUpdateRequired",
+    "method": "GET",
+    "path": "/api/tripPlans/trip-key/updateRequired",
+    "referencePath": "/api/tripPlans",
+    "auth": false,
+    "query": {
+      "clientSchemaVersion": "2"
+    }
+  },
+  {
+    "name": "SetTripDistinction",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/distinction",
+    "referencePath": "/api/tripPlans",
+    "auth": true,
+    "body": {
+      "distinction": "featured"
+    }
+  },
+  {
+    "name": "RegisterTripView",
+    "method": "POST",
+    "path": "/api/tripPlans/trip-key/registerView",
+    "referencePath": "/api/tripPlans",
+    "auth": false
+  },
+  {
+    "name": "GetJournalStopPolylines",
+    "method": "POST",
+    "path": "/api/tripPlans/journalStopPolylines",
+    "referencePath": "/api/tripPlans/journalStopPolylines",
+    "referenceMethod": "POST",
+    "auth": true,
+    "body": {
+      "existingPolylines": [],
+      "stops": [
+        {
+          "id": "a",
+          "lat": 35.6812,
+          "lng": 139.7671,
+          "placeId": "place-a",
+          "stopType": "place"
+        },
+        {
+          "id": "b",
+          "lat": 35.6895,
+          "lng": 139.6917,
+          "placeId": "place-b",
+          "stopType": "place"
+        }
+      ]
+    }
+  },
+  {
+    "name": "GetIfEdited",
+    "method": "POST",
+    "path": "/api/tripPlans/getIfEdited",
+    "referencePath": "/api/tripPlans/getIfEdited",
+    "referenceMethod": "POST",
+    "auth": false,
+    "body": {
+      "clientSchemaVersion": 2,
+      "platform": "web",
+      "tripPlans": [
+        {
+          "key": "trip-key",
+          "lastEditRevision": 4
+        }
+      ]
     }
   }
 ]
