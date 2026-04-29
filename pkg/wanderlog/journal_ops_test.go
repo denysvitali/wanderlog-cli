@@ -119,6 +119,21 @@ func TestSetTripDistinction(t *testing.T) {
 	}
 }
 
+func TestUpdateTripPlanGeo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/tripPlans/mytrip/updateTripPlanGeo/123" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	if err := client.UpdateTripPlanGeo("mytrip", 123); err != nil {
+		t.Fatalf("UpdateTripPlanGeo: %v", err)
+	}
+}
+
 func TestCreateGuideFromTripPlan(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" || !strings.HasSuffix(r.URL.Path, "/createGuideFromTripPlan") {

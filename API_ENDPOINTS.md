@@ -141,9 +141,8 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 - 🧰 **Raw API Covered** - Endpoint can be called with `wanderlog api`, but no typed wrapper exists yet
 
 > **Note**: The tables below are a historical inventory of every discovered
-> endpoint. For the current coverage summary (user, feed, journal, config
-> groups), see the *Recently Added* sections at the top of this file. Some
-> rows below are marked ❌ but are now fully typed — the groups above win.
+> endpoint. Browser-only, payment, telemetry, and admin endpoints may remain
+> intentionally unwrapped even when they are available through `wanderlog api`.
 
 ## Complete API Endpoint Catalog
 
@@ -194,11 +193,11 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | `/api/flights/autocompleteAirport` | GET | ✅ `AutocompleteAirport()` | `client.go:506` | - |
 | `/api/flights/autocompleteAirportWithLocation` | GET | ✅ `AutocompleteAirportWithLocation()` | `client.go:538` | - |
 | `/api/flights/flightStopsLista` | GET | ✅ `GetFlightStops()` | `client.go:571` | - |
-| `/api/tripPlans/flights` | GET | ❌ Not Implemented | - | - |
+| `/api/tripPlans/:key/flights` | GET | ✅ `GetTripFlights()` | `write_ops_social.go:346` | `TestIntegration_GetTripFlights` |
 | `/api/lodging/searchLodgings` | POST | ✅ `SearchLodgings()` | `client.go:671` | `search_hotels` |
 | `/api/lodging/getGooglePriceRates` | POST | ✅ `GetGooglePriceRates()` | `client.go:721` | - |
 
-> **Note:** The MCP tool `search_hotels` uses the lodging search method. The `search_flights` tool was removed because it was not implemented (returned "not implemented" errors). The `/api/tripPlans/flights` endpoint for retrieving flights attached to a trip is not yet implemented in the Go client.
+> **Note:** The MCP tool `search_hotels` uses the lodging search method. The old `search_flights` tool was removed because it returned placeholder errors; attached trip flights are available through `get_flights`.
 
 ### Collaboration
 
@@ -221,9 +220,9 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
-| `/api/user` | GET/POST | ❌ | Get/update user profile |
+| `/api/user` | GET/POST | ✅ `GetMe()` / `UpdateMe()` | Get/update user profile |
 | `/api/user/login` | POST | ✅ Partial | User login (implemented in auth.go) |
-| `/api/user/logout` | POST | ❌ | User logout |
+| `/api/user/logout` | POST | ✅ `ServerLogout()` | User logout |
 | `/api/user/register` | POST | ❌ | User registration |
 | `/api/user/profilePicture` | POST | ❌ | Update profile picture |
 | `/api/user/loginFacebookAccessToken` | POST | ❌ | Facebook OAuth login |
@@ -245,13 +244,13 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
 | `/api/user/utcOffset` | POST | ❌ | Set user timezone |
-| `/api/user/isUsernameTaken/:username` | GET | ❌ | Check username availability |
+| `/api/user/isUsernameTaken/:username` | GET | ✅ `IsUsernameTaken()` | Check username availability |
 | `/api/user/subscribeBlog` | POST | ❌ | Subscribe to blog |
-| `/api/user/keyValue/:key` | GET/POST | ❌ | Key-value storage |
-| `/api/user/notification/settings` | GET/POST | ❌ | Notification settings |
-| `/api/user/notifications` | GET | ❌ | Get notifications |
-| `/api/user/notifications/markRead` | POST | ❌ | Mark notifications read |
-| `/api/user/emails` | GET | ❌ | Get user emails |
+| `/api/user/keyValue/:key` | GET/POST | ✅ `GetUserKV()` / `SetUserKV()` | Key-value storage |
+| `/api/user/notification/settings` | GET/POST | ✅ `GetNotificationSettings()` / `UpdateNotificationSettings()` | Notification settings |
+| `/api/user/notifications` | GET | ✅ `GetNotifications()` | Get notifications |
+| `/api/user/notifications/markRead` | POST | ✅ `MarkNotificationsRead()` | Mark notifications read |
+| `/api/user/emails` | GET | ✅ `GetUserEmails()` | Get user emails |
 | `/api/user/fcmToken` | POST | ❌ | Firebase Cloud Messaging token |
 | `/api/user/saveFlightDealSettings` | POST | ❌ | Flight deal preferences |
 | `/api/user/isDeleting` | GET/POST | ❌ | Account deletion status |
@@ -266,7 +265,7 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | `/api/user/mutuallyFollowing` | GET | ❌ | Get mutual followers |
 | `/api/user/:userId/follows` | GET | ❌ | Check if user follows |
 | `/api/user/:userId/email` | GET | ❌ | Get user email |
-| `/api/user/autocomplete/:search` | GET | ❌ | Autocomplete users |
+| `/api/user/autocomplete/:search` | GET | ✅ `AutocompleteUsers()` | Autocomplete users |
 | `/api/user/byEmail` | POST | ❌ | Find user by email |
 | `/api/user/leaderboard` | GET | ❌ | Get leaderboard |
 | `/api/user/block` | POST | ❌ | Block user |
@@ -277,23 +276,23 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
 | `/api/tripPlans` | GET | ✅ | List user trips |
-| `/api/tripPlans/feed` | GET | ❌ | Get trip feed |
-| `/api/tripPlans/feed/v2` | GET | ❌ | Get trip feed v2 |
-| `/api/tripPlans/feed/mostRecentlyEdited` | GET | ❌ | Recently edited trips |
-| `/api/tripPlans/home` | GET | ❌ | Home feed |
-| `/api/tripPlans/history` | GET | ❌ | Trip history |
-| `/api/tripPlans/friendsPlans` | GET | ❌ | Friends' trips |
+| `/api/tripPlans/feed` | GET | ✅ `GetFeed()` | Get trip feed |
+| `/api/tripPlans/feed/v2` | GET | ✅ `GetFeedV2()` | Get trip feed v2 |
+| `/api/tripPlans/feed/mostRecentlyEdited` | GET | ✅ `GetFeedMostRecent()` | Recently edited trips |
+| `/api/tripPlans/home` | GET | ✅ `GetFeedHome()` | Home feed |
+| `/api/tripPlans/history` | GET | ✅ `GetTripHistory()` | Trip history |
+| `/api/tripPlans/friendsPlans` | GET | ✅ `GetFriendsPlans()` | Friends' trips |
 | `/api/tripPlans/myProfile/` | GET | ✅ | User's profile trips |
-| `/api/tripPlans/profile/:userId` | GET | ❌ | User profile trips |
-| `/api/tripPlans/profile/byUsername/:username` | GET | ❌ | Profile by username |
+| `/api/tripPlans/profile/:userId` | GET | ✅ `GetUserProfile()` | User profile trips |
+| `/api/tripPlans/profile/byUsername/:username` | GET | ✅ `GetUserProfileByUsername()` | Profile by username |
 | `/api/tripPlans/profile/sampleMapsByUsernames/:usernames` | GET | ❌ | Sample maps by usernames |
 
 ### Trip Operations - Guides & Browse
 
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
-| `/api/tripPlans/browse/guides` | GET | ❌ | Browse guides |
-| `/api/tripPlans/browse/guides/:geoId` | GET | ❌ | Browse guides by location |
+| `/api/tripPlans/browse/guides` | GET | ✅ `BrowseGuides()` | Browse guides |
+| `/api/tripPlans/browse/guides/:geoId` | GET | ✅ `BrowseGuides()` | Browse guides by location |
 | `/api/tripPlans/landingPage/guides` | GET | ❌ | Landing page guides |
 | `/api/tripPlans/landingPage/stories` | GET | ❌ | Landing page stories |
 | `/api/tripPlans/:key/:geoId/relatedGuides` | GET | ❌ | Related guides |
@@ -302,15 +301,15 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 
 | Endpoint | Method | Implementation | Location | Test |
 |----------|--------|----------------|----------|------|
-| `/api/tripPlans/createExampleTripPlan` | POST | ❌ | - | - |
+| `/api/tripPlans/createExampleTripPlan` | POST | ✅ `CreateExampleTrip()` | `write_ops_trip.go:126` | - |
 | `/api/tripPlans/:key/flights` | GET | ✅ `GetTripFlights()` | `write_ops.go:1125` | `TestIntegration_GetTripFlights` |
 | `/api/tripPlans/:key/export/v2` | POST | ✅ `ExportTrip()` | `write_ops.go:1155` | `TestIntegration_ExportTrip` |
-| `/api/tripPlans/:key/createGuideFromTripPlan` | POST | ❌ | - | - |
-| `/api/tripPlans/:key/updateTripPlanGeo/:geoId` | POST | ❌ | - | - |
-| `/api/tripPlans/:key/distinction` | GET/POST | ❌ | - | - |
-| `/api/tripPlans/:key/registerView` | POST | ❌ | - | - |
-| `/api/tripPlans/:key/updateRequired` | GET | ❌ | - | - |
-| `/api/tripPlans/getIfEdited` | POST | ❌ | - | - |
+| `/api/tripPlans/:key/createGuideFromTripPlan` | POST | ✅ `CreateGuideFromTripPlan()` | `journal_ops.go:158` | - |
+| `/api/tripPlans/:key/updateTripPlanGeo/:geoId` | POST | ✅ `UpdateTripPlanGeo()` | `journal_ops.go:158` | `TestUpdateTripPlanGeo` |
+| `/api/tripPlans/:key/distinction` | GET/POST | ✅ `GetTripDistinction()` / `SetTripDistinction()` | `journal_ops.go:118` | - |
+| `/api/tripPlans/:key/registerView` | POST | ✅ `RegisterTripView()` | `journal_ops.go:80` | - |
+| `/api/tripPlans/:key/updateRequired` | GET | ✅ `GetTripUpdateRequired()` | `journal_ops.go:94` | - |
+| `/api/tripPlans/getIfEdited` | POST | ✅ `GetIfEdited()` | `feed_ops.go:129` | - |
 | `/api/tripPlans/:key/sections` | GET | ✅ | `GetTripSections()` | |
 | `/api/tripPlans/:key/sections/:sectionId/place` | POST | ✅ | `AddPlace()` | |
 | `/api/tripPlans/:key/sections/:sectionId/place/:placeId` | DELETE | ✅ | `RemovePlace()` | |
@@ -321,9 +320,9 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
-| `/api/tripPlans/viewOnlyJournal/:journalKey` | GET | ❌ | View-only journal |
+| `/api/tripPlans/viewOnlyJournal/:journalKey` | GET | ✅ `GetViewOnlyJournal()` | View-only journal |
 | `/api/tripPlans/viewOnlyJournal/mobile/:journalKey` | GET | ❌ | Mobile view-only journal |
-| `/api/tripPlans/:key/expensesAsCSV` | GET | ❌ | Export expenses as CSV |
+| `/api/tripPlans/:key/expensesAsCSV` | GET | ✅ `GetTripExpensesCSV()` | Export expenses as CSV |
 
 ### Payments & Subscriptions
 
@@ -348,9 +347,9 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | `/api/tripPlans/admin/recent/plans` | GET | ❌ | Recent plans (admin) |
 | `/api/tripPlans/admin/recent/recommendations` | GET | ❌ | Recent recommendations (admin) |
 | `/api/mailboxes/:id` | GET | ❌ | Get mailbox |
-| `/api/sessionStore` | GET/POST | ❌ | Session storage |
-| `/api/sessionStore/preferences/:key` | GET/POST | ❌ | Session preferences |
-| `/api/config/globalConfig` | GET | ❌ | Global configuration |
+| `/api/sessionStore` | GET/POST | ✅ `GetSessionStore()` / `SetSessionStoreValue()` | Session storage |
+| `/api/sessionStore/preferences/:key` | GET/POST | ✅ `GetSessionPreferences()` | Session preferences |
+| `/api/config/globalConfig` | GET | ✅ `GetGlobalConfig()` | Global configuration |
 
 ### Analytics
 

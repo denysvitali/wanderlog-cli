@@ -154,6 +154,22 @@ func (c *Client) SetTripDistinction(tripKey, distinction string) error {
 	return decodeOpenAPIBody("SetTripDistinction", resp.StatusCode(), resp.Body, nil)
 }
 
+// UpdateTripPlanGeo changes the primary destination geo for a trip.
+func (c *Client) UpdateTripPlanGeo(tripKey string, geoID int) error {
+	if err := c.requireAuth("UpdateTripPlanGeo"); err != nil {
+		return err
+	}
+	api, err := c.openAPI()
+	if err != nil {
+		return err
+	}
+	resp, err := api.UpdateTripPlanGeoWithResponse(context.Background(), tripKey, geoID)
+	if err != nil {
+		return err
+	}
+	return decodeOpenAPIBody("UpdateTripPlanGeo", resp.StatusCode(), resp.Body, nil)
+}
+
 // CreateGuideFromTripPlan promotes a trip plan into a published guide.
 func (c *Client) CreateGuideFromTripPlan(tripKey string) (*CreateGuideResponse, error) {
 	api, err := c.openAPI()
