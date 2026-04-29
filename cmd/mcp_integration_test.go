@@ -20,11 +20,13 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"add_flight":                true,
 		"add_lodging":               true,
 		"add_place":                 true,
+		"add_trip_expense":          true,
 		"autocomplete_users":        true,
 		"browse_guides":             true,
 		"copy_trip":                 true,
 		"create_guide_from_trip":    true,
 		"create_trip":               true,
+		"delete_trip_expense":       true,
 		"delete_trip":               true,
 		"delete_trips":              true,
 		"get_feed_friends":          true,
@@ -64,7 +66,10 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"search_places_wanderlog":   true,
 		"search_restaurants":        true,
 		"send_trip_invites":         true,
+		"set_trip_budget":           true,
 		"set_user_kv":               true,
+		"update_place_notes":        true,
+		"update_trip_expense":       true,
 		"update_trip":               true,
 	}
 
@@ -1429,6 +1434,75 @@ func TestMCPIntegration_ReorderPlaces_ErrorCases(t *testing.T) {
 		}
 
 		result, err := handleReorderPlaces(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+}
+
+// TestMCPIntegration_BudgetTools_ErrorCases tests trip budget tool validation.
+func TestMCPIntegration_BudgetTools_ErrorCases(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("set_trip_budget_missing_amount", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "set_trip_budget",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"currency": "EUR",
+				},
+			},
+		}
+		result, err := handleSetTripBudget(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("add_trip_expense_missing_description", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_trip_expense",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"amount":   12.5,
+					"currency": "EUR",
+				},
+			},
+		}
+		result, err := handleAddTripExpense(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("update_trip_expense_missing_expense_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_trip_expense",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"amount":   20,
+				},
+			},
+		}
+		result, err := handleUpdateTripExpense(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+	})
+
+	t.Run("delete_trip_expense_missing_expense_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "delete_trip_expense",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+		result, err := handleDeleteTripExpense(ctx, request)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.True(t, result.IsError)

@@ -12,6 +12,16 @@ import (
 func TestSearchLodgings(t *testing.T) {
 	t.Run("successful search", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/geo/countries") {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+				return
+			}
+			if r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/geo/listGeosWithSearchedCategories") {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"success":true,"data":[{"id":1,"name":"Tokyo","bounds":[138.29911,34.57763,141.24051,36.44085]}]}`))
+				return
+			}
 			if r.Method != "POST" || !strings.HasSuffix(r.URL.Path, "/lodging/searchLodgings") {
 				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 			}
@@ -23,11 +33,18 @@ func TestSearchLodgings(t *testing.T) {
 			if err := json.Unmarshal(body, &payload); err != nil {
 				t.Fatalf("decoding body: %v", err)
 			}
-			if _, ok := payload["childrenAges"]; !ok {
-				t.Fatalf("expected childrenAges in request body: %s", string(body))
+			if _, ok := payload["bounds"]; !ok {
+				t.Fatalf("expected bounds in request body: %s", string(body))
+			}
+			guests, ok := payload["guests"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected nested guests in request body: %s", string(body))
+			}
+			if _, ok := guests["childrenAges"]; !ok {
+				t.Fatalf("expected guests.childrenAges in request body: %s", string(body))
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+			_, _ = w.Write([]byte(`{"success":true,"offers":[{"propertyId":"prop-1","name":"Tokyo Hotel"}]}`))
 		}))
 		defer server.Close()
 
@@ -39,10 +56,16 @@ func TestSearchLodgings(t *testing.T) {
 		if !result.Success {
 			t.Error("expected success")
 		}
+		if len(result.Data) != 1 || result.Data[0].PropertyID != "prop-1" {
+			t.Fatalf("expected offers to be normalized into data, got %+v", result.Data)
+		}
 	})
 
 	t.Run("api returns success=false", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if writeTestGeoEndpoints(w, r) {
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"success":false,"error":"no results"}`))
 		}))
@@ -57,6 +80,9 @@ func TestSearchLodgings(t *testing.T) {
 
 	t.Run("non-200 response", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if writeTestGeoEndpoints(w, r) {
+				return
+			}
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
 		defer server.Close()
@@ -67,6 +93,20 @@ func TestSearchLodgings(t *testing.T) {
 			t.Fatal("expected error for non-200")
 		}
 	})
+}
+
+func writeTestGeoEndpoints(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/geo/countries") {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+		return true
+	}
+	if r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/geo/listGeosWithSearchedCategories") {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":[{"id":1,"name":"Tokyo","bounds":[138.29911,34.57763,141.24051,36.44085]},{"id":2,"name":"Nowhere","bounds":[1,2,3,4]}]}`))
+		return true
+	}
+	return false
 }
 
 func TestGetGooglePriceRates(t *testing.T) {

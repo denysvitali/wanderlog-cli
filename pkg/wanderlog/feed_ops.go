@@ -197,8 +197,9 @@ func (c *Client) BrowseGuides(geoID int) (*BrowseGuidesResponse, error) {
 
 // GeoIDName represents a geo entry with ID and name, returned by various geo list endpoints.
 type GeoIDName struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID     int       `json:"id"`
+	Name   string    `json:"name"`
+	Bounds []float64 `json:"bounds"`
 }
 
 // GeoSearchResult holds combined country and city geo entries.

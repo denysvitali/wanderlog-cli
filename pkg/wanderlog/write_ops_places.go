@@ -248,42 +248,9 @@ func (c *Client) MovePlace(tripKey string, placeID, fromSectionID, toSectionID, 
 		return fmt.Errorf("getting current trip: %w", err)
 	}
 
-	fromIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, fromSectionID)
-	if fromIdx < 0 {
-		return fmt.Errorf("source section %d not found", fromSectionID)
-	}
-
-	toIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, toSectionID)
-	if toIdx < 0 {
-		return fmt.Errorf("destination section %d not found", toSectionID)
-	}
-
-	// Find the block index of the place in the source section
-	blockIdx := -1
-	var blockData any
-	for i, block := range trip.TripPlan.Itinerary.Sections[fromIdx].Blocks {
-		if block.ID == placeID {
-			blockIdx = i
-			blockData = block
-			break
-		}
-	}
-	if blockIdx < 0 {
-		return fmt.Errorf("place %d not found in section %d", placeID, fromSectionID)
-	}
-
-	// Build operations: delete from source, insert into destination
-	ops := []Operation{
-		DeleteFromList(
-			[]any{"itinerary", "sections", fromIdx, "blocks"},
-			blockIdx,
-			blockData,
-		),
-		InsertInList(
-			[]any{"itinerary", "sections", toIdx, "blocks"},
-			position,
-			blockData,
-		),
+	ops, err := movePlaceOperations(trip.TripPlan.Itinerary.Sections, placeID, fromSectionID, toSectionID, position)
+	if err != nil {
+		return err
 	}
 
 	if err := c.ApplyOperations(tripKey, ops); err != nil {
@@ -313,36 +280,9 @@ func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) er
 		return fmt.Errorf("getting current trip: %w", err)
 	}
 
-	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
-	if sectionIdx < 0 {
-		return fmt.Errorf("section %d not found", sectionID)
-	}
-
-	section := trip.TripPlan.Itinerary.Sections[sectionIdx]
-
-	// Build a map of block ID -> block data
-	blockMap := make(map[int]interface{})
-	for _, block := range section.Blocks {
-		blockMap[block.ID] = block
-	}
-
-	// Build the new blocks list in the requested order
-	newBlocks := make([]any, 0, len(placeIDs))
-	for _, id := range placeIDs {
-		block, ok := blockMap[id]
-		if !ok {
-			return fmt.Errorf("place %d not found in section %d", id, sectionID)
-		}
-		newBlocks = append(newBlocks, block)
-	}
-
-	// Replace the entire blocks array
-	ops := []Operation{
-		ReplaceInObject(
-			[]any{"itinerary", "sections", sectionIdx, "blocks"},
-			section.Blocks,
-			newBlocks,
-		),
+	ops, err := reorderPlacesOperations(trip.TripPlan.Itinerary.Sections, sectionID, placeIDs)
+	if err != nil {
+		return err
 	}
 
 	if err := c.ApplyOperations(tripKey, ops); err != nil {
@@ -356,4 +296,100 @@ func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) er
 	}).Info("Successfully reordered places")
 
 	return nil
+}
+
+func movePlaceOperations(sections []ItSections, placeID, fromSectionID, toSectionID, position int) ([]Operation, error) {
+	fromIdx := FindSectionIndex(sections, fromSectionID)
+	if fromIdx < 0 {
+		return nil, fmt.Errorf("source section %d not found", fromSectionID)
+	}
+	toIdx := FindSectionIndex(sections, toSectionID)
+	if toIdx < 0 {
+		return nil, fmt.Errorf("destination section %d not found", toSectionID)
+	}
+	if position < 0 {
+		return nil, fmt.Errorf("position must be >= 0")
+	}
+
+	blockIdx := -1
+	var blockData any
+	for i, block := range sections[fromIdx].Blocks {
+		if block.ID == placeID {
+			blockIdx = i
+			blockData = block
+			break
+		}
+	}
+	if blockIdx < 0 {
+		return nil, fmt.Errorf("place %d not found in section %d", placeID, fromSectionID)
+	}
+
+	insertPosition := position
+	if insertPosition > len(sections[toIdx].Blocks) {
+		insertPosition = len(sections[toIdx].Blocks)
+	}
+	if fromIdx == toIdx && insertPosition > blockIdx {
+		insertPosition--
+	}
+
+	return []Operation{
+		DeleteFromList(
+			[]any{"itinerary", "sections", fromIdx, "blocks"},
+			blockIdx,
+			blockData,
+		),
+		InsertInList(
+			[]any{"itinerary", "sections", toIdx, "blocks"},
+			insertPosition,
+			blockData,
+		),
+	}, nil
+}
+
+func reorderPlacesOperations(sections []ItSections, sectionID int, placeIDs []int) ([]Operation, error) {
+	sectionIdx := FindSectionIndex(sections, sectionID)
+	if sectionIdx < 0 {
+		return nil, fmt.Errorf("section %d not found", sectionID)
+	}
+	section := sections[sectionIdx]
+
+	blockMap := make(map[int]any)
+	order := make(map[int]int, len(placeIDs))
+	for i, id := range placeIDs {
+		if _, exists := order[id]; exists {
+			return nil, fmt.Errorf("duplicate place %d in requested order", id)
+		}
+		order[id] = i
+	}
+	for _, block := range section.Blocks {
+		blockMap[block.ID] = block
+	}
+
+	orderedBlocks := make([]any, len(placeIDs))
+	for _, id := range placeIDs {
+		block, ok := blockMap[id]
+		if !ok {
+			return nil, fmt.Errorf("place %d not found in section %d", id, sectionID)
+		}
+		orderedBlocks[order[id]] = block
+	}
+
+	newBlocks := make([]any, 0, len(section.Blocks))
+	orderedIdx := 0
+	for _, block := range section.Blocks {
+		if _, shouldReorder := order[block.ID]; shouldReorder {
+			newBlocks = append(newBlocks, orderedBlocks[orderedIdx])
+			orderedIdx++
+			continue
+		}
+		newBlocks = append(newBlocks, block)
+	}
+
+	return []Operation{
+		ReplaceInObject(
+			[]any{"itinerary", "sections", sectionIdx, "blocks"},
+			section.Blocks,
+			newBlocks,
+		),
+	}, nil
 }

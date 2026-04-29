@@ -306,8 +306,6 @@ func (c *Client) searchWanderlogPlaces(query string, latitude, longitude *float6
 			Name:       name,
 			Address:    address,
 			PlaceID:    place.PlaceID,
-			Latitude:   lat,
-			Longitude:  lng,
 			Categories: place.Types,
 		})
 	}
@@ -639,7 +637,7 @@ func (c *Client) SearchPlacesWithWanderlog(query string, lat, lng float64) (*Wan
 }
 
 // SearchLodgings searches for hotels/lodgings for given dates and guest count.
-// The API uses startDate/endDate (not checkIn/checkOut) and aduldCount/roomCount/childrenAges.
+// The request body matches the React Native app: bounds, dates, and nested guests.
 func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*LodgingSearchResponse, error) {
 	api, err := c.openAPI()
 	if err != nil {
@@ -653,16 +651,38 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 	if err != nil {
 		return nil, fmt.Errorf("search lodgings: %w", err)
 	}
+	bounds, err := c.lookupGeoBounds(query)
+	if err != nil {
+		return nil, fmt.Errorf("search lodgings: %w", err)
+	}
+	if guests <= 0 {
+		guests = 1
+	}
 
 	reqBody, err := json.Marshal(map[string]any{
-		"destination":  query,
-		"dates":        map[string]string{"startDate": startDate.Format(openapi_types.DateFormat), "endDate": endDate.Format(openapi_types.DateFormat)},
-		"guests":       guests,
-		"adultCount":   guests,
-		"aduldCount":   guests,
-		"roomCount":    1,
-		"childrenAges": []int{},
-		"source":       "google",
+		"bounds": bounds,
+		"dates": map[string]string{
+			"startDate": startDate.Format(openapi_types.DateFormat),
+			"endDate":   endDate.Format(openapi_types.DateFormat),
+		},
+		"guests": map[string]any{
+			"adultCount":   guests,
+			"roomCount":    1,
+			"childrenAges": []int{},
+		},
+		"sources": []string{"google"},
+		"filters": map[string]any{
+			"hotelClasses":          nil,
+			"minGuestRating":        nil,
+			"priceRange":            nil,
+			"amenities":             nil,
+			"propertyTypes":         map[string]any{"accommodationTypes": nil, "lodgingTypes": nil},
+			"minBedsInRoom":         nil,
+			"propertyName":          "",
+			"vacationRentalFilters": nil,
+			"hotelOrVacationRental": nil,
+		},
+		"hotelOrVacationRental": nil,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("search lodgings: marshaling request: %w", err)
@@ -686,8 +706,78 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 	if !result.Success {
 		return nil, fmt.Errorf("lodging search API returned success=false for query %q; response: %s", query, string(body))
 	}
+	if len(result.Data) == 0 && len(result.Offers) > 0 {
+		result.Data = result.Offers
+	}
 
 	return &result, nil
+}
+
+func (c *Client) lookupGeoBounds(query string) ([]float64, error) {
+	geos, err := c.SearchGeos()
+	if err != nil {
+		return nil, fmt.Errorf("looking up geo bounds for %q: %w", query, err)
+	}
+	normalized := strings.ToLower(strings.TrimSpace(query))
+	if normalized == "" {
+		return nil, fmt.Errorf("location is required")
+	}
+	var fallback []float64
+	match := func(geo GeoIDName) bool {
+		if len(geo.Bounds) != 4 {
+			return false
+		}
+		name := strings.ToLower(strings.TrimSpace(geo.Name))
+		if name == normalized {
+			fallback = geo.Bounds
+			return true
+		}
+		if fallback == nil && strings.Contains(name, normalized) {
+			fallback = geo.Bounds
+		}
+		return false
+	}
+	for _, geo := range geos.Cities {
+		if match(geo) {
+			return fallback, nil
+		}
+	}
+	for _, geo := range geos.Countries {
+		if match(geo) {
+			return fallback, nil
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
+	}
+	if bounds, err := c.lookupPlaceBounds(query); err == nil {
+		return bounds, nil
+	}
+	return nil, fmt.Errorf("no geo bounds found for %q; use search_geos and a supported destination name", query)
+}
+
+func (c *Client) lookupPlaceBounds(query string) ([]float64, error) {
+	results, err := c.SearchPlacesWithWanderlog(query, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, place := range results.Data {
+		if place.PlaceID == "" {
+			continue
+		}
+		details, err := c.GetPlaceDetails(place.PlaceID)
+		if err != nil || !details.Success {
+			continue
+		}
+		lat := details.Data.Details.Geometry.Location.Lat
+		lng := details.Data.Details.Geometry.Location.Lng
+		if lat == 0 && lng == 0 {
+			continue
+		}
+		const delta = 0.35
+		return []float64{lng - delta, lat - delta, lng + delta, lat + delta}, nil
+	}
+	return nil, fmt.Errorf("no place geometry found for %q", query)
 }
 
 // GetGooglePriceRates retrieves Google price rates for a specific lodging property

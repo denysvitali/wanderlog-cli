@@ -347,6 +347,116 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			),
 		)
 		s.AddTool(reorderPlacesTool, handleReorderPlaces)
+
+		updatePlaceNotesTool := mcp.NewTool("update_place_notes",
+			mcp.WithDescription("Replace the notes text on a place block without rewriting the whole section"),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithNumber("section_id",
+				mcp.Required(),
+				mcp.Description("Section ID containing the place block"),
+			),
+			mcp.WithNumber("place_id",
+				mcp.Required(),
+				mcp.Description("Internal Wanderlog place block ID, not a Google Place ID"),
+			),
+			mcp.WithString("notes",
+				mcp.Required(),
+				mcp.Description("Replacement notes text"),
+			),
+		)
+		s.AddTool(updatePlaceNotesTool, handleUpdatePlaceNotes)
+
+		setTripBudgetTool := mcp.NewTool("set_trip_budget",
+			mcp.WithDescription("Set or update the total trip budget amount and currency."),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithNumber("amount",
+				mcp.Required(),
+				mcp.Description("Budget amount"),
+			),
+			mcp.WithString("currency",
+				mcp.Required(),
+				mcp.Description("Currency code, e.g. USD, EUR, JPY"),
+			),
+		)
+		s.AddTool(setTripBudgetTool, handleSetTripBudget)
+
+		addTripExpenseTool := mcp.NewTool("add_trip_expense",
+			mcp.WithDescription("Add an expense to the trip budget. Use this for ticket costs, reservations, food, transport, lodging, and other spending."),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithString("description",
+				mcp.Required(),
+				mcp.Description("Expense description"),
+			),
+			mcp.WithString("category",
+				mcp.Description("Expense category: flights, lodging, carRental, publicTransit, food, drinks, sightseeing, activities, shopping, gas, groceries, other"),
+				mcp.DefaultString("other"),
+			),
+			mcp.WithNumber("amount",
+				mcp.Required(),
+				mcp.Description("Expense amount"),
+			),
+			mcp.WithString("currency",
+				mcp.Required(),
+				mcp.Description("Currency code, e.g. USD, EUR, JPY"),
+			),
+			mcp.WithString("date",
+				mcp.Description("Expense date (YYYY-MM-DD). Defaults to today."),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Description("Optional itinerary/reservation block ID to link this expense to"),
+			),
+			mcp.WithNumber("paid_by_user_id",
+				mcp.Description("User ID who paid. Defaults to authenticated user."),
+			),
+			mcp.WithString("split_with_user_ids",
+				mcp.Description("Comma-separated user IDs to split with"),
+			),
+			mcp.WithString("associated_date",
+				mcp.Description("Optional trip date to associate with the expense (YYYY-MM-DD)"),
+			),
+		)
+		s.AddTool(addTripExpenseTool, handleAddTripExpense)
+
+		updateTripExpenseTool := mcp.NewTool("update_trip_expense",
+			mcp.WithDescription("Update an existing trip budget expense by expense ID."),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithNumber("expense_id",
+				mcp.Required(),
+				mcp.Description("Expense ID"),
+			),
+			mcp.WithString("description", mcp.Description("New expense description")),
+			mcp.WithString("category", mcp.Description("New expense category")),
+			mcp.WithNumber("amount", mcp.Description("New expense amount")),
+			mcp.WithString("currency", mcp.Description("New currency code")),
+			mcp.WithString("date", mcp.Description("New expense date (YYYY-MM-DD)")),
+			mcp.WithNumber("block_id", mcp.Description("New linked block ID")),
+			mcp.WithBoolean("clear_block_id", mcp.Description("Remove linked block ID")),
+			mcp.WithNumber("paid_by_user_id", mcp.Description("New user ID who paid")),
+			mcp.WithString("split_with_user_ids", mcp.Description("Comma-separated user IDs to split with")),
+			mcp.WithString("associated_date", mcp.Description("New associated trip date (YYYY-MM-DD)")),
+			mcp.WithBoolean("clear_associated_date", mcp.Description("Remove associated date")),
+		)
+		s.AddTool(updateTripExpenseTool, handleUpdateTripExpense)
+
+		deleteTripExpenseTool := mcp.NewTool("delete_trip_expense",
+			mcp.WithDescription("Delete a trip budget expense by expense ID."),
+			mcp.WithString("trip_key",
+				mcp.Description("The key/ID of the trip (optional if default trip ID is set)"),
+			),
+			mcp.WithNumber("expense_id",
+				mcp.Required(),
+				mcp.Description("Expense ID"),
+			),
+		)
+		s.AddTool(deleteTripExpenseTool, handleDeleteTripExpense)
 	}
 
 	// Add search places tool
@@ -531,15 +641,16 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		s.AddTool(updateTripTool, handleUpdateTrip)
 	}
 
-	// Social features
-	likeTripTool := mcp.NewTool("like_trip",
-		mcp.WithDescription("Like or unlike a trip plan"),
-		mcp.WithString("trip_key", mcp.Required(),
-			mcp.Description("Trip key")),
-		mcp.WithBoolean("liked", mcp.Required(),
-			mcp.Description("true to like, false to unlike")),
-	)
-	s.AddTool(likeTripTool, handleLikeTrip)
+	if !readOnly {
+		likeTripTool := mcp.NewTool("like_trip",
+			mcp.WithDescription("Like or unlike a trip plan"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithBoolean("liked", mcp.Required(),
+				mcp.Description("true to like, false to unlike")),
+		)
+		s.AddTool(likeTripTool, handleLikeTrip)
+	}
 
 	getLikeCountTool := mcp.NewTool("get_like_count",
 		mcp.WithDescription("Get like count and status for a trip"),
@@ -548,17 +659,18 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	)
 	s.AddTool(getLikeCountTool, handleGetLikeCount)
 
-	// Collaboration tools
-	sendInvitesTool := mcp.NewTool("send_trip_invites",
-		mcp.WithDescription("Send invites to collaborate on a trip"),
-		mcp.WithString("trip_key", mcp.Required(),
-			mcp.Description("Trip key")),
-		mcp.WithString("invitees", mcp.Required(),
-			mcp.Description("Comma-separated list of email addresses")),
-		mcp.WithString("message",
-			mcp.Description("Optional message to include with the invite")),
-	)
-	s.AddTool(sendInvitesTool, handleSendInvites)
+	if !readOnly {
+		sendInvitesTool := mcp.NewTool("send_trip_invites",
+			mcp.WithDescription("Send invites to collaborate on a trip"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithString("invitees", mcp.Required(),
+				mcp.Description("Comma-separated list of email addresses")),
+			mcp.WithString("message",
+				mcp.Description("Optional message to include with the invite")),
+		)
+		s.AddTool(sendInvitesTool, handleSendInvites)
+	}
 
 	listInvitesTool := mcp.NewTool("list_trip_invites",
 		mcp.WithDescription("List all invites sent for a trip"),
