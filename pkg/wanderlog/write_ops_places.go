@@ -333,12 +333,12 @@ func (c *Client) UpdatePlaceVisitTime(tripKey string, sectionID, placeID int, st
 		return fmt.Errorf("end_time: %w", err)
 	}
 
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
 
-	ops, err := updatePlaceVisitTimeOperations(trip.TripPlan.Itinerary.Sections, sectionID, placeID, startTime, endTime)
+	ops, err := updatePlaceVisitTimeRawOperations(trip, sectionID, placeID, startTime, endTime)
 	if err != nil {
 		return err
 	}
@@ -355,6 +355,94 @@ func (c *Client) UpdatePlaceVisitTime(tripKey string, sectionID, placeID int, st
 	}).Info("Successfully updated place visit time")
 
 	return nil
+}
+
+func rawInt(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		i, _ := v.Int64()
+		return int(i)
+	default:
+		return 0
+	}
+}
+
+func cloneRawMap(value map[string]any) (map[string]any, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	var cloned map[string]any
+	if err := json.Unmarshal(data, &cloned); err != nil {
+		return nil, err
+	}
+	return cloned, nil
+}
+
+func findRawItineraryBlock(trip map[string]any, sectionID, blockID int) (int, int, map[string]any, error) {
+	tripPlan, _ := trip["tripPlan"].(map[string]any)
+	itinerary, _ := tripPlan["itinerary"].(map[string]any)
+	sections, _ := itinerary["sections"].([]any)
+	for sectionIdx, sectionAny := range sections {
+		section, _ := sectionAny.(map[string]any)
+		if section == nil {
+			continue
+		}
+		if sectionID > 0 && rawInt(section["id"]) != sectionID {
+			continue
+		}
+		blocks, _ := section["blocks"].([]any)
+		for blockIdx, blockAny := range blocks {
+			block, _ := blockAny.(map[string]any)
+			if block == nil || rawInt(block["id"]) != blockID {
+				continue
+			}
+			return sectionIdx, blockIdx, block, nil
+		}
+	}
+	if sectionID > 0 {
+		return 0, 0, nil, fmt.Errorf("place %d not found in section %d", blockID, sectionID)
+	}
+	return 0, 0, nil, fmt.Errorf("place %d not found", blockID)
+}
+
+func updatePlaceVisitTimeRawOperations(trip map[string]any, sectionID, placeID int, startTime, endTime string) ([]Operation, error) {
+	sectionIdx, blockIdx, oldBlock, err := findRawItineraryBlock(trip, sectionID, placeID)
+	if err != nil {
+		return nil, err
+	}
+	if blockType, ok := oldBlock["type"].(string); ok && blockType != "" && blockType != "place" {
+		return nil, fmt.Errorf("block %d has type %q, expected %q", placeID, blockType, "place")
+	}
+	if _, ok := oldBlock["place"]; !ok {
+		return nil, fmt.Errorf("block %d is not a place block", placeID)
+	}
+
+	newBlock, err := cloneRawMap(oldBlock)
+	if err != nil {
+		return nil, fmt.Errorf("copying place block %d: %w", placeID, err)
+	}
+	if startTime != "" {
+		newBlock["startTime"] = startTime
+	}
+	if endTime != "" {
+		newBlock["endTime"] = endTime
+	}
+
+	return []Operation{
+		ReplaceInList(
+			[]any{"itinerary", "sections", sectionIdx, "blocks"},
+			blockIdx,
+			oldBlock,
+			newBlock,
+		),
+	}, nil
 }
 
 func movePlaceOperations(sections []ItSections, placeID, fromSectionID, toSectionID, position int) ([]Operation, error) {

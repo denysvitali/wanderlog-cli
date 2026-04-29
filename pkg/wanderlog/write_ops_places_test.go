@@ -82,3 +82,51 @@ func TestUpdatePlaceVisitTimeOperationsReplacesBlock(t *testing.T) {
 		t.Fatalf("end time = %q, want %q", got, want)
 	}
 }
+
+func TestUpdatePlaceVisitTimeRawOperationsPreservesBlock(t *testing.T) {
+	var trip map[string]any
+	data := []byte(`{
+		"tripPlan": {
+			"itinerary": {
+				"sections": [{
+					"id": 10,
+					"blocks": [{
+						"id": 1,
+						"type": "place",
+						"place": {"name": "Cafe"},
+						"startTime": "08:00",
+						"endTime": "10:00",
+						"serverOnlyField": {"keep": true}
+					}]
+				}]
+			}
+		}
+	}`)
+	if err := json.Unmarshal(data, &trip); err != nil {
+		t.Fatalf("unmarshal trip: %v", err)
+	}
+
+	ops, err := updatePlaceVisitTimeRawOperations(trip, 10, 1, "09:30", "")
+	if err != nil {
+		t.Fatalf("updatePlaceVisitTimeRawOperations: %v", err)
+	}
+	if len(ops) != 1 {
+		t.Fatalf("ops length = %d, want 1", len(ops))
+	}
+	if got, want := ops[0].P, []interface{}{"itinerary", "sections", 0, "blocks", 0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("path = %v, want %v", got, want)
+	}
+	newBlock, ok := ops[0].LI.(map[string]any)
+	if !ok {
+		t.Fatalf("new block type = %T, want map[string]any", ops[0].LI)
+	}
+	if got, want := newBlock["startTime"], "09:30"; got != want {
+		t.Fatalf("startTime = %v, want %q", got, want)
+	}
+	if got, want := newBlock["endTime"], "10:00"; got != want {
+		t.Fatalf("endTime = %v, want preserved %q", got, want)
+	}
+	if _, ok := newBlock["serverOnlyField"]; !ok {
+		t.Fatalf("serverOnlyField was not preserved")
+	}
+}
