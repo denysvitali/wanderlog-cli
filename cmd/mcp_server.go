@@ -236,6 +236,42 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		)
 		s.AddTool(addFlightTool, handleAddFlight)
 
+		// Add lodging to trip tool
+		addLodgingTool := mcp.NewTool("add_lodging",
+			mcp.WithDescription("Add a lodging/hotel reservation to the trip's Lodging section, creating that section when needed. Requires name and check_in/check_out dates."),
+			mcp.WithString("trip_key",
+				mcp.Description("The trip key to add the lodging to (optional if default trip key is set)"),
+			),
+			mcp.WithString("name",
+				mcp.Required(),
+				mcp.Description("Name of the hotel/lodging"),
+			),
+			mcp.WithString("place_id",
+				mcp.Description("Google Place ID for the hotel"),
+			),
+			mcp.WithNumber("latitude",
+				mcp.Description("Latitude of the hotel (optional - auto-fetched if place_id provided)"),
+			),
+			mcp.WithNumber("longitude",
+				mcp.Description("Longitude of the hotel (optional - auto-fetched if place_id provided)"),
+			),
+			mcp.WithString("check_in",
+				mcp.Required(),
+				mcp.Description("Check-in date (YYYY-MM-DD)"),
+			),
+			mcp.WithString("check_out",
+				mcp.Required(),
+				mcp.Description("Check-out date (YYYY-MM-DD)"),
+			),
+			mcp.WithString("confirmation_number",
+				mcp.Description("Confirmation number"),
+			),
+			mcp.WithString("notes",
+				mcp.Description("Additional notes"),
+			),
+		)
+		s.AddTool(addLodgingTool, handleAddLodging)
+
 		// Remove place from trip tool
 		removePlaceTool := mcp.NewTool("remove_place",
 			mcp.WithDescription("Remove a place from a trip"),
