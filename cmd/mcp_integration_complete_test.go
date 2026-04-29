@@ -24,10 +24,13 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 	require.NotNil(t, auth)
 
 	ctx := context.Background()
+	const integrationTestTripTitle = "Integration Test Trip"
+
+	deleteExistingIntegrationTestTrips(t, integrationTestTripTitle)
 
 	// 2. Search for geo and create a Japan trip
 	geoID := searchGeoIDForLifecycleTest(t, ctx, "Japan")
-	tripTitle := "MCP Japan Trip - Complete Feature Test"
+	tripTitle := integrationTestTripTitle + " - In Progress"
 
 	createReq := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -315,7 +318,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 				Name: "update_trip",
 				Arguments: map[string]interface{}{
 					"trip_key": tripKey,
-					"title":    "Japan Adventure 2026 - Complete Feature Test",
+					"title":    integrationTestTripTitle,
 				},
 			},
 		}
@@ -673,23 +676,9 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 		assert.True(t, hasLodging, "Trip should have a lodging block")
 	})
 
-	// 17. CLEANUP - Delete the trip
-	t.Run("cleanup_delete_trip", func(t *testing.T) {
-		request := mcp.CallToolRequest{
-			Params: mcp.CallToolParams{
-				Name: "delete_trip",
-				Arguments: map[string]interface{}{
-					"trip_key": tripKey,
-				},
-			},
-		}
-
-		result, err := handleDeleteTrip(ctx, request)
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		assert.False(t, result.IsError, "delete_trip should not error: %s", getTextContent(result))
-		t.Logf("Cleaned up trip: %s", tripKey)
-
+	// 17. CLEANUP - Delete copied trips only. The main Integration Test Trip is
+	// intentionally retained for manual inspection until the next test run.
+	t.Run("cleanup_copied_trips", func(t *testing.T) {
 		for _, copiedTripKey := range copiedTripKeys {
 			copyDeleteReq := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -705,6 +694,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 			assert.False(t, copyDeleteResult.IsError, "delete copied trip should not error: %s", getTextContent(copyDeleteResult))
 			t.Logf("Cleaned up copied trip: %s", copiedTripKey)
 		}
+		t.Logf("Retained integration test trip: %s", tripKey)
 	})
 
 	t.Logf("=== COMPLETE FEATURE TEST SUMMARY ===")
@@ -775,4 +765,32 @@ func placeBlockOrderInSection(t *testing.T, trip *wanderlog.TripResponse, sectio
 		names = append(names, block.Place.Name)
 	}
 	return ids, names
+}
+
+func deleteExistingIntegrationTestTrips(t *testing.T, title string) {
+	t.Helper()
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	auth, err := loadAuthFromEnvOrKeychain()
+	require.NoError(t, err, "Failed to load credentials for integration trip cleanup")
+	client.SetAuth(auth)
+
+	trips, err := client.GetUserTrips()
+	require.NoError(t, err, "Failed to list trips before integration trip cleanup")
+
+	for _, trip := range trips.Data {
+		if !isIntegrationTestTripTitle(trip.Title, title) {
+			continue
+		}
+		require.NotEmpty(t, trip.Key, "Matched integration test trip has empty key")
+		require.NoError(t, client.DeleteTrip(trip.Key), "Failed to delete stale integration test trip %q (%s)", trip.Title, trip.Key)
+		t.Logf("Deleted stale integration test trip: %s (%s)", trip.Title, trip.Key)
+	}
+}
+
+func isIntegrationTestTripTitle(candidate, title string) bool {
+	return candidate == title ||
+		strings.HasPrefix(candidate, title+" - ") ||
+		strings.HasPrefix(candidate, "Copy of "+title)
 }
