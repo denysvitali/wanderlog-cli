@@ -670,7 +670,8 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 			"roomCount":    1,
 			"childrenAges": []int{},
 		},
-		"sources": []string{"google"},
+		"sources": nil,
+		"sortBy":  "ratings",
 		"filters": map[string]any{
 			"hotelClasses":          nil,
 			"minGuestRating":        nil,
@@ -682,7 +683,6 @@ func (c *Client) SearchLodgings(query, checkIn, checkOut string, guests int) (*L
 			"vacationRentalFilters": nil,
 			"hotelOrVacationRental": nil,
 		},
-		"hotelOrVacationRental": nil,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("search lodgings: marshaling request: %w", err)
