@@ -17,36 +17,45 @@ const (
 func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 	tools := createMCPServer(false).ListTools()
 	covered := map[string]bool{
+		"add_checklist_items":       true,
+		"add_collaborator":          true,
 		"add_flight":                true,
 		"add_lodging":               true,
 		"add_place":                 true,
 		"add_trip_expense":          true,
+		"autocomplete_airports":     true,
 		"autocomplete_users":        true,
+		"autofill_day":              true,
 		"browse_guides":             true,
 		"copy_trip":                 true,
 		"create_guide_from_trip":    true,
 		"create_trip":               true,
-		"delete_trip_expense":       true,
-		"delete_trip":               true,
-		"delete_trips":              true,
 		"delete_flight":             true,
 		"delete_itinerary_block":    true,
 		"delete_lodging":            true,
+		"delete_trip":               true,
+		"delete_trip_expense":       true,
+		"delete_trips":              true,
+		"export_trip":               true,
+		"get_all_airlines":          true,
 		"get_feed_friends":          true,
 		"get_feed_home":             true,
 		"get_feed_recent":           true,
 		"get_flights":               true,
 		"get_flight_stops":          true,
 		"get_global_config":         true,
+		"get_hotel_rates":           true,
 		"get_like_count":            true,
 		"get_me":                    true,
 		"get_notifications":         true,
 		"get_notification_settings": true,
+		"get_or_create_share_key":   true,
 		"get_place_details":         true,
 		"get_trip":                  true,
 		"get_trip_distinction":      true,
 		"get_trip_expenses_csv":     true,
 		"get_trip_history":          true,
+		"get_trip_images":           true,
 		"get_trip_sections":         true,
 		"get_user_emails":           true,
 		"get_user_profile":          true,
@@ -60,6 +69,7 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"mark_notifications_read":   true,
 		"move_place":                true,
 		"register_trip_view":        true,
+		"remove_collaborator":       true,
 		"remove_place":              true,
 		"reorder_places":            true,
 		"restore_trip":              true,
@@ -71,12 +81,13 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"send_trip_invites":         true,
 		"set_trip_budget":           true,
 		"set_user_kv":               true,
-		"update_place_notes":        true,
-		"update_place_visit_time":   true,
+		"toggle_checklist_item":     true,
 		"update_flight":             true,
 		"update_lodging":            true,
-		"update_trip_expense":       true,
+		"update_place_notes":        true,
+		"update_place_visit_time":   true,
 		"update_trip":               true,
+		"update_trip_expense":       true,
 	}
 
 	missing := make([]string, 0)
@@ -91,10 +102,13 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 
 func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 	writeTools := []string{
+		"add_checklist_items",
+		"add_collaborator",
 		"add_flight",
 		"add_lodging",
 		"add_place",
 		"add_trip_expense",
+		"autofill_day",
 		"copy_trip",
 		"create_guide_from_trip",
 		"create_trip",
@@ -104,16 +118,20 @@ func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 		"delete_trip",
 		"delete_trip_expense",
 		"delete_trips",
+		"export_trip",
+		"get_or_create_share_key",
 		"like_trip",
 		"mark_notifications_read",
 		"move_place",
 		"register_trip_view",
+		"remove_collaborator",
 		"remove_place",
 		"reorder_places",
 		"restore_trip",
 		"send_trip_invites",
 		"set_trip_budget",
 		"set_user_kv",
+		"toggle_checklist_item",
 		"update_flight",
 		"update_lodging",
 		"update_place_notes",
@@ -171,6 +189,80 @@ func TestMCPIntegration_WriteHandlerValidationBeforeAuth(t *testing.T) {
 		require.NotNil(t, result)
 		assert.True(t, result.IsError)
 		assert.Contains(t, getTextContent(result), "invitees must contain")
+	})
+
+	t.Run("add_checklist_items_blank_items", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_checklist_items",
+				Arguments: map[string]interface{}{
+					"trip_key":   testTripID,
+					"section_id": 123,
+					"items":      " , ",
+				},
+			},
+		}
+
+		result, err := handleAddChecklistItems(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "items must contain")
+	})
+
+	t.Run("toggle_checklist_item_missing_item_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "toggle_checklist_item",
+				Arguments: map[string]interface{}{
+					"trip_key":   testTripID,
+					"section_id": 123,
+					"checked":    true,
+				},
+			},
+		}
+
+		result, err := handleToggleChecklistItem(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "item_id must be")
+	})
+
+	t.Run("collaborator_missing_user_id", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "add_collaborator",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+				},
+			},
+		}
+
+		result, err := handleAddCollaborator(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "user_id must be")
+	})
+
+	t.Run("share_key_without_permissions", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_or_create_share_key",
+				Arguments: map[string]interface{}{
+					"edit_key": testTripID,
+					"can_view": false,
+					"can_edit": false,
+				},
+			},
+		}
+
+		result, err := handleGetOrCreateShareKey(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "at least one permission")
 	})
 }
 
