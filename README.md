@@ -518,7 +518,6 @@ go build -o wanderlog
 │   └── trip1.json        # Sample trip for development
 ├── main.go               # Entry point
 ├── go.mod                # Go module definition
-├── API_ENDPOINTS.md      # API endpoint catalog
 ├── TESTING.md            # Test documentation
 └── CLAUDE.md             # Development guidance
 ```
