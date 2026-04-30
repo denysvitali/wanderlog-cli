@@ -473,5 +473,394 @@
         }
       ]
     }
+  },
+  {
+    "name": "ListGeosWithGoodGuides",
+    "method": "GET",
+    "path": "/api/geo/geosWithGoodGuides",
+    "decompiledPath": "/api/geo/geosWithGoodGuides",
+    "auth": false
+  },
+  {
+    "name": "ListPopularAndNearbyGeos",
+    "method": "GET",
+    "path": "/api/geo/popularAndNearby",
+    "decompiledPath": "/api/geo/popularAndNearby",
+    "auth": false
+  },
+  {
+    "name": "FindCountryForIP",
+    "method": "GET",
+    "path": "/api/geo/findCountryForIP",
+    "decompiledPath": "/api/geo/findCountryForIP",
+    "decompiledMethod": "GET",
+    "auth": false
+  },
+  {
+    "name": "FindNearestTripadvisorGeo",
+    "method": "GET",
+    "path": "/api/geo/nearestTripadvisorGeo",
+    "decompiledPath": "/api/geo/nearestTripadvisorGeo",
+    "auth": false,
+    "query": {
+      "latitude": "35.6812",
+      "longitude": "139.7671"
+    }
+  },
+  {
+    "name": "FindNearestGeosToIP",
+    "method": "GET",
+    "path": "/api/geo/findNearestGeosToIP",
+    "decompiledPath": "/api/geo/findNearestGeosToIP",
+    "auth": false
+  },
+  {
+    "name": "FindNearestKayakCity",
+    "method": "GET",
+    "path": "/api/geo/nearestKayakCity",
+    "decompiledPath": "/api/geo/nearestKayakCity",
+    "auth": false,
+    "query": {
+      "latitude": "35.6812",
+      "longitude": "139.7671",
+      "cityNameToMatch": "Tokyo"
+    }
+  },
+  {
+    "name": "GetClientGeos",
+    "method": "GET",
+    "path": "/api/geo/clientGeos",
+    "decompiledPath": "/api/geo/clientGeos",
+    "auth": false,
+    "query": {
+      "geoIds": "12345,67890"
+    }
+  },
+  {
+    "name": "ListTripPlannerGeos",
+    "method": "GET",
+    "path": "/api/geo/tripPlannerGeos",
+    "decompiledPath": "/api/geo/tripPlannerGeos",
+    "auth": false
+  },
+  {
+    "name": "ListCountries",
+    "method": "GET",
+    "path": "/api/geo/countries",
+    "decompiledPath": "/api/geo/countries",
+    "auth": false,
+    "query": {
+      "language": "en"
+    }
+  },
+  {
+    "name": "ListGeoCategoriesForCategory",
+    "method": "GET",
+    "path": "/api/geo/listGeoCategoriesForCategory",
+    "decompiledPath": "/api/geo/listGeoCategoriesForCategory",
+    "auth": false,
+    "query": {
+      "keywordCategoryId": "42",
+      "language": "en"
+    }
+  },
+  {
+    "name": "ListGeoCategoriesForGeo",
+    "method": "GET",
+    "path": "/api/geo/listGeoCategoriesForGeo",
+    "decompiledPath": "/api/geo/listGeoCategoriesForGeo",
+    "auth": false,
+    "query": {
+      "geoId": "12345",
+      "source": "tripPlanner"
+    }
+  },
+  {
+    "name": "ListGeoInMonthGeos",
+    "method": "GET",
+    "path": "/api/geo/geoInMonthGeos",
+    "decompiledPath": "/api/geo/geoInMonthGeos",
+    "auth": false
+  },
+  {
+    "name": "ListKeywordCategories",
+    "method": "GET",
+    "path": "/api/geo/listKeywordCategories",
+    "decompiledPath": "/api/geo/listKeywordCategories",
+    "auth": false,
+    "query": {
+      "language": "en"
+    }
+  },
+  {
+    "name": "SearchGeo",
+    "method": "GET",
+    "path": "/api/geo/search",
+    "decompiledPath": "/api/geo/search",
+    "auth": false,
+    "query": {
+      "q": "tokyo"
+    }
+  },
+  {
+    "name": "GetAllDistanceInfoForPlace",
+    "method": "GET",
+    "path": "/api/directions/allDistanceInfoForPlace/v2",
+    "decompiledPath": "/api/directions/allDistanceInfoForPlace/v2",
+    "auth": false,
+    "query": {
+      "data": "{\"placeId\":\"place-1\"}"
+    }
+  },
+  {
+    "name": "GetDistancesForMode",
+    "method": "POST",
+    "path": "/api/directions/distancesForMode",
+    "decompiledPath": "/api/directions/distancesForMode",
+    "decompiledMethod": "POST",
+    "auth": false,
+    "body": {
+      "mode": "driving",
+      "places": []
+    }
+  },
+  {
+    "name": "OptimizeRoute",
+    "method": "POST",
+    "path": "/api/directions/optimizeRoute",
+    "decompiledPath": "/api/directions/optimizeRoute",
+    "decompiledMethod": "POST",
+    "auth": false,
+    "body": {
+      "mode": "driving",
+      "places": []
+    }
+  },
+  {
+    "name": "GetRecommendedPlaces",
+    "method": "POST",
+    "path": "/api/recommendations/v2",
+    "decompiledPath": "/api/recommendations/v2",
+    "decompiledMethod": "POST",
+    "auth": true,
+    "body": {
+      "tripPlanId": 1,
+      "geoId": 12345,
+      "input": "things to do"
+    }
+  },
+  {
+    "name": "MarkRecommendationNotInterested",
+    "method": "POST",
+    "path": "/api/recommendations/notInterested",
+    "decompiledPath": "/api/recommendations/notInterested",
+    "decompiledMethod": "POST",
+    "auth": true,
+    "body": {
+      "tripPlanId": 1,
+      "mapsPlaceId": "place-123"
+    }
+  },
+  {
+    "name": "AutocompletePlaces",
+    "method": "GET",
+    "path": "/api/placesAPI/autocomplete",
+    "decompiledPath": "/api/placesAPI/autocomplete",
+    "auth": false,
+    "query": {
+      "request": "{\"input\":\"tokyo\",\"sessiontoken\":\"contract-token\",\"location\":{\"longitude\":139.7671,\"latitude\":35.6812},\"radius\":50000,\"language\":\"en\"}"
+    }
+  },
+  {
+    "name": "FindPlaceFromLngLat",
+    "method": "GET",
+    "path": "/api/placesAPI/findPlaceFromLngLat",
+    "decompiledPath": "/api/placesAPI/findPlaceFromLngLat",
+    "auth": false,
+    "query": {
+      "request": "{\"longitude\":139.7671,\"latitude\":35.6812}"
+    }
+  },
+  {
+    "name": "GetMapLayerGroups",
+    "method": "GET",
+    "path": "/api/placesAPI/mapLayerGroups",
+    "decompiledPath": "/api/placesAPI/mapLayerGroups",
+    "auth": false,
+    "query": {
+      "request": "{\"layerGroupIds\":[]}"
+    }
+  },
+  {
+    "name": "GetMultiplePlaceDetails",
+    "method": "GET",
+    "path": "/api/placesAPI/getMultiplePlaceDetails",
+    "decompiledPath": "/api/placesAPI/getMultiplePlaceDetails",
+    "auth": false,
+    "query": {
+      "placeIds": "place-1,place-2",
+      "language": "en"
+    }
+  },
+  {
+    "name": "GetPlaceDetailsV2",
+    "method": "GET",
+    "path": "/api/placesAPI/getPlaceDetails/v2",
+    "decompiledPath": "/api/placesAPI/getPlaceDetails/v2",
+    "auth": false,
+    "query": {
+      "placeId": "place-123",
+      "language": "en"
+    }
+  },
+  {
+    "name": "SearchPlacesGoogle",
+    "method": "GET",
+    "path": "/api/placesAPI/searchPlaces",
+    "decompiledPath": "/api/placesAPI/searchPlaces",
+    "auth": false,
+    "query": {
+      "request": "{\"input\":\"tokyo\"}"
+    }
+  },
+  {
+    "name": "GetPlacesMetadata",
+    "method": "GET",
+    "path": "/api/places/metadata",
+    "decompiledPath": "/api/places/metadata",
+    "auth": false,
+    "query": {
+      "placeIds": "place-1,place-2"
+    }
+  },
+  {
+    "name": "GetPlaceCards",
+    "method": "GET",
+    "path": "/api/places/card",
+    "decompiledPath": "/api/places/card",
+    "auth": false,
+    "query": {
+      "placeIds": "place-1,place-2"
+    }
+  },
+  {
+    "name": "ListPlacePageGeos",
+    "method": "GET",
+    "path": "/api/places/placePageGeos",
+    "decompiledPath": "/api/places/placePageGeos",
+    "auth": false
+  },
+  {
+    "name": "GetTripPlanAssistantText",
+    "method": "POST",
+    "path": "/api/chat/tripPlanAssistant/getText/v2",
+    "decompiledPath": "/api/chat/tripPlanAssistant/getText/v2",
+    "auth": true,
+    "body": {
+      "message": "what should I do in Tokyo?"
+    }
+  },
+  {
+    "name": "GetTripPlanAssistantHighlights",
+    "method": "POST",
+    "path": "/api/chat/tripPlanAssistant/getHighlights/v2",
+    "decompiledPath": "/api/chat/tripPlanAssistant/getHighlights/v2",
+    "decompiledMethod": "POST",
+    "auth": true,
+    "body": {
+      "assistantMessage": "Visit Senso-ji",
+      "tripPlanId": 1
+    }
+  },
+  {
+    "name": "GetTripPlanAssistantHistory",
+    "method": "GET",
+    "path": "/api/chat/tripPlanAssistant/history",
+    "decompiledPath": "/api/chat/tripPlanAssistant/history",
+    "auth": true,
+    "query": {
+      "chatId": "chat-1"
+    }
+  },
+  {
+    "name": "ListTripPlanAssistantChats",
+    "method": "GET",
+    "path": "/api/chat/tripPlanAssistant/chats",
+    "decompiledPath": "/api/chat/tripPlanAssistant/chats",
+    "auth": true,
+    "query": {
+      "tripPlanId": "1"
+    }
+  },
+  {
+    "name": "GetTripPlanAssistantInitialChat",
+    "method": "GET",
+    "path": "/api/chat/tripPlanAssistant/initialChatWithItems",
+    "decompiledPath": "/api/chat/tripPlanAssistant/initialChatWithItems",
+    "auth": true,
+    "query": {
+      "tripPlanId": "1"
+    }
+  },
+  {
+    "name": "GetTripLikesBulk",
+    "method": "POST",
+    "path": "/api/tripPlans/likes",
+    "decompiledPath": "/api/tripPlans/likes",
+    "decompiledMethod": "POST",
+    "auth": true,
+    "body": {
+      "keys": ["trip-a", "trip-b"]
+    }
+  },
+  {
+    "name": "CreateTripFromFlights",
+    "method": "POST",
+    "path": "/api/tripPlans/flights",
+    "decompiledPath": "/api/tripPlans/flights",
+    "decompiledMethod": "POST",
+    "auth": true,
+    "body": {
+      "flights": []
+    }
+  },
+  {
+    "name": "GetMyProfileData",
+    "method": "GET",
+    "path": "/api/tripPlans/myProfile/",
+    "decompiledPath": "/api/tripPlans/myProfile/",
+    "decompiledMethod": "GET",
+    "auth": true
+  },
+  {
+    "name": "GetLodgingCheckoutData",
+    "method": "GET",
+    "path": "/api/lodging/checkoutData",
+    "decompiledPath": "/api/lodging/checkoutData",
+    "decompiledMethod": "GET",
+    "auth": false,
+    "query": {
+      "lodgingPropertyId": "property-123"
+    }
+  },
+  {
+    "name": "GetDealsForUser",
+    "method": "GET",
+    "path": "/api/deals",
+    "decompiledPath": "/api/deals",
+    "decompiledMethod": "GET",
+    "auth": true
+  },
+  {
+    "name": "RateEmail",
+    "method": "POST",
+    "path": "/api/emails/rate",
+    "decompiledPath": "/api/emails/rate",
+    "decompiledMethod": "POST",
+    "auth": true,
+    "body": {
+      "emailId": 1,
+      "rating": "thumbs_up"
+    }
   }
 ]

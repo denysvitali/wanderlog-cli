@@ -821,6 +821,10 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	// Register extended tools (user, feed, journal, config) from mcp_tools.go.
 	registerExtendedTools(s, readOnly)
 
+	// Register decompiled-bundle extras (geo, directions, recommendations,
+	// places/placesAPI, chat assistant, lodging checkout, misc).
+	registerDecompiledExtras(s, readOnly)
+
 	// Add trip analysis prompt
 	analyzeTripsPrompt := mcp.NewPrompt("analyze_trip",
 		mcp.WithPromptDescription("Analyze a trip and provide insights or recommendations"),

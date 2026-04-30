@@ -112,6 +112,47 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"update_trip":                  true,
 		"update_trip_plan_geo":         true,
 		"update_trip_expense":          true,
+
+		// Decompiled-bundle extras (registerDecompiledExtras).
+		"autocomplete_places":                  true,
+		"create_trip_from_flights":             true,
+		"find_country_for_ip":                  true,
+		"find_nearest_geos_to_ip":              true,
+		"find_nearest_kayak_city":              true,
+		"find_nearest_tripadvisor_geo":         true,
+		"find_place_from_lng_lat":              true,
+		"get_all_distance_info_for_place":      true,
+		"get_client_geos":                      true,
+		"get_deals_for_user":                   true,
+		"get_distances_for_mode":               true,
+		"get_lodging_checkout_data":            true,
+		"get_map_layer_groups":                 true,
+		"get_multiple_place_details":           true,
+		"get_my_profile_data":                  true,
+		"get_place_cards":                      true,
+		"get_place_details_v2":                 true,
+		"get_places_metadata":                  true,
+		"get_recommended_places":               true,
+		"get_trip_likes_bulk":                  true,
+		"get_trip_plan_assistant_highlights":   true,
+		"get_trip_plan_assistant_history":      true,
+		"get_trip_plan_assistant_initial_chat": true,
+		"get_trip_plan_assistant_text":         true,
+		"list_countries":                       true,
+		"list_geo_categories_for_category":     true,
+		"list_geo_categories_for_geo":          true,
+		"list_geo_in_month_geos":               true,
+		"list_geos_with_good_guides":           true,
+		"list_keyword_categories":              true,
+		"list_place_page_geos":                 true,
+		"list_popular_and_nearby_geos":         true,
+		"list_trip_plan_assistant_chats":       true,
+		"list_trip_planner_geos":               true,
+		"mark_recommendation_not_interested":   true,
+		"optimize_route":                       true,
+		"rate_email":                           true,
+		"search_geo":                           true,
+		"search_places_google":                 true,
 	}
 
 	missing := make([]string, 0)
@@ -174,6 +215,14 @@ func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 		"update_trip_plan_geo",
 		"update_trip_expense",
 		"nuke_trip_places",
+
+		// Decompiled-bundle write-gated extras.
+		"create_trip_from_flights",
+		"get_recommended_places",
+		"get_trip_plan_assistant_highlights",
+		"get_trip_plan_assistant_text",
+		"mark_recommendation_not_interested",
+		"rate_email",
 	}
 
 	readOnlyTools := createMCPServer(true).ListTools()
