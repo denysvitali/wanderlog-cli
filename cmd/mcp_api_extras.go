@@ -740,7 +740,7 @@ func parseJSONPayload(request mcp.CallToolRequest, name string) (any, error) {
 	}
 	var payload any
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-		return nil, fmt.Errorf("invalid %s JSON: %v", name, err)
+		return nil, fmt.Errorf("invalid %s JSON: %w", name, err)
 	}
 	return payload, nil
 }
