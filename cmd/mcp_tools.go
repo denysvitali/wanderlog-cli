@@ -52,6 +52,30 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		handleGetUserEmails,
 	)
 	s.AddTool(
+		mcp.NewTool("get_user_kv",
+			mcp.WithDescription("Read a value from the authenticated user's key-value store"),
+			mcp.WithString("key", mcp.Required(),
+				mcp.Description("Key name")),
+		),
+		handleGetUserKV,
+	)
+	s.AddTool(
+		mcp.NewTool("list_following",
+			mcp.WithDescription("List follow relationships for user IDs"),
+			mcp.WithString("user_ids", mcp.Required(),
+				mcp.Description("Comma-separated Wanderlog user IDs")),
+		),
+		handleListFollowing,
+	)
+	s.AddTool(
+		mcp.NewTool("find_user_by_email",
+			mcp.WithDescription("Find a Wanderlog user by email address"),
+			mcp.WithString("email", mcp.Required(),
+				mcp.Description("Email address")),
+		),
+		handleFindUserByEmail,
+	)
+	s.AddTool(
 		mcp.NewTool("autocomplete_users",
 			mcp.WithDescription("Autocomplete Wanderlog users by name prefix"),
 			mcp.WithString("query", mcp.Required(),
@@ -76,6 +100,18 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		handleGetFeedHome,
 	)
 	s.AddTool(
+		mcp.NewTool("get_feed",
+			mcp.WithDescription("Fetch the legacy public trip feed"),
+		),
+		handleGetFeed,
+	)
+	s.AddTool(
+		mcp.NewTool("get_feed_v2",
+			mcp.WithDescription("Fetch the v2 public trip feed"),
+		),
+		handleGetFeedV2,
+	)
+	s.AddTool(
 		mcp.NewTool("get_feed_recent",
 			mcp.WithDescription("Get the authenticated user's most recently edited trip"),
 		),
@@ -93,6 +129,14 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 			mcp.WithNumber("offset", mcp.Description("Pagination offset (default 0)")),
 		),
 		handleGetTripHistory,
+	)
+	s.AddTool(
+		mcp.NewTool("get_if_edited",
+			mcp.WithDescription("Check whether trip plans have changed since known revisions"),
+			mcp.WithString("body", mcp.Required(),
+				mcp.Description("JSON GetIfEditedRequest body")),
+		),
+		handleGetIfEdited,
 	)
 	s.AddTool(
 		mcp.NewTool("browse_guides",
@@ -123,6 +167,14 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		handleGetViewOnlyJournal,
 	)
 	s.AddTool(
+		mcp.NewTool("get_journal_stop_polylines",
+			mcp.WithDescription("Compute polylines between journal stops"),
+			mcp.WithString("body", mcp.Required(),
+				mcp.Description("JSON JournalStopPolylinesRequest body")),
+		),
+		handleGetJournalStopPolylines,
+	)
+	s.AddTool(
 		mcp.NewTool("get_trip_expenses_csv",
 			mcp.WithDescription("Download a trip's expenses as CSV (requires authentication)"),
 			mcp.WithString("trip_key", mcp.Required(),
@@ -139,12 +191,36 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		handleGetTripDistinction,
 	)
 	s.AddTool(
+		mcp.NewTool("get_trip_update_required",
+			mcp.WithDescription("Check whether a trip requires a client schema update"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+		),
+		handleGetTripUpdateRequired,
+	)
+	s.AddTool(
 		mcp.NewTool("get_trip_images",
 			mcp.WithDescription("Get images attached to a trip"),
 			mcp.WithString("trip_key", mcp.Required(),
 				mcp.Description("Trip key")),
 		),
 		handleGetTripImages,
+	)
+	s.AddTool(
+		mcp.NewTool("get_trip_places",
+			mcp.WithDescription("Get a trip's places endpoint response"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+		),
+		handleGetTripPlaces,
+	)
+	s.AddTool(
+		mcp.NewTool("search_places_in_trips",
+			mcp.WithDescription("Search places across the authenticated user's trips"),
+			mcp.WithString("query", mcp.Required(),
+				mcp.Description("Place search query")),
+		),
+		handleSearchPlacesInTrips,
 	)
 
 	// travel helper APIs (read-only)
@@ -180,6 +256,21 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		),
 		handleGetGlobalConfig,
 	)
+	s.AddTool(
+		mcp.NewTool("get_session_store",
+			mcp.WithDescription("Fetch the current session store"),
+		),
+		handleGetSessionStore,
+	)
+	s.AddTool(
+		mcp.NewTool("get_session_preferences",
+			mcp.WithDescription("Fetch locale-scoped session preferences"),
+			mcp.WithString("locale",
+				mcp.Description("Locale code"),
+				mcp.DefaultString("en")),
+		),
+		handleGetSessionPreferences,
+	)
 
 	// Write-gated tools
 	if readOnly {
@@ -204,12 +295,70 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 		handleSetUserKV,
 	)
 	s.AddTool(
+		mcp.NewTool("update_me",
+			mcp.WithDescription("Update the authenticated user's profile fields"),
+			mcp.WithString("name", mcp.Description("Display name")),
+			mcp.WithString("username", mcp.Description("Username")),
+			mcp.WithString("bio", mcp.Description("Bio")),
+			mcp.WithString("location", mcp.Description("Location")),
+		),
+		handleUpdateMe,
+	)
+	s.AddTool(
+		mcp.NewTool("update_notification_settings",
+			mcp.WithDescription("Replace the authenticated user's notification settings"),
+			mcp.WithString("settings", mcp.Required(),
+				mcp.Description("JSON notification settings object")),
+		),
+		handleUpdateNotificationSettings,
+	)
+	s.AddTool(
+		mcp.NewTool("set_utc_offset",
+			mcp.WithDescription("Persist the authenticated user's UTC offset in minutes"),
+			mcp.WithNumber("offset_minutes", mcp.Required(),
+				mcp.Description("Offset from UTC in minutes")),
+		),
+		handleSetUTCOffset,
+	)
+	s.AddTool(
+		mcp.NewTool("block_user",
+			mcp.WithDescription("Block a Wanderlog user"),
+			mcp.WithString("user_id", mcp.Required(),
+				mcp.Description("Wanderlog user ID")),
+		),
+		handleBlockUser,
+	)
+	s.AddTool(
+		mcp.NewTool("server_logout",
+			mcp.WithDescription("Invalidate the current Wanderlog server session"),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true")),
+		),
+		handleServerLogout,
+	)
+	s.AddTool(
+		mcp.NewTool("set_session_store_value",
+			mcp.WithDescription("Write a value into the authenticated session store"),
+			mcp.WithString("key", mcp.Required(),
+				mcp.Description("Key name")),
+			mcp.WithString("value", mcp.Required(),
+				mcp.Description("Value (JSON or plain string)")),
+		),
+		handleSetSessionStoreValue,
+	)
+	s.AddTool(
 		mcp.NewTool("register_trip_view",
 			mcp.WithDescription("Register a view on a shared trip"),
 			mcp.WithString("trip_key", mcp.Required(),
 				mcp.Description("Trip key")),
 		),
 		handleRegisterTripView,
+	)
+	s.AddTool(
+		mcp.NewTool("create_example_trip",
+			mcp.WithDescription("Create a Wanderlog example trip"),
+		),
+		handleCreateExampleTrip,
 	)
 	s.AddTool(
 		mcp.NewTool("create_guide_from_trip",
@@ -298,6 +447,60 @@ func registerExtendedTools(s *server.MCPServer, readOnly bool) {
 				mcp.DefaultBool(false)),
 		),
 		handleGetOrCreateShareKey,
+	)
+	s.AddTool(
+		mcp.NewTool("set_trip_distinction",
+			mcp.WithDescription("Update a trip's distinction/badge"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithString("distinction", mcp.Required(),
+				mcp.Description("Distinction value")),
+		),
+		handleSetTripDistinction,
+	)
+	s.AddTool(
+		mcp.NewTool("update_trip_plan_geo",
+			mcp.WithDescription("Update a trip's primary destination geo"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithNumber("geo_id", mcp.Required(),
+				mcp.Description("Wanderlog geo ID")),
+		),
+		handleUpdateTripPlanGeo,
+	)
+	s.AddTool(
+		mcp.NewTool("clear_section_blocks",
+			mcp.WithDescription("Remove all blocks from one trip section"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithNumber("section_id", mcp.Required(),
+				mcp.Description("Section ID")),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true")),
+		),
+		handleClearSectionBlocks,
+	)
+	s.AddTool(
+		mcp.NewTool("delete_section",
+			mcp.WithDescription("Delete an entire trip section"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithNumber("section_id", mcp.Required(),
+				mcp.Description("Section ID")),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true")),
+		),
+		handleDeleteSection,
+	)
+	s.AddTool(
+		mcp.NewTool("nuke_trip_places",
+			mcp.WithDescription("Remove all place blocks from all trip sections"),
+			mcp.WithString("trip_key", mcp.Required(),
+				mcp.Description("Trip key")),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true")),
+		),
+		handleNukeTripPlaces,
 	)
 }
 
@@ -394,6 +597,61 @@ func handleGetUserEmails(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	return mcp.NewToolResultStructuredOnly(resp), nil
 }
 
+func handleGetUserKV(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	key, err := request.RequireString("key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("key is required"), nil //nolint:nilerr
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	value, err := client.GetKeyValue(key)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(map[string]any{"key": key, "value": value}), nil
+}
+
+func handleListFollowing(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userIDsArg, err := request.RequireString("user_ids")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("user_ids is required"), nil //nolint:nilerr
+	}
+	userIDs := parseCommaList(userIDsArg)
+	if len(userIDs) == 0 {
+		return mcp.NewToolResultError("user_ids must contain at least one ID"), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	resp, err := client.ListFollowing(userIDs)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleFindUserByEmail(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	email, err := request.RequireString("email")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("email is required"), nil //nolint:nilerr
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	resp, err := client.FindUserByEmail(email)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
 func handleAutocompleteUsers(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query, err := request.RequireString("query")
 	if err != nil {
@@ -437,6 +695,24 @@ func handleGetFeedHome(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	return mcp.NewToolResultStructuredOnly(resp), nil
 }
 
+func handleGetFeed(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	client := optionalAuthClient()
+	resp, err := client.GetFeed()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleGetFeedV2(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	client := optionalAuthClient()
+	resp, err := client.GetFeedV2()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
 func handleGetFeedRecent(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	client, err := ensuredAuthClient()
 	if err != nil {
@@ -468,6 +744,24 @@ func handleGetTripHistory(ctx context.Context, request mcp.CallToolRequest) (*mc
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 	resp, err := client.GetTripHistory(offset)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleGetIfEdited(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	body, err := request.RequireString("body")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("body is required"), nil //nolint:nilerr
+	}
+	var req wanderlog.GetIfEditedRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("body must be valid JSON: %v", err)), nil
+	}
+	client := optionalAuthClient()
+	resp, err := client.GetIfEdited(req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
@@ -552,6 +846,27 @@ func handleGetViewOnlyJournal(ctx context.Context, request mcp.CallToolRequest) 
 	return mcp.NewToolResultStructuredOnly(resp), nil
 }
 
+func handleGetJournalStopPolylines(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	body, err := request.RequireString("body")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("body is required"), nil //nolint:nilerr
+	}
+	var req wanderlog.JournalStopPolylinesRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("body must be valid JSON: %v", err)), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	resp, err := client.GetJournalStopPolylines(req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
 func handleGetTripExpensesCSV(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
@@ -583,6 +898,20 @@ func handleGetTripDistinction(ctx context.Context, request mcp.CallToolRequest) 
 	return mcp.NewToolResultStructuredOnly(resp), nil
 }
 
+func handleGetTripUpdateRequired(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	client := optionalAuthClient()
+	resp, err := client.GetTripUpdateRequired(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
 func handleGetTripImages(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
@@ -591,6 +920,34 @@ func handleGetTripImages(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	}
 	client := optionalAuthClient()
 	resp, err := client.GetTripImages(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleGetTripPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	client := optionalAuthClient()
+	resp, err := client.GetTripPlaces(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleSearchPlacesInTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	query, err := request.RequireString("query")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
+	}
+	client := optionalAuthClient()
+	resp, err := client.SearchPlacesInTrips(query)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
@@ -613,14 +970,25 @@ func handleAutocompleteAirports(ctx context.Context, request mcp.CallToolRequest
 		return mcp.NewToolResultError("query is required"), nil //nolint:nilerr
 	}
 	client := optionalAuthClient()
-	if lat, ok := request.GetArguments()["latitude"].(float64); ok {
-		if lng, ok := request.GetArguments()["longitude"].(float64); ok {
-			resp, err := client.AutocompleteAirportWithLocation(query, lat, lng)
-			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
-			}
-			return mcp.NewToolResultStructuredOnly(resp), nil
+	args := request.GetArguments()
+	_, hasLat := args["latitude"]
+	_, hasLng := args["longitude"]
+	if hasLat || hasLng {
+		lat, err := request.RequireFloat("latitude")
+		if err != nil {
+			_ = err
+			return mcp.NewToolResultError("latitude is required when longitude is set"), nil //nolint:nilerr
 		}
+		lng, err := request.RequireFloat("longitude")
+		if err != nil {
+			_ = err
+			return mcp.NewToolResultError("longitude is required when latitude is set"), nil //nolint:nilerr
+		}
+		resp, err := client.AutocompleteAirportWithLocation(query, lat, lng)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+		}
+		return mcp.NewToolResultStructuredOnly(resp), nil
 	}
 	resp, err := client.AutocompleteAirport(query)
 	if err != nil {
@@ -650,6 +1018,33 @@ func handleGetGlobalConfig(ctx context.Context, request mcp.CallToolRequest) (*m
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultStructuredOnly(cfg), nil
+}
+
+func handleGetSessionStore(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	client := optionalAuthClient()
+	resp, err := client.GetSessionStore()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleGetSessionPreferences(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	locale := request.GetString("locale", "en")
+	client := optionalAuthClient()
+	resp, err := client.GetSessionPreferences(locale)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func parseJSONValue(value string) any {
+	var parsed any
+	if err := json.Unmarshal([]byte(value), &parsed); err != nil {
+		return value
+	}
+	return parsed
 }
 
 func handleMarkNotificationsRead(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -702,6 +1097,118 @@ func handleSetUserKV(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	return mcp.NewToolResultText(fmt.Sprintf("Wrote key %q", key)), nil
 }
 
+func handleUpdateMe(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	req := wanderlog.UpdateUserRequest{
+		Name:     strings.TrimSpace(request.GetString("name", "")),
+		Username: strings.TrimSpace(request.GetString("username", "")),
+		Bio:      strings.TrimSpace(request.GetString("bio", "")),
+		Location: strings.TrimSpace(request.GetString("location", "")),
+	}
+	if req.Name == "" && req.Username == "" && req.Bio == "" && req.Location == "" {
+		return mcp.NewToolResultError("at least one profile field is required"), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	resp, err := client.UpdateMe(req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleUpdateNotificationSettings(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	settings, err := request.RequireString("settings")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("settings is required"), nil //nolint:nilerr
+	}
+	var raw json.RawMessage
+	if err := json.Unmarshal([]byte(settings), &raw); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("settings must be valid JSON: %v", err)), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	resp, err := client.UpdateNotificationSettings(raw)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleSetUTCOffset(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	offset, err := request.RequireInt("offset_minutes")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("offset_minutes is required"), nil //nolint:nilerr
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.SetUTCOffset(offset); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Set UTC offset to %d minutes", offset)), nil
+}
+
+func handleBlockUser(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID, err := request.RequireString("user_id")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("user_id is required"), nil //nolint:nilerr
+	}
+	if strings.TrimSpace(userID) == "" {
+		return mcp.NewToolResultError("user_id must not be blank"), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.BlockUser(userID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Blocked user %s", userID)), nil
+}
+
+func handleServerLogout(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.ServerLogout(); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText("Logged out server session"), nil
+}
+
+func handleSetSessionStoreValue(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	key, err := request.RequireString("key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("key is required"), nil //nolint:nilerr
+	}
+	value, err := request.RequireString("value")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("value is required"), nil //nolint:nilerr
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.SetSessionStoreValue(key, parseJSONValue(value)); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Wrote session key %q", key)), nil
+}
+
 func handleRegisterTripView(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	tripKey, err := request.RequireString("trip_key")
 	if err != nil {
@@ -713,6 +1220,18 @@ func handleRegisterTripView(ctx context.Context, request mcp.CallToolRequest) (*
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Registered view on %s", tripKey)), nil
+}
+
+func handleCreateExampleTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	resp, err := client.CreateExampleTrip()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultStructuredOnly(resp), nil
 }
 
 func handleCreateGuideFromTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -730,6 +1249,120 @@ func handleCreateGuideFromTrip(ctx context.Context, request mcp.CallToolRequest)
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultStructuredOnly(resp), nil
+}
+
+func handleSetTripDistinction(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	distinction, err := request.RequireString("distinction")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("distinction is required"), nil //nolint:nilerr
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.SetTripDistinction(tripKey, distinction); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Set distinction on %s", tripKey)), nil
+}
+
+func handleUpdateTripPlanGeo(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	geoID := request.GetInt("geo_id", 0)
+	if geoID <= 0 {
+		return mcp.NewToolResultError("geo_id must be a positive integer"), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.UpdateTripPlanGeo(tripKey, geoID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Updated trip %s geo to %d", tripKey, geoID)), nil
+}
+
+func requireConfirmed(request mcp.CallToolRequest) error {
+	confirmed, err := request.RequireBool("confirm")
+	if err != nil || !confirmed {
+		return fmt.Errorf("confirm must be true")
+	}
+	return nil
+}
+
+func handleClearSectionBlocks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+	if sectionID <= 0 {
+		return mcp.NewToolResultError("section_id must be a positive integer"), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.ClearSectionBlocks(tripKey, sectionID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Cleared section %d", sectionID)), nil
+}
+
+func handleDeleteSection(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	sectionID := request.GetInt("section_id", 0)
+	if sectionID <= 0 {
+		return mcp.NewToolResultError("section_id must be a positive integer"), nil
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.DeleteSection(tripKey, sectionID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Deleted section %d", sectionID)), nil
+}
+
+func handleNukeTripPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	tripKey, err := request.RequireString("trip_key")
+	if err != nil {
+		_ = err
+		return mcp.NewToolResultError("trip_key is required"), nil //nolint:nilerr
+	}
+	client, err := ensuredAuthClient()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+	if err := client.NukeTripPlaces(tripKey); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Removed all place blocks from %s", tripKey)), nil
 }
 
 func handleExportTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
