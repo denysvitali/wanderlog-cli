@@ -83,13 +83,6 @@ func (c *Client) Login(email, password string) (*AuthCredentials, error) {
 	}, nil
 }
 
-func derefString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 // SetAuth configures the client with authentication credentials
 func (c *Client) SetAuth(creds *AuthCredentials) {
 	c.auth = creds

@@ -19,6 +19,6 @@ type RecommendedPlacesResponse struct {
 // MarkRecommendationNotInterestedRequest is the body for POST
 // /api/recommendations/notInterested.
 type MarkRecommendationNotInterestedRequest struct {
-	TripPlanID   int    `json:"tripPlanId"`
-	MapsPlaceID  string `json:"mapsPlaceId"`
+	TripPlanID  int    `json:"tripPlanId"`
+	MapsPlaceID string `json:"mapsPlaceId"`
 }
