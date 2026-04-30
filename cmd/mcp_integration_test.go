@@ -17,77 +17,101 @@ const (
 func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 	tools := createMCPServer(false).ListTools()
 	covered := map[string]bool{
-		"add_checklist_items":       true,
-		"add_collaborator":          true,
-		"add_flight":                true,
-		"add_lodging":               true,
-		"add_place":                 true,
-		"add_trip_expense":          true,
-		"autocomplete_airports":     true,
-		"autocomplete_users":        true,
-		"autofill_day":              true,
-		"browse_guides":             true,
-		"copy_trip":                 true,
-		"create_guide_from_trip":    true,
-		"create_trip":               true,
-		"delete_flight":             true,
-		"delete_itinerary_block":    true,
-		"delete_lodging":            true,
-		"delete_trip":               true,
-		"delete_trip_expense":       true,
-		"delete_trips":              true,
-		"export_trip":               true,
-		"get_all_airlines":          true,
-		"get_feed_friends":          true,
-		"get_feed_home":             true,
-		"get_feed_recent":           true,
-		"get_flights":               true,
-		"get_flight_stops":          true,
-		"get_global_config":         true,
-		"get_hotel_rates":           true,
-		"get_like_count":            true,
-		"get_me":                    true,
-		"get_notifications":         true,
-		"get_notification_settings": true,
-		"get_or_create_share_key":   true,
-		"get_place_details":         true,
-		"get_trip":                  true,
-		"get_trip_distinction":      true,
-		"get_trip_expenses_csv":     true,
-		"get_trip_history":          true,
-		"get_trip_images":           true,
-		"get_trip_sections":         true,
-		"get_user_emails":           true,
-		"get_user_profile":          true,
-		"get_view_only_journal":     true,
-		"is_username_taken":         true,
-		"like_trip":                 true,
-		"list_places":               true,
-		"list_sections":             true,
-		"list_trip_invites":         true,
-		"list_trips":                true,
-		"mark_notifications_read":   true,
-		"move_place":                true,
-		"register_trip_view":        true,
-		"remove_collaborator":       true,
-		"remove_place":              true,
-		"reorder_places":            true,
-		"restore_trip":              true,
-		"search_geos":               true,
-		"search_hotels":             true,
-		"search_places":             true,
-		"search_places_wanderlog":   true,
-		"search_restaurants":        true,
-		"send_trip_invites":         true,
-		"set_trip_budget":           true,
-		"set_user_kv":               true,
-		"toggle_checklist_item":     true,
-		"update_flight":             true,
-		"update_lodging":            true,
-		"update_place_notes":        true,
-		"update_place_visit_time":   true,
-		"update_trip":               true,
-		"update_trip_expense":       true,
+		"add_checklist_items":          true,
+		"add_collaborator":             true,
+		"add_flight":                   true,
+		"add_lodging":                  true,
+		"add_place":                    true,
+		"add_trip_expense":             true,
+		"autocomplete_airports":        true,
+		"autocomplete_users":           true,
+		"autofill_day":                 true,
+		"block_user":                   true,
+		"browse_guides":                true,
+		"clear_section_blocks":         true,
+		"copy_trip":                    true,
+		"create_example_trip":          true,
+		"create_guide_from_trip":       true,
+		"create_trip":                  true,
+		"delete_section":               true,
+		"delete_flight":                true,
+		"delete_itinerary_block":       true,
+		"delete_lodging":               true,
+		"delete_trip":                  true,
+		"delete_trip_expense":          true,
+		"delete_trips":                 true,
+		"export_trip":                  true,
+		"find_user_by_email":           true,
+		"get_all_airlines":             true,
+		"get_feed":                     true,
+		"get_feed_friends":             true,
+		"get_feed_home":                true,
+		"get_feed_recent":              true,
+		"get_feed_v2":                  true,
+		"get_flights":                  true,
+		"get_flight_stops":             true,
+		"get_global_config":            true,
+		"get_hotel_rates":              true,
+		"get_if_edited":                true,
+		"get_journal_stop_polylines":   true,
+		"get_like_count":               true,
+		"get_me":                       true,
+		"get_notifications":            true,
+		"get_notification_settings":    true,
+		"get_or_create_share_key":      true,
+		"get_place_details":            true,
+		"get_session_preferences":      true,
+		"get_session_store":            true,
+		"get_trip":                     true,
+		"get_trip_distinction":         true,
+		"get_trip_expenses_csv":        true,
+		"get_trip_history":             true,
+		"get_trip_images":              true,
+		"get_trip_places":              true,
+		"get_trip_sections":            true,
+		"get_trip_update_required":     true,
+		"get_user_kv":                  true,
+		"get_user_emails":              true,
+		"get_user_profile":             true,
+		"get_view_only_journal":        true,
+		"is_username_taken":            true,
+		"like_trip":                    true,
+		"list_places":                  true,
+		"list_following":               true,
+		"list_sections":                true,
+		"list_trip_invites":            true,
+		"list_trips":                   true,
+		"mark_notifications_read":      true,
+		"move_place":                   true,
+		"nuke_trip_places":             true,
+		"register_trip_view":           true,
+		"remove_collaborator":          true,
+		"remove_place":                 true,
+		"reorder_places":               true,
+		"restore_trip":                 true,
+		"search_places_in_trips":       true,
+		"search_geos":                  true,
+		"search_hotels":                true,
+		"search_places":                true,
+		"search_places_wanderlog":      true,
+		"search_restaurants":           true,
+		"send_trip_invites":            true,
+		"server_logout":                true,
+		"set_trip_budget":              true,
+		"set_trip_distinction":         true,
+		"set_session_store_value":      true,
+		"set_utc_offset":               true,
+		"set_user_kv":                  true,
+		"toggle_checklist_item":        true,
+		"update_me":                    true,
+		"update_flight":                true,
+		"update_lodging":               true,
+		"update_notification_settings": true,
+		"update_place_notes":           true,
+		"update_place_visit_time":      true,
+		"update_trip":                  true,
+		"update_trip_plan_geo":         true,
+		"update_trip_expense":          true,
 	}
 
 	missing := make([]string, 0)
@@ -109,9 +133,13 @@ func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 		"add_place",
 		"add_trip_expense",
 		"autofill_day",
+		"block_user",
+		"clear_section_blocks",
 		"copy_trip",
+		"create_example_trip",
 		"create_guide_from_trip",
 		"create_trip",
+		"delete_section",
 		"delete_flight",
 		"delete_itinerary_block",
 		"delete_lodging",
@@ -129,15 +157,23 @@ func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 		"reorder_places",
 		"restore_trip",
 		"send_trip_invites",
+		"server_logout",
+		"set_session_store_value",
 		"set_trip_budget",
+		"set_trip_distinction",
+		"set_utc_offset",
 		"set_user_kv",
 		"toggle_checklist_item",
+		"update_me",
 		"update_flight",
 		"update_lodging",
+		"update_notification_settings",
 		"update_place_notes",
 		"update_place_visit_time",
 		"update_trip",
+		"update_trip_plan_geo",
 		"update_trip_expense",
+		"nuke_trip_places",
 	}
 
 	readOnlyTools := createMCPServer(true).ListTools()
@@ -263,6 +299,123 @@ func TestMCPIntegration_WriteHandlerValidationBeforeAuth(t *testing.T) {
 		require.NotNil(t, result)
 		assert.True(t, result.IsError)
 		assert.Contains(t, getTextContent(result), "at least one permission")
+	})
+
+	t.Run("update_me_without_fields", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "update_me",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleUpdateMe(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "at least one profile field")
+	})
+
+	t.Run("update_notification_settings_invalid_json", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "update_notification_settings",
+				Arguments: map[string]interface{}{
+					"settings": "{",
+				},
+			},
+		}
+
+		result, err := handleUpdateNotificationSettings(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "valid JSON")
+	})
+
+	t.Run("get_if_edited_invalid_json", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_if_edited",
+				Arguments: map[string]interface{}{
+					"body": "{",
+				},
+			},
+		}
+
+		result, err := handleGetIfEdited(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "valid JSON")
+	})
+
+	t.Run("set_utc_offset_missing_offset", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name:      "set_utc_offset",
+				Arguments: map[string]interface{}{},
+			},
+		}
+
+		result, err := handleSetUTCOffset(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "offset_minutes is required")
+	})
+
+	t.Run("autocomplete_airports_requires_lat_lng_pair", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "autocomplete_airports",
+				Arguments: map[string]interface{}{
+					"query":    "SFO",
+					"latitude": 37.6,
+				},
+			},
+		}
+
+		result, err := handleAutocompleteAirports(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "longitude is required")
+	})
+
+	t.Run("nuke_trip_places_requires_confirm", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "nuke_trip_places",
+				Arguments: map[string]interface{}{
+					"trip_key": testTripID,
+					"confirm":  false,
+				},
+			},
+		}
+
+		result, err := handleNukeTripPlaces(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "confirm must be true")
+	})
+
+	t.Run("server_logout_requires_confirm", func(t *testing.T) {
+		request := mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "server_logout",
+				Arguments: map[string]interface{}{
+					"confirm": false,
+				},
+			},
+		}
+
+		result, err := handleServerLogout(ctx, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.IsError)
+		assert.Contains(t, getTextContent(result), "confirm must be true")
 	})
 }
 

@@ -73,17 +73,17 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Go Implementation | CLI Command | MCP Tool |
 |----------|-------------------|-------------|----------|
 | `GET /api/user` | `GetMe()` | `wanderlog user profile` | `get_me` |
-| `POST /api/user` | `UpdateMe()` | - | - |
-| `POST /api/user/logout` | `ServerLogout()` | `wanderlog user server-logout` | - |
+| `POST /api/user` | `UpdateMe()` | - | `update_me` (write) |
+| `POST /api/user/logout` | `ServerLogout()` | `wanderlog user server-logout` | `server_logout` (write) |
 | `GET /api/user/notifications` | `GetNotifications()` | `wanderlog user notifications` | `get_notifications` |
 | `POST /api/user/notifications/markRead` | `MarkNotificationsRead()` | `wanderlog user mark-read` | `mark_notifications_read` (write) |
-| `GET/POST /api/user/notification/settings` | `GetNotificationSettings()`, `UpdateNotificationSettings()` | `wanderlog user settings`, `settings-set` | `get_notification_settings` |
-| `GET/POST /api/user/keyValue/:key` | `GetKeyValue()`, `SetKeyValue()` | `wanderlog user kv-get/kv-set` | `set_user_kv` (write) |
-| `POST /api/user/utcOffset` | `SetUTCOffset()` | `wanderlog user utc-offset` | - |
-| `POST /api/user/following/list` | `ListFollowing()` | `wanderlog user following` | - |
+| `GET/POST /api/user/notification/settings` | `GetNotificationSettings()`, `UpdateNotificationSettings()` | `wanderlog user settings`, `settings-set` | `get_notification_settings`, `update_notification_settings` (write) |
+| `GET/POST /api/user/keyValue/:key` | `GetKeyValue()`, `SetKeyValue()` | `wanderlog user kv-get/kv-set` | `get_user_kv`, `set_user_kv` (write) |
+| `POST /api/user/utcOffset` | `SetUTCOffset()` | `wanderlog user utc-offset` | `set_utc_offset` (write) |
+| `POST /api/user/following/list` | `ListFollowing()` | `wanderlog user following` | `list_following` |
 | `GET /api/user/autocomplete/:search` | `AutocompleteUsers()` | `wanderlog user search` | `autocomplete_users` |
-| `GET /api/user/byEmail` | `FindUserByEmail()` | `wanderlog user by-email` | - |
-| `POST /api/user/block` | `BlockUser()` | `wanderlog user block` | - |
+| `GET /api/user/byEmail` | `FindUserByEmail()` | `wanderlog user by-email` | `find_user_by_email` |
+| `POST /api/user/block` | `BlockUser()` | `wanderlog user block` | `block_user` (write) |
 | `GET /api/user/isUsernameTaken/:username` | `IsUsernameTaken()` | `wanderlog user username-taken` | `is_username_taken` |
 | `GET /api/user/emails` | `GetUserEmails()` | `wanderlog user emails` | `get_user_emails` |
 | `GET /api/tripPlans/profile/:userId` | `GetUserProfile()` | `wanderlog user profile <id>` | `get_user_profile` |
@@ -94,12 +94,12 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Go Implementation | CLI Command | MCP Tool |
 |----------|-------------------|-------------|----------|
 | `GET /api/tripPlans/home` | `GetFeedHome()` | `wanderlog feed home` | `get_feed_home` |
-| `GET /api/tripPlans/feed` | `GetFeed()` | `wanderlog feed legacy` | - |
-| `GET /api/tripPlans/feed/v2` | `GetFeedV2()` | `wanderlog feed v2` | - |
+| `GET /api/tripPlans/feed` | `GetFeed()` | `wanderlog feed legacy` | `get_feed` |
+| `GET /api/tripPlans/feed/v2` | `GetFeedV2()` | `wanderlog feed v2` | `get_feed_v2` |
 | `GET /api/tripPlans/feed/mostRecentlyEdited` | `GetFeedMostRecent()` | `wanderlog feed recent` | `get_feed_recent` |
 | `GET /api/tripPlans/friendsPlans` | `GetFriendsPlans()` | `wanderlog feed friends` | `get_feed_friends` |
 | `GET /api/tripPlans/history` | `GetTripHistory()` | `wanderlog feed history` | `get_trip_history` |
-| `POST /api/tripPlans/getIfEdited` | `GetIfEdited()` | `wanderlog get-if-edited` | - |
+| `POST /api/tripPlans/getIfEdited` | `GetIfEdited()` | `wanderlog get-if-edited` | `get_if_edited` |
 | `GET /api/tripPlans/browse/guides[/:geoId]` | `BrowseGuides()` | `wanderlog feed guides` | `browse_guides` |
 
 **Journal & Advanced Trip Ops (Recently Added):**
@@ -107,11 +107,11 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Go Implementation | CLI Command | MCP Tool |
 |----------|-------------------|-------------|----------|
 | `GET /api/tripPlans/viewOnlyJournal/:journalKey` | `GetViewOnlyJournal()` | `wanderlog journal <key>` | `get_view_only_journal` |
-| `POST /api/tripPlans/journalStopPolylines` | `GetJournalStopPolylines()` | - | - |
+| `POST /api/tripPlans/journalStopPolylines` | `GetJournalStopPolylines()` | - | `get_journal_stop_polylines` |
 | `GET /api/tripPlans/:key/expensesAsCSV` | `GetTripExpensesCSV()` | `wanderlog expenses` | `get_trip_expenses_csv` |
 | `POST /api/tripPlans/:key/registerView` | `RegisterTripView()` | `wanderlog register-view` | `register_trip_view` (write) |
-| `GET /api/tripPlans/:key/updateRequired` | `GetTripUpdateRequired()` | `wanderlog update-required` | - |
-| `GET/POST /api/tripPlans/:key/distinction` | `GetTripDistinction()`, `SetTripDistinction()` | `wanderlog distinction` | `get_trip_distinction` |
+| `GET /api/tripPlans/:key/updateRequired` | `GetTripUpdateRequired()` | `wanderlog update-required` | `get_trip_update_required` |
+| `GET/POST /api/tripPlans/:key/distinction` | `GetTripDistinction()`, `SetTripDistinction()` | `wanderlog distinction` | `get_trip_distinction`, `set_trip_distinction` (write) |
 | `POST /api/tripPlans/:key/createGuideFromTripPlan` | `CreateGuideFromTripPlan()` | `wanderlog create-guide` | `create_guide_from_trip` (write) |
 
 **Config & Session (Recently Added):**
@@ -119,8 +119,8 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | Endpoint | Go Implementation | CLI Command | MCP Tool |
 |----------|-------------------|-------------|----------|
 | `GET /api/config/globalConfig` | `GetGlobalConfig()` | `wanderlog config global` | `get_global_config` |
-| `GET/POST /api/sessionStore` | `GetSessionStore()`, `SetSessionStoreValue()` | `wanderlog config session`, `session-set` | - |
-| `GET /api/sessionStore/preferences/:locale` | `GetSessionPreferences()` | `wanderlog config preferences` | - |
+| `GET/POST /api/sessionStore` | `GetSessionStore()`, `SetSessionStoreValue()` | `wanderlog config session`, `session-set` | `get_session_store`, `set_session_store_value` (write) |
+| `GET /api/sessionStore/preferences/:locale` | `GetSessionPreferences()` | `wanderlog config preferences` | `get_session_preferences` |
 
 **Still Out of Scope (intentionally):**
 - OAuth login variants (`/api/user/loginFacebookAccessToken`, `/api/user/loginGoogleAuthCode/v2`, `/api/user/loginGoogleIdToken`, `/api/user/loginAppleAuthCode`) — require browser handshake; email login covers CLI needs
@@ -243,7 +243,7 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
-| `/api/user/utcOffset` | POST | ❌ | Set user timezone |
+| `/api/user/utcOffset` | POST | ✅ `SetUTCOffset()` | Set user timezone |
 | `/api/user/isUsernameTaken/:username` | GET | ✅ `IsUsernameTaken()` | Check username availability |
 | `/api/user/subscribeBlog` | POST | ❌ | Subscribe to blog |
 | `/api/user/keyValue/:key` | GET/POST | ✅ `GetUserKV()` / `SetUserKV()` | Key-value storage |
@@ -259,16 +259,16 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 
 | Endpoint | Method | Status | Purpose |
 |----------|--------|--------|---------|
-| `/api/user/following/list` | GET | ❌ | List following |
+| `/api/user/following/list` | POST | ✅ `ListFollowing()` | List following |
 | `/api/user/following/visitedGeo/:geoId` | GET | ❌ | Following who visited location |
 | `/api/user/followingMultiple` | POST | ❌ | Follow multiple users |
 | `/api/user/mutuallyFollowing` | GET | ❌ | Get mutual followers |
 | `/api/user/:userId/follows` | GET | ❌ | Check if user follows |
 | `/api/user/:userId/email` | GET | ❌ | Get user email |
 | `/api/user/autocomplete/:search` | GET | ✅ `AutocompleteUsers()` | Autocomplete users |
-| `/api/user/byEmail` | POST | ❌ | Find user by email |
+| `/api/user/byEmail` | GET | ✅ `FindUserByEmail()` | Find user by email |
 | `/api/user/leaderboard` | GET | ❌ | Get leaderboard |
-| `/api/user/block` | POST | ❌ | Block user |
+| `/api/user/block` | POST | ✅ `BlockUser()` | Block user |
 | `/api/user/combine/:token` | GET/POST | ❌ | Combine accounts |
 
 ### Trip Operations - Feed & Discovery
