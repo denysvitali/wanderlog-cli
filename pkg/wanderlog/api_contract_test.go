@@ -220,6 +220,173 @@ func TestAPIRequestContracts(t *testing.T) {
 			})
 			return err
 		},
+		"ListGeosWithGoodGuides": func(c *Client) error {
+			_, err := c.ListGeosWithGoodGuides()
+			return err
+		},
+		"ListPopularAndNearbyGeos": func(c *Client) error {
+			_, err := c.ListPopularAndNearbyGeos()
+			return err
+		},
+		"FindCountryForIP": func(c *Client) error {
+			_, err := c.FindCountryForIP()
+			return err
+		},
+		"FindNearestTripadvisorGeo": func(c *Client) error {
+			_, err := c.FindNearestTripadvisorGeo(35.6812, 139.7671)
+			return err
+		},
+		"FindNearestGeosToIP": func(c *Client) error {
+			_, err := c.FindNearestGeosToIP(nil)
+			return err
+		},
+		"FindNearestKayakCity": func(c *Client) error {
+			_, err := c.FindNearestKayakCity(35.6812, 139.7671, "Tokyo")
+			return err
+		},
+		"GetClientGeos": func(c *Client) error {
+			_, err := c.GetClientGeos([]int{12345, 67890})
+			return err
+		},
+		"ListTripPlannerGeos": func(c *Client) error {
+			_, err := c.ListTripPlannerGeos()
+			return err
+		},
+		"ListCountries": func(c *Client) error {
+			_, err := c.ListCountries("en")
+			return err
+		},
+		"ListGeoCategoriesForCategory": func(c *Client) error {
+			_, err := c.ListGeoCategoriesForCategory(42, "en")
+			return err
+		},
+		"ListGeoCategoriesForGeo": func(c *Client) error {
+			_, err := c.ListGeoCategoriesForGeo(12345, "tripPlanner")
+			return err
+		},
+		"ListGeoInMonthGeos": func(c *Client) error {
+			_, err := c.ListGeoInMonthGeos()
+			return err
+		},
+		"ListKeywordCategories": func(c *Client) error {
+			_, err := c.ListKeywordCategories("en")
+			return err
+		},
+		"SearchGeo": func(c *Client) error {
+			_, err := c.SearchGeo(map[string]string{"q": "tokyo"})
+			return err
+		},
+		"GetAllDistanceInfoForPlace": func(c *Client) error {
+			_, err := c.GetAllDistanceInfoForPlace(map[string]any{"placeId": "place-1"})
+			return err
+		},
+		"GetDistancesForMode": func(c *Client) error {
+			_, err := c.GetDistancesForMode(map[string]any{"mode": "driving", "places": []any{}})
+			return err
+		},
+		"OptimizeRoute": func(c *Client) error {
+			_, err := c.OptimizeRoute(map[string]any{"mode": "driving", "places": []any{}})
+			return err
+		},
+		"GetRecommendedPlaces": func(c *Client) error {
+			_, err := c.GetRecommendedPlaces(RecommendedPlacesRequest{
+				TripPlanID: 1,
+				GeoID:      12345,
+				Input:      "things to do",
+			})
+			return err
+		},
+		"MarkRecommendationNotInterested": func(c *Client) error {
+			return c.MarkRecommendationNotInterested(MarkRecommendationNotInterestedRequest{
+				TripPlanID:  1,
+				MapsPlaceID: "place-123",
+			})
+		},
+		"AutocompletePlaces": func(c *Client) error {
+			oldFn := autocompleteSessionToken
+			autocompleteSessionToken = func() string { return "contract-token" }
+			defer func() { autocompleteSessionToken = oldFn }()
+			_, err := c.AutocompletePlaces("tokyo", 35.6812, 139.7671)
+			return err
+		},
+		"FindPlaceFromLngLat": func(c *Client) error {
+			_, err := c.FindPlaceFromLngLat(35.6812, 139.7671)
+			return err
+		},
+		"GetMapLayerGroups": func(c *Client) error {
+			_, err := c.GetMapLayerGroups(map[string]any{"layerGroupIds": []any{}})
+			return err
+		},
+		"GetMultiplePlaceDetails": func(c *Client) error {
+			_, err := c.GetMultiplePlaceDetails([]string{"place-1", "place-2"}, "en")
+			return err
+		},
+		"GetPlaceDetailsV2": func(c *Client) error {
+			_, err := c.GetPlaceDetailsV2("place-123", "en")
+			return err
+		},
+		"SearchPlacesGoogle": func(c *Client) error {
+			_, err := c.SearchPlacesGoogle(map[string]any{"input": "tokyo"})
+			return err
+		},
+		"GetPlacesMetadata": func(c *Client) error {
+			_, err := c.GetPlacesMetadata([]string{"place-1", "place-2"}, nil)
+			return err
+		},
+		"GetPlaceCards": func(c *Client) error {
+			_, err := c.GetPlaceCards([]string{"place-1", "place-2"})
+			return err
+		},
+		"ListPlacePageGeos": func(c *Client) error {
+			_, err := c.ListPlacePageGeos()
+			return err
+		},
+		"GetTripPlanAssistantText": func(c *Client) error {
+			_, err := c.GetTripPlanAssistantText(AssistantTextRequest{Message: "what should I do in Tokyo?"})
+			return err
+		},
+		"GetTripPlanAssistantHighlights": func(c *Client) error {
+			_, err := c.GetTripPlanAssistantHighlights(AssistantHighlightsRequest{
+				AssistantMessage: "Visit Senso-ji",
+				TripPlanID:       1,
+			})
+			return err
+		},
+		"GetTripPlanAssistantHistory": func(c *Client) error {
+			_, err := c.GetTripPlanAssistantHistory(map[string]string{"chatId": "chat-1"})
+			return err
+		},
+		"ListTripPlanAssistantChats": func(c *Client) error {
+			_, err := c.ListTripPlanAssistantChats(1, "", 0, 0)
+			return err
+		},
+		"GetTripPlanAssistantInitialChat": func(c *Client) error {
+			_, err := c.GetTripPlanAssistantInitialChat(1)
+			return err
+		},
+		"GetTripLikesBulk": func(c *Client) error {
+			_, err := c.GetTripLikesBulk([]string{"trip-a", "trip-b"})
+			return err
+		},
+		"CreateTripFromFlights": func(c *Client) error {
+			_, err := c.CreateTripFromFlights(map[string]any{"flights": []any{}})
+			return err
+		},
+		"GetMyProfileData": func(c *Client) error {
+			_, err := c.GetMyProfileData()
+			return err
+		},
+		"GetLodgingCheckoutData": func(c *Client) error {
+			_, err := c.GetLodgingCheckoutData(map[string]string{"lodgingPropertyId": "property-123"})
+			return err
+		},
+		"GetDealsForUser": func(c *Client) error {
+			_, err := c.GetDealsForUser()
+			return err
+		},
+		"RateEmail": func(c *Client) error {
+			return c.RateEmail(RateEmailRequest{EmailID: 1, Rating: "thumbs_up"})
+		},
 	}
 
 	for _, contract := range contracts {

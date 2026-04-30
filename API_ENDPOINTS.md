@@ -122,6 +122,80 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 | `GET/POST /api/sessionStore` | `GetSessionStore()`, `SetSessionStoreValue()` | `wanderlog config session`, `session-set` | `get_session_store`, `set_session_store_value` (write) |
 | `GET /api/sessionStore/preferences/:locale` | `GetSessionPreferences()` | `wanderlog config preferences` | `get_session_preferences` |
 
+**Geo (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `GET /api/geo/geosWithGoodGuides` | `ListGeosWithGoodGuides()` | `list_geos_with_good_guides` |
+| `GET /api/geo/popularAndNearby` | `ListPopularAndNearbyGeos()` | `list_popular_and_nearby_geos` |
+| `GET /api/geo/findCountryForIP` | `FindCountryForIP()` | `find_country_for_ip` |
+| `GET /api/geo/nearestTripadvisorGeo` | `FindNearestTripadvisorGeo()` | `find_nearest_tripadvisor_geo` |
+| `GET /api/geo/findNearestGeosToIP` | `FindNearestGeosToIP()` | `find_nearest_geos_to_ip` |
+| `GET /api/geo/nearestKayakCity` | `FindNearestKayakCity()` | `find_nearest_kayak_city` |
+| `GET /api/geo/clientGeos` | `GetClientGeos()` | `get_client_geos` |
+| `GET /api/geo/tripPlannerGeos` | `ListTripPlannerGeos()` | `list_trip_planner_geos` |
+| `GET /api/geo/countries` | `ListCountries()` | `list_countries` |
+| `GET /api/geo/listGeoCategoriesForCategory` | `ListGeoCategoriesForCategory()` | `list_geo_categories_for_category` |
+| `GET /api/geo/listGeoCategoriesForGeo` | `ListGeoCategoriesForGeo()` | `list_geo_categories_for_geo` |
+| `GET /api/geo/geoInMonthGeos` | `ListGeoInMonthGeos()` | `list_geo_in_month_geos` |
+| `GET /api/geo/listKeywordCategories` | `ListKeywordCategories()` | `list_keyword_categories` |
+| `GET /api/geo/search` | `SearchGeo()` | `search_geo` |
+
+**Directions (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `GET /api/directions/allDistanceInfoForPlace/v2` | `GetAllDistanceInfoForPlace()` | `get_all_distance_info_for_place` |
+| `POST /api/directions/distancesForMode` | `GetDistancesForMode()` | `get_distances_for_mode` |
+| `POST /api/directions/optimizeRoute` | `OptimizeRoute()` | `optimize_route` |
+
+**Recommendations (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `POST /api/recommendations/v2` | `GetRecommendedPlaces()` | `get_recommended_places` (write-gated) |
+| `POST /api/recommendations/notInterested` | `MarkRecommendationNotInterested()` | `mark_recommendation_not_interested` (write-gated) |
+
+**PlacesAPI extras (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `GET /api/placesAPI/autocomplete` | `AutocompletePlaces()` | `autocomplete_places` |
+| `GET /api/placesAPI/findPlaceFromLngLat` | `FindPlaceFromLngLat()` | `find_place_from_lng_lat` |
+| `GET /api/placesAPI/mapLayerGroups` | `GetMapLayerGroups()` | `get_map_layer_groups` |
+| `GET /api/placesAPI/getMultiplePlaceDetails` | `GetMultiplePlaceDetails()` | `get_multiple_place_details` |
+| `GET /api/placesAPI/getPlaceDetails/v2` | `GetPlaceDetailsV2()` | `get_place_details_v2` |
+| `GET /api/placesAPI/searchPlaces` | `SearchPlacesGoogle()` | `search_places_google` |
+
+**Places (cards/metadata) (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `GET /api/places/metadata` | `GetPlacesMetadata()` | `get_places_metadata` |
+| `GET /api/places/card` | `GetPlaceCards()` | `get_place_cards` |
+| `GET /api/places/placePageGeos` | `ListPlacePageGeos()` | `list_place_page_geos` |
+
+**Trip Plan AI assistant (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `POST /api/chat/tripPlanAssistant/getText/v2` (NDJSON) | `GetTripPlanAssistantText()` | `get_trip_plan_assistant_text` (write-gated) |
+| `POST /api/chat/tripPlanAssistant/getHighlights/v2` | `GetTripPlanAssistantHighlights()` | `get_trip_plan_assistant_highlights` (write-gated) |
+| `GET /api/chat/tripPlanAssistant/history` | `GetTripPlanAssistantHistory()` | `get_trip_plan_assistant_history` |
+| `GET /api/chat/tripPlanAssistant/chats` | `ListTripPlanAssistantChats()` | `list_trip_plan_assistant_chats` |
+| `GET /api/chat/tripPlanAssistant/initialChatWithItems` | `GetTripPlanAssistantInitialChat()` | `get_trip_plan_assistant_initial_chat` |
+
+**Trip + Lodging + Misc extras (API pass):**
+
+| Endpoint | Go Implementation | MCP Tool |
+|----------|-------------------|----------|
+| `POST /api/tripPlans/likes` | `GetTripLikesBulk()` | `get_trip_likes_bulk` |
+| `POST /api/tripPlans/flights` | `CreateTripFromFlights()` | `create_trip_from_flights` (write-gated) |
+| `GET /api/tripPlans/myProfile/` | `GetMyProfileData()` | `get_my_profile_data` |
+| `GET /api/lodging/checkoutData` | `GetLodgingCheckoutData()` | `get_lodging_checkout_data` |
+| `GET /api/deals` | `GetDealsForUser()` | `get_deals_for_user` |
+| `POST /api/emails/rate` | `RateEmail()` | `rate_email` (write-gated) |
+
 **Still Out of Scope (intentionally):**
 - OAuth login variants (`/api/user/loginFacebookAccessToken`, `/api/user/loginGoogleAuthCode/v2`, `/api/user/loginGoogleIdToken`, `/api/user/loginAppleAuthCode`) — require browser handshake; email login covers CLI needs
 - `/api/user/register`, `/api/user/resetPassword`, `/api/user/startResetPassword`, `/api/user/isValidPasswordResetToken`, `/api/user/activate/*`, `/api/user/changeEmail/*` — account-lifecycle flows better handled in the web UI
