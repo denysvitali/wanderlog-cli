@@ -37,22 +37,22 @@ Strongly typed wrappers cover the core trip, search, flight, lodging, collaborat
 | Endpoint | Go Implementation | Location | Integration Test |
 |----------|-------------------|----------|------------------|
 | `GET /api/tripPlans/{key}/flights` | `GetTripFlights()` | `write_ops.go:1125` | `TestIntegration_GetTripFlights` |
-| `POST /api/tripPlans/{key}/export/v2` | `ExportTrip()` | `write_ops.go:1155` | `TestIntegration_ExportTrip` |
-| `POST /api/tripPlans/autofillDay` | `AutofillDay()` | `write_ops.go:1201` | `TestIntegration_AutofillDay` |
-| `POST /api/tripPlans/checklistSection` | `AddChecklistItems()` | `write_ops.go:1257` | `TestIntegration_AddChecklistItems` |
+| `POST /api/tripPlans/{key}/export/v2` | `ExportTrip()` | `write_ops_social.go` | `TestIntegration_ExportTrip` |
+| `POST /api/tripPlans/autofillDay` | `AutofillDay()` | `write_ops_social.go` | `TestIntegration_AutofillDay` |
+| `POST /api/tripPlans/checklistSection` | `AddChecklistItems()`, `ToggleChecklistItem()` | `write_ops_social.go` | `TestIntegration_AddChecklistItems` |
 
 ### Covered Helper APIs
 
 | Endpoint | Go Implementation | CLI Command | MCP Tool |
 |----------|-------------------|-------------|----------|
-| `GET /api/flights/allAirlines` | `GetAllAirlines()` | `wanderlog travel airlines` | - |
-| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `wanderlog travel airports` | - |
-| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `wanderlog travel airports --lat --lng` | - |
-| `GET /api/flights/flightStopsLista` | `GetFlightStops()` | `wanderlog travel flight-stops` | - |
+| `GET /api/flights/allAirlines` | `GetAllAirlines()` | `wanderlog travel airlines` | `get_all_airlines` |
+| `GET /api/flights/autocompleteAirport` | `AutocompleteAirport()` | `wanderlog travel airports` | `autocomplete_airports` |
+| `GET /api/flights/autocompleteAirportWithLocation` | `AutocompleteAirportWithLocation()` | `wanderlog travel airports --lat --lng` | `autocomplete_airports` |
+| `GET /api/flights/flightStopsLista` | `GetFlightStops()` | `wanderlog travel flight-stops` | `get_flight_stops` |
 | `POST /api/lodging/searchLodgings` | `SearchLodgings()` | `wanderlog travel hotels` | `search_hotels` |
-| `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | `wanderlog travel hotel-rates` | - |
+| `POST /api/lodging/getGooglePriceRates` | `GetGooglePriceRates()` | `wanderlog travel hotel-rates` | `get_hotel_rates` |
 | `GET /api/placesAPI/getPlaceDetailsAndCardData` | `GetPlaceDetails()` | `wanderlog place-details` | `get_place_details` |
-| `GET /api/placesAPI/autocomplete/v2` | `SearchPlacesWithWanderllog()` | `wanderlog search-places` | `search_places` |
+| `GET /api/placesAPI/autocomplete/v2` | `SearchPlacesWithWanderlog()` | `wanderlog search-places` | `search_places`, `search_places_wanderlog` |
 
 ### Raw API Coverage
 
@@ -189,25 +189,25 @@ Use the typed commands where available; use `wanderlog api` for admin, payments,
 
 | Endpoint | Method | Implementation | Location | MCP Tool |
 |----------|--------|----------------|----------|----------|
-| `/api/flights/allAirlines` | GET | ✅ `GetAllAirlines()` | `client.go:474` | - |
-| `/api/flights/autocompleteAirport` | GET | ✅ `AutocompleteAirport()` | `client.go:506` | - |
-| `/api/flights/autocompleteAirportWithLocation` | GET | ✅ `AutocompleteAirportWithLocation()` | `client.go:538` | - |
-| `/api/flights/flightStopsLista` | GET | ✅ `GetFlightStops()` | `client.go:571` | - |
+| `/api/flights/allAirlines` | GET | ✅ `GetAllAirlines()` | `client.go` | `get_all_airlines` |
+| `/api/flights/autocompleteAirport` | GET | ✅ `AutocompleteAirport()` | `client.go` | `autocomplete_airports` |
+| `/api/flights/autocompleteAirportWithLocation` | GET | ✅ `AutocompleteAirportWithLocation()` | `client.go` | `autocomplete_airports` |
+| `/api/flights/flightStopsLista` | GET | ✅ `GetFlightStops()` | `client.go` | `get_flight_stops` |
 | `/api/tripPlans/:key/flights` | GET | ✅ `GetTripFlights()` | `write_ops_social.go:346` | `TestIntegration_GetTripFlights` |
 | `/api/lodging/searchLodgings` | POST | ✅ `SearchLodgings()` | `client.go:671` | `search_hotels` |
-| `/api/lodging/getGooglePriceRates` | POST | ✅ `GetGooglePriceRates()` | `client.go:721` | - |
+| `/api/lodging/getGooglePriceRates` | POST | ✅ `GetGooglePriceRates()` | `client.go` | `get_hotel_rates` |
 
 > **Note:** The MCP tool `search_hotels` uses the lodging search method. The old `search_flights` tool was removed because it returned placeholder errors; attached trip flights are available through `get_flights`.
 
 ### Collaboration
 
-| Endpoint | Method | Implementation | Location | Test |
-|----------|--------|----------------|----------|------|
-| `/api/tripPlans/:key/invite` | POST | ✅ `SendTripInvites()` | `write_ops.go:812` | - |
-| `/api/tripPlans/:key/invites` | GET | ✅ `ListTripInvites()` | `write_ops.go:855` | `TestIntegration_ListTripInvites` |
-| `/api/tripPlans/:key/collaborator` | POST | ✅ `AddCollaborator()` | `write_ops.go:969` | - |
-| `/api/tripPlans/:key/collaborator` | DELETE | ✅ `RemoveCollaborator()` | `write_ops.go:1016` | - |
-| `/api/tripPlans/:editKey/shareKey` | POST | ✅ `GetOrCreateShareKey()` | `write_ops.go:1063` | - |
+| Endpoint | Method | Implementation | Location | MCP Tool |
+|----------|--------|----------------|----------|----------|
+| `/api/tripPlans/:key/invite` | POST | ✅ `SendTripInvites()` | `write_ops.go:812` | `send_trip_invites` |
+| `/api/tripPlans/:key/invites` | GET | ✅ `ListTripInvites()` | `write_ops.go:855` | `list_trip_invites` |
+| `/api/tripPlans/:key/collaborator` | POST | ✅ `AddCollaborator()` | `write_ops_social.go` | `add_collaborator` |
+| `/api/tripPlans/:key/collaborator` | DELETE | ✅ `RemoveCollaborator()` | `write_ops_social.go` | `remove_collaborator` |
+| `/api/tripPlans/:editKey/shareKey` | POST | ✅ `GetOrCreateShareKey()` | `write_ops_social.go` | `get_or_create_share_key` |
 
 ### Social Features
 
