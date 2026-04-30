@@ -3,6 +3,10 @@
   "extends": [
     "config:recommended"
   ],
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
   "packageRules": [
     {
       "description": "Group Go module updates together",
