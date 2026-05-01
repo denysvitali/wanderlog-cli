@@ -499,7 +499,10 @@ func handleGetTripSections(ctx context.Context, request mcp.CallToolRequest) (*m
 	}
 
 	// Return structured data directly - more efficient than text formatting
-	return mcp.NewToolResultStructuredOnly(sections), nil
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"trip_key": tripKey,
+		"sections": sections,
+	}), nil
 }
 
 func optionalIntArgument(request mcp.CallToolRequest, key string) (int, bool) {
