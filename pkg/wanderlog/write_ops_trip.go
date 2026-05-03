@@ -352,6 +352,24 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	if req.Place.Geometry != nil {
 		place["geometry"] = req.Place.Geometry
 	}
+	if req.Place.FormattedAddress != "" {
+		place["formatted_address"] = req.Place.FormattedAddress
+	}
+	if req.Place.URL != "" {
+		place["url"] = req.Place.URL
+	}
+	if req.Place.Website != "" {
+		place["website"] = req.Place.Website
+	}
+	if req.Place.InternationalPhoneNumber != "" {
+		place["international_phone_number"] = req.Place.InternationalPhoneNumber
+	}
+	if len(req.Place.Types) > 0 {
+		place["types"] = req.Place.Types
+	}
+	if req.Place.BusinessStatus != "" {
+		place["business_status"] = req.Place.BusinessStatus
+	}
 	if req.Text != "" {
 		place["text"] = quillTextForString(req.Text)
 		place["placeNotes"] = req.Text
@@ -370,6 +388,18 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 		"place_id": req.Place.PlaceID,
 		"placeId":  req.Place.PlaceID,
 		"geometry": req.Place.Geometry,
+	}
+	for _, key := range []string{
+		"formatted_address",
+		"url",
+		"website",
+		"international_phone_number",
+		"types",
+		"business_status",
+	} {
+		if value, ok := place[key]; ok {
+			place["place"].(map[string]any)[key] = value
+		}
 	}
 
 	addDuplicates := false

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ func minimalPlaceForBlock(name, placeID string, latitude, longitude float64) map
 	if placeID != "" {
 		place["place_id"] = placeID
 		place["placeId"] = placeID
+		place["url"] = googleMapsURL(name, placeID)
 	}
 	if latitude != 0 || longitude != 0 {
 		place["geometry"] = map[string]any{
@@ -41,6 +43,18 @@ func minimalPlaceForBlock(name, placeID string, latitude, longitude float64) map
 		}
 	}
 	return place
+}
+
+func googleMapsURL(name, placeID string) string {
+	if placeID == "" {
+		return ""
+	}
+	values := url.Values{
+		"api":            {"1"},
+		"query":          {name},
+		"query_place_id": {placeID},
+	}
+	return "https://www.google.com/maps/search/?" + values.Encode()
 }
 
 func placeDetailsForBlock(details *wanderlog.PlaceDetailsResponse) map[string]any {
@@ -1231,20 +1245,19 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError("start_time/end_time require an itinerary section; provide section_id or section_date"), nil
 	}
 
-	// CRITICAL FIX: If place_id is provided but coordinates are missing, fetch them first
-	// This prevents creating places without location data, which breaks trips with:
-	// "TypeError: Cannot read properties of undefined (reading 'location')"
-	if placeID != "" && (latitude == 0 && longitude == 0) {
+	var placeDetails *wanderlog.PlaceDetailsResponse
+	if placeID != "" {
 		logger.WithField("place_id", placeID).Debug("Fetching place details to get coordinates")
 
-		placeDetails, err := client.GetPlaceDetails(placeID)
+		placeDetails, err = client.GetPlaceDetails(placeID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to fetch place details for coordinates: %v. Please provide latitude and longitude parameters.", err)), nil
 		}
 
-		// Extract coordinates from place details
-		latitude = placeDetails.Data.Details.Geometry.Location.Lat
-		longitude = placeDetails.Data.Details.Geometry.Location.Lng
+		if latitude == 0 && longitude == 0 {
+			latitude = placeDetails.Data.Details.Geometry.Location.Lat
+			longitude = placeDetails.Data.Details.Geometry.Location.Lng
+		}
 
 		// Also use the canonical name from the API if user didn't override it
 		if name == "" || name == placeID {
@@ -1263,6 +1276,15 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	placeInfo := wanderlog.AddPlaceInfo{
 		PlaceID: placeID,
 		Name:    name,
+	}
+	if placeDetails != nil {
+		details := placeDetails.Data.Details
+		placeInfo.FormattedAddress = details.FormattedAddress
+		placeInfo.URL = googleMapsURL(name, placeID)
+		placeInfo.Website = details.Website
+		placeInfo.InternationalPhoneNumber = details.InternationalPhoneNumber
+		placeInfo.Types = details.Types
+		placeInfo.BusinessStatus = details.BusinessStatus
 	}
 
 	// CRITICAL: Always require coordinates when place_id is provided

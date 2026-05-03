@@ -35,6 +35,7 @@ func TestLodgingBlockShapeMatchesReactNativeBundle(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "Hotel Test", gotPlace["name"])
 	assert.Equal(t, "ChIJhotel", gotPlace["place_id"])
+	assert.Contains(t, gotPlace["url"], "query_place_id=ChIJhotel")
 	assert.Contains(t, gotPlace, "geometry")
 
 	gotHotel, ok := block["hotel"].(map[string]any)
