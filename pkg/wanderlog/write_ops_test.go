@@ -242,6 +242,7 @@ func TestAddPlace(t *testing.T) {
 				Place: models.AddPlaceInfo{
 					PlaceID: "ChIJ123",
 					Name:    "Test Place",
+					URL:     "https://www.google.com/maps/search/?api=1&query_place_id=ChIJ123",
 					Geometry: &models.PlaceGeometry{
 						Location: models.PlaceLocation{
 							Lat: 40.7128,
@@ -324,6 +325,9 @@ func TestAddPlace(t *testing.T) {
 					}
 					if nestedPlace["place_id"] != tt.req.Place.PlaceID {
 						t.Fatalf("expected nested place_id %q, got %v", tt.req.Place.PlaceID, nestedPlace["place_id"])
+					}
+					if tt.req.Place.URL != "" && nestedPlace["url"] != tt.req.Place.URL {
+						t.Fatalf("expected nested url %q, got %v", tt.req.Place.URL, nestedPlace["url"])
 					}
 					if tt.req.Text != "" {
 						text, ok := payload.Places[0]["text"].(map[string]any)

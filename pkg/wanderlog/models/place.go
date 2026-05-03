@@ -10,9 +10,15 @@ type AddPlaceRequest struct {
 
 // AddPlaceInfo represents the place information when adding a place
 type AddPlaceInfo struct {
-	PlaceID  string         `json:"place_id,omitempty"` // API uses snake_case
-	Name     string         `json:"name"`
-	Geometry *PlaceGeometry `json:"geometry,omitempty"`
+	PlaceID                  string         `json:"place_id,omitempty"` // API uses snake_case
+	Name                     string         `json:"name"`
+	Geometry                 *PlaceGeometry `json:"geometry,omitempty"`
+	FormattedAddress         string         `json:"formatted_address,omitempty"`
+	URL                      string         `json:"url,omitempty"`
+	Website                  string         `json:"website,omitempty"`
+	InternationalPhoneNumber string         `json:"international_phone_number,omitempty"`
+	Types                    []string       `json:"types,omitempty"`
+	BusinessStatus           string         `json:"business_status,omitempty"`
 }
 
 // PlaceGeometry represents the geographic location of a place
