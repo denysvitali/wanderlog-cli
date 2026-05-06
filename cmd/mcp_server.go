@@ -95,9 +95,12 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 
 	// Add get trip details tool
 	getTripTool := mcp.NewTool("get_trip",
-		mcp.WithDescription("Get detailed information about a specific trip"),
+		mcp.WithDescription("Get the full trip plan for a specific trip key, including itinerary sections and trip resources"),
 		mcp.WithString("trip_id",
 			mcp.Description("The trip key to retrieve, not the numeric database ID (optional if default trip key is set)"),
+		),
+		mcp.WithString("trip_key",
+			mcp.Description("Alias for trip_id; the shared trip key to retrieve"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format (default, json)"),
@@ -106,6 +109,33 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		),
 	)
 	s.AddTool(getTripTool, handleGetTrip)
+
+	getTripPlanTool := mcp.NewTool("get_trip_plan",
+		mcp.WithDescription("Get the full Wanderlog trip plan by shared trip key, including itinerary, sections, places, and resources"),
+		mcp.WithString("trip_key",
+			mcp.Description("The shared trip key to retrieve (optional if default trip key is set)"),
+		),
+		mcp.WithString("trip_id",
+			mcp.Description("Alias for trip_key"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format (json by default, default for text summary)"),
+			mcp.DefaultString("json"),
+			mcp.Enum("default", "json"),
+		),
+	)
+	s.AddTool(getTripPlanTool, handleGetTripPlan)
+
+	getItineraryTool := mcp.NewTool("get_itinerary",
+		mcp.WithDescription("Get the structured itinerary for a Wanderlog trip by shared trip key"),
+		mcp.WithString("trip_key",
+			mcp.Description("The shared trip key to retrieve (optional if default trip key is set)"),
+		),
+		mcp.WithString("trip_id",
+			mcp.Description("Alias for trip_key"),
+		),
+	)
+	s.AddTool(getItineraryTool, handleGetItinerary)
 
 	// Add list places tool
 	listPlacesTool := mcp.NewTool("list_places",

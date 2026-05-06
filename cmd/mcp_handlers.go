@@ -237,17 +237,20 @@ func handleListTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 }
 
 func handleGetTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey := request.GetString("trip_id", "")
-	if tripKey == "" {
-		// Try to get from context
-		if defaultTripID, ok := tripIDFromContext(ctx); ok {
-			tripKey = defaultTripID
-		} else {
-			return mcp.NewToolResultError("trip_id is required (either as parameter or default trip ID must be set)"), nil
-		}
+	return handleGetTripWithDefaultFormat(ctx, request, "default")
+}
+
+func handleGetTripPlan(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return handleGetTripWithDefaultFormat(ctx, request, "json")
+}
+
+func handleGetTripWithDefaultFormat(ctx context.Context, request mcp.CallToolRequest, defaultFormat string) (*mcp.CallToolResult, error) {
+	tripKey, errMsg := tripKeyArg(ctx, request)
+	if errMsg != "" {
+		return mcp.NewToolResultError(errMsg), nil
 	}
 
-	format := request.GetString("format", "default")
+	format := request.GetString("format", defaultFormat)
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
@@ -283,6 +286,34 @@ func handleGetTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	return mcp.NewToolResultText(result), nil
+}
+
+func handleGetItinerary(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, errMsg := tripKeyArg(ctx, request)
+	if errMsg != "" {
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip: %v", err)), nil
+	}
+
+	return mcp.NewToolResultStructuredOnly(map[string]any{
+		"success":         trip.Success,
+		"trip_key":        tripKey,
+		"trip_plan":       trip.TripPlan,
+		"itinerary":       trip.TripPlan.Itinerary,
+		"resources":       trip.Resources,
+		"guide_resources": trip.GuideResources,
+	}), nil
 }
 
 func handleListPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

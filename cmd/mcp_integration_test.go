@@ -62,11 +62,13 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 		"get_place_details":            true,
 		"get_session_preferences":      true,
 		"get_session_store":            true,
+		"get_itinerary":                true,
 		"get_trip":                     true,
 		"get_trip_distinction":         true,
 		"get_trip_expenses_csv":        true,
 		"get_trip_history":             true,
 		"get_trip_images":              true,
+		"get_trip_plan":                true,
 		"get_trip_places":              true,
 		"get_trip_sections":            true,
 		"get_trip_update_required":     true,
@@ -163,6 +165,16 @@ func TestMCPIntegration_AllRegisteredToolsHaveCoverage(t *testing.T) {
 	}
 	sort.Strings(missing)
 	assert.Empty(t, missing, "registered MCP tools need integration coverage entries")
+}
+
+func TestMCPIntegration_TripPlanReadAliasesRegistered(t *testing.T) {
+	readOnlyTools := createMCPServer(true).ListTools()
+	readWriteTools := createMCPServer(false).ListTools()
+
+	for _, name := range []string{"get_trip", "get_trip_plan", "get_itinerary"} {
+		assert.Contains(t, readOnlyTools, name, "%s should be registered in read-only mode", name)
+		assert.Contains(t, readWriteTools, name, "%s should be registered when writes are enabled", name)
+	}
 }
 
 func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
