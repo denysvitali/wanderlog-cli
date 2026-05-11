@@ -1738,6 +1738,249 @@ func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	return mcp.NewToolResultStructured(result, fmt.Sprintf("🏨 Successfully added lodging %s to trip %s (%s)", placeName, tripKey, sectionLabel)), nil
 }
 
+// Transit (train) section helpers
+
+func findTransitSectionID(trip *wanderlog.TripResponse) int {
+	if trip == nil {
+		return 0
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if section.Type == "transit" {
+			return section.ID
+		}
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if strings.EqualFold(section.Heading, "Transit") || section.PlaceMarkerIcon == "subway" {
+			return section.ID
+		}
+	}
+	return 0
+}
+
+func newTransitSection(sectionID int) map[string]any {
+	return map[string]any{
+		"id":               sectionID,
+		"heading":          "Transit",
+		"type":             "transit",
+		"mode":             "placeList",
+		"placeMarkerColor": "#17b978",
+		"placeMarkerIcon":  "subway",
+		"text": map[string]any{
+			"ops": []any{map[string]any{"insert": "\n"}},
+		},
+		"blocks": []any{},
+	}
+}
+
+func createTransitSection(client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
+	if trip == nil {
+		return 0, fmt.Errorf("trip response is nil")
+	}
+	sectionID := maxItineraryItemID(trip) + 1
+	section := newTransitSection(sectionID)
+	position := sectionIndexToAddSectionType("transit", trip.TripPlan.Itinerary.Sections)
+	op := wanderlog.InsertInList([]interface{}{"itinerary", "sections"}, position, section)
+	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+		return 0, err
+	}
+	return sectionID, nil
+}
+
+func ensureTransitSectionID(client *wanderlog.Client, tripKey string) (int, string, error) {
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return 0, "", fmt.Errorf("getting current trip: %w", err)
+	}
+	if sectionID := findTransitSectionID(trip); sectionID > 0 {
+		return sectionID, fmt.Sprintf("Transit section ID %d", sectionID), nil
+	}
+	sectionID, err := createTransitSection(client, tripKey, trip)
+	if err != nil {
+		return 0, "", fmt.Errorf("creating Transit section: %w", err)
+	}
+	return sectionID, fmt.Sprintf("Transit section ID %d", sectionID), nil
+}
+
+func tripHasAddedTrain(trip *wanderlog.TripResponse, sectionID int, carrier, departDate, departPlaceID, arrivePlaceID string) bool {
+	if trip == nil {
+		return false
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		if sectionID > 0 && section.ID != sectionID {
+			continue
+		}
+		for _, block := range section.Blocks {
+			if block.Type != "train" {
+				continue
+			}
+			if carrier != "" && !strings.EqualFold(block.Carrier, carrier) {
+				continue
+			}
+			if departDate != "" && block.Depart.Date != departDate {
+				continue
+			}
+			if departPlaceID != "" {
+				if block.Depart.Place == nil || block.Depart.Place.PlaceID != departPlaceID {
+					continue
+				}
+			}
+			if arrivePlaceID != "" {
+				if block.Arrive == nil || block.Arrive.Place == nil || block.Arrive.Place.PlaceID != arrivePlaceID {
+					continue
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func verifyAddedTrainPersisted(client *wanderlog.Client, tripKey string, sectionID int, carrier, departDate, departPlaceID, arrivePlaceID string) error {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+		}
+		trip, err := client.GetTrip(tripKey)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if tripHasAddedTrain(trip, sectionID, carrier, departDate, departPlaceID, arrivePlaceID) {
+			return nil
+		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("write request completed, but verification failed while reloading trip: %w", lastErr)
+	}
+	return fmt.Errorf("write request completed, but train (%s, %s) was not found when the trip was reloaded", carrier, departDate)
+}
+
+// resolveTrainStop builds the full place sub-object for a train depart/arrive
+// stop, fetching Google place details when a place_id is given.
+func resolveTrainStop(client *wanderlog.Client, label, placeName, placeID string, latitude, longitude float64) (map[string]any, error) {
+	if placeID == "" && placeName == "" {
+		return nil, fmt.Errorf("%s_place_id or %s_name is required", label, label)
+	}
+	place := minimalPlaceForBlock(placeName, placeID, latitude, longitude)
+	if placeID != "" {
+		details, err := client.GetPlaceDetails(placeID)
+		if err != nil {
+			return nil, fmt.Errorf("fetching %s place details for %s: %w", label, placeID, err)
+		}
+		detailed := placeDetailsForBlock(details)
+		if detailed == nil {
+			return nil, fmt.Errorf("fetching %s place details for %s returned no data", label, placeID)
+		}
+		if placeName != "" {
+			detailed["name"] = placeName
+		}
+		place = detailed
+	}
+	if placeID != "" {
+		// Sanity check: must have geometry so the web app can plot it on the map.
+		if _, ok := place["geometry"]; !ok {
+			return nil, fmt.Errorf("%s place details for %s contained no geometry; provide latitude/longitude or use a different place_id", label, placeID)
+		}
+	}
+	return place, nil
+}
+
+func handleAddTrain(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tripKey, err := resolveTripKey(ctx, request, "trip_key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	carrier := strings.TrimSpace(request.GetString("carrier", ""))
+	if carrier == "" {
+		return mcp.NewToolResultError("carrier is required (e.g. 'SBB', 'DB', 'Trenitalia', or a full train designator like 'EC 317')"), nil
+	}
+
+	departureDate, err := validateDateArgument("departure_date", request.GetString("departure_date", ""), true)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	arrivalDate, err := validateDateArgument("arrival_date", request.GetString("arrival_date", ""), false)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	if arrivalDate == "" {
+		arrivalDate = departureDate
+	}
+	departureTime := request.GetString("departure_time", "")
+	arrivalTime := request.GetString("arrival_time", "")
+
+	departurePlaceID := request.GetString("departure_place_id", "")
+	departureName := request.GetString("departure_name", "")
+	departureLat := request.GetFloat("departure_latitude", 0)
+	departureLng := request.GetFloat("departure_longitude", 0)
+
+	arrivalPlaceID := request.GetString("arrival_place_id", "")
+	arrivalName := request.GetString("arrival_name", "")
+	arrivalLat := request.GetFloat("arrival_latitude", 0)
+	arrivalLng := request.GetFloat("arrival_longitude", 0)
+
+	confirmationNumber := request.GetString("confirmation_number", "")
+	notes := request.GetString("notes", "")
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	departPlace, err := resolveTrainStop(client, "departure", departureName, departurePlaceID, departureLat, departureLng)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	arrivePlace, err := resolveTrainStop(client, "arrival", arrivalName, arrivalPlaceID, arrivalLat, arrivalLng)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	sectionID, sectionLabel, err := ensureTransitSectionID(client, tripKey)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve Transit section for trip %s: %v", tripKey, err)), nil
+	}
+
+	block := map[string]any{
+		"type":               "train",
+		"carrier":            carrier,
+		"confirmationNumber": confirmationNumber,
+		"depart": map[string]any{
+			"place": departPlace,
+			"date":  departureDate,
+			"time":  departureTime,
+		},
+		"arrive": map[string]any{
+			"place": arrivePlace,
+			"date":  arrivalDate,
+			"time":  arrivalTime,
+		},
+		"text": quillTextForString(notes),
+	}
+
+	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add train (%s) to trip %s (%s): %v", carrier, tripKey, sectionLabel, err)), nil
+	}
+	if err := verifyAddedTrainPersisted(client, tripKey, sectionID, carrier, departureDate, departurePlaceID, arrivalPlaceID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to add train (%s) to trip %s (%s): %v", carrier, tripKey, sectionLabel, err)), nil
+	}
+
+	result := map[string]any{
+		"trip_key":           tripKey,
+		"section_id":         sectionID,
+		"block_id":           block["id"],
+		"carrier":            carrier,
+		"departure_place_id": departurePlaceID,
+		"arrival_place_id":   arrivalPlaceID,
+		"departure_date":     departureDate,
+		"arrival_date":       arrivalDate,
+	}
+	return mcp.NewToolResultStructured(result, fmt.Sprintf("🚆 Successfully added train (%s) to trip %s (%s)", carrier, tripKey, sectionLabel)), nil
+}
+
 func findRawItineraryBlock(trip map[string]any, sectionID, blockID int) (int, int, map[string]any, error) {
 	tripPlan, _ := trip["tripPlan"].(map[string]any)
 	itinerary, _ := tripPlan["itinerary"].(map[string]any)
