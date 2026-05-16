@@ -476,7 +476,7 @@ func loadReferenceEndpoints(t *testing.T) map[string]map[string]bool {
 			URL    string `json:"url"`
 		} `json:"wrappedAxios"`
 	}
-	readJSONFixture(t, "artifacts/api-contracts/reference_calls.json", &extracted)
+	readJSONFixture(t, "artifacts/api-contracts/api_calls.json", &extracted)
 	endpoints := map[string]map[string]bool{}
 	for _, item := range extracted.EndpointStrings {
 		if item.URL != "" {

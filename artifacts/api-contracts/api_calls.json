@@ -1118,7 +1118,7 @@
       "url_expr": "\"/api/recommendations/v2\""
     }
   ],
-  "source": "artifacts/reference/wanderlog_reference.js",
+  "source": "captured",
   "wrappedAxios": [
     {
       "kind": "wrappedAxios",
