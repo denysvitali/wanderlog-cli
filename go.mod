@@ -4,15 +4,15 @@ go 1.24.5
 
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/mark3labs/mcp-go v0.41.1
+	github.com/charmbracelet/lipgloss/v2 v2.0.3
+	github.com/mark3labs/mcp-go v0.54.0
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.10.1
+	github.com/sirupsen/logrus v1.9.4
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/zalando/go-keyring v0.2.6
-	golang.org/x/term v0.36.0
+	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
