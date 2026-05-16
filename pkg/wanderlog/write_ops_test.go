@@ -1,0 +1,645 @@
+package wanderlog
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
+	"github.com/sirupsen/logrus"
+)
+
+func TestCreateTrip(t *testing.T) {
+	tests := []struct {
+		name           string
+		req            CreateTripRequest
+		serverResponse string
+		serverStatus   int
+		expectError    bool
+		checkResponse  func(*testing.T, *CreateTripResponse)
+	}{
+		{
+			name: "successful create",
+			req: CreateTripRequest{
+				Title:               "Test Trip",
+				GeoIDs:              []int{1},
+				InitialMapsPlaceIDs: []int{},
+				Type:                "plan",
+				StartDate:           "2025-01-01",
+				EndDate:             "2025-01-10",
+				Privacy:             "private",
+			},
+			serverResponse: `{
+				"success": true,
+				"data": {
+					"id": 123,
+					"key": "test-trip-key",
+					"viewKey": "view-key-123",
+					"title": "Example trip plan"
+				}
+			}`,
+			serverStatus: http.StatusOK,
+			expectError:  false,
+			checkResponse: func(t *testing.T, resp *CreateTripResponse) {
+				if !resp.Success {
+					t.Error("Expected success to be true")
+				}
+				if resp.TripPlan.ID != 123 {
+					t.Errorf("Expected trip ID 123, got %d", resp.TripPlan.ID)
+				}
+				if resp.TripPlan.Key != "test-trip-key" {
+					t.Errorf("Expected key 'test-trip-key', got '%s'", resp.TripPlan.Key)
+				}
+			},
+		},
+		{
+			name: "server error",
+			req: CreateTripRequest{
+				Title:  "Test Trip",
+				GeoIDs: []int{1},
+			},
+			serverResponse: `{"error": "internal server error"}`,
+			serverStatus:   http.StatusInternalServerError,
+			expectError:    true,
+		},
+		{
+			name: "api returns success false",
+			req: CreateTripRequest{
+				Title:  "Test Trip",
+				GeoIDs: []int{1},
+			},
+			serverResponse: `{"success": false}`,
+			serverStatus:   http.StatusOK,
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test server
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "POST" {
+					t.Errorf("Expected POST request, got %s", r.Method)
+				}
+				if !strings.HasSuffix(r.URL.Path, "/tripPlans") {
+					t.Errorf("Expected path to end with /tripPlans, got %s", r.URL.Path)
+				}
+				if strings.Contains(r.URL.Path, "createExampleTripPlan") {
+					t.Errorf("CreateTrip must not call createExampleTripPlan")
+				}
+
+				if r.Header.Get("Content-Type") != "application/json" {
+					t.Error("Expected Content-Type: application/json")
+				}
+				if r.Header.Get("Cookie") == "" {
+					t.Error("Expected Cookie header")
+				}
+				if r.Header.Get("X-XSRF-TOKEN") == "" {
+					t.Error("Expected X-XSRF-TOKEN header")
+				}
+
+				body, _ := io.ReadAll(r.Body)
+				var reqData CreateTripRequest
+				if err := json.Unmarshal(body, &reqData); err != nil {
+					t.Errorf("Failed to parse request body: %v", err)
+				}
+				if reqData.Title != tt.req.Title {
+					t.Errorf("Expected title '%s', got '%s'", tt.req.Title, reqData.Title)
+				}
+				if len(reqData.GeoIDs) != len(tt.req.GeoIDs) {
+					t.Errorf("Expected %d geo IDs, got %d", len(tt.req.GeoIDs), len(reqData.GeoIDs))
+				}
+
+				w.WriteHeader(tt.serverStatus)
+				w.Write([]byte(tt.serverResponse))
+			}))
+			defer server.Close()
+
+			// Override BaseURL for testing
+			oldBaseURL := BaseURL
+			BaseURL = server.URL
+			defer func() { BaseURL = oldBaseURL }()
+
+			// Create client with auth
+			client := NewClient()
+			client.auth = &AuthCredentials{
+				SessionCookie: "test-session",
+				XSRFToken:     "test-token",
+			}
+			logger := logrus.New()
+			logger.SetLevel(logrus.ErrorLevel)
+			client.SetLogger(logger)
+
+			// Call function
+			resp, err := client.CreateTrip(tt.req)
+
+			// Check error
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			// Check response
+			if !tt.expectError && tt.checkResponse != nil {
+				tt.checkResponse(t, resp)
+			}
+		})
+	}
+}
+
+func TestCreateTripRequiresAuth(t *testing.T) {
+	client := NewClient()
+	client.auth = nil // No auth
+
+	_, err := client.CreateTrip(CreateTripRequest{Title: "Test"})
+	if err == nil {
+		t.Error("Expected error when auth is nil")
+	}
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected 'authentication required' error, got: %v", err)
+	}
+}
+
+func TestDeleteTrip(t *testing.T) {
+	tests := []struct {
+		name         string
+		tripKey      string
+		serverStatus int
+		expectError  bool
+	}{
+		{
+			name:         "successful delete",
+			tripKey:      "test-trip-key",
+			serverStatus: http.StatusOK,
+			expectError:  false,
+		},
+		{
+			name:         "not found",
+			tripKey:      "nonexistent",
+			serverStatus: http.StatusNotFound,
+			expectError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "DELETE" {
+					t.Errorf("Expected DELETE request, got %s", r.Method)
+				}
+				if !strings.Contains(r.URL.Path, tt.tripKey) {
+					t.Errorf("Expected path to contain '%s', got %s", tt.tripKey, r.URL.Path)
+				}
+				w.WriteHeader(tt.serverStatus)
+			}))
+			defer server.Close()
+
+			oldBaseURL := BaseURL
+			BaseURL = server.URL
+			defer func() { BaseURL = oldBaseURL }()
+
+			client := NewClient()
+			client.auth = &AuthCredentials{
+				SessionCookie: "test-session",
+				XSRFToken:     "test-token",
+			}
+			logger := logrus.New()
+			logger.SetLevel(logrus.ErrorLevel)
+			client.SetLogger(logger)
+
+			err := client.DeleteTrip(tt.tripKey)
+
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestAddPlace(t *testing.T) {
+	tests := []struct {
+		name           string
+		tripKey        string
+		sectionID      int
+		req            AddPlaceRequest
+		serverResponse string
+		serverStatus   int
+		expectError    bool
+	}{
+		{
+			name:      "successful add with section",
+			tripKey:   "test-trip",
+			sectionID: 1,
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test Place",
+					URL:     "https://www.google.com/maps/search/?api=1&query_place_id=ChIJ123",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 40.7128,
+							Lng: -74.0060,
+						},
+					},
+				},
+				Text: "Test Place",
+			},
+			serverResponse: `{"success": true}`,
+			serverStatus:   http.StatusOK,
+			expectError:    false,
+		},
+		{
+			name:      "api error response",
+			tripKey:   "test-trip",
+			sectionID: 1,
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "invalid",
+					Name:    "Invalid Place",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: 0,
+						},
+					},
+				},
+			},
+			serverResponse: `{"success": false, "error": "Invalid place"}`,
+			serverStatus:   http.StatusOK,
+			expectError:    true,
+		},
+		{
+			name:      "server error",
+			tripKey:   "test-trip",
+			sectionID: 1,
+			req: AddPlaceRequest{
+				Text: "Test",
+			},
+			serverResponse: `{"error": "internal error"}`,
+			serverStatus:   http.StatusInternalServerError,
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "POST" {
+					t.Errorf("Expected POST request, got %s", r.Method)
+				}
+
+				// Verify path
+				if tt.sectionID > 0 {
+					if !strings.Contains(r.URL.Path, "/sections/") {
+						t.Errorf("Expected path to contain '/sections/', got %s", r.URL.Path)
+					}
+				}
+				if !strings.Contains(r.URL.Path, tt.tripKey) {
+					t.Errorf("Expected path to contain '%s', got %s", tt.tripKey, r.URL.Path)
+				}
+				if !tt.expectError || strings.Contains(tt.serverResponse, "success") {
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Fatalf("reading request body: %v", err)
+					}
+					var payload struct {
+						Places []map[string]any `json:"places"`
+					}
+					if err := json.Unmarshal(body, &payload); err != nil {
+						t.Fatalf("decoding request body: %v", err)
+					}
+					if len(payload.Places) != 1 {
+						t.Fatalf("expected one place in native add-place payload, got %d", len(payload.Places))
+					}
+					nestedPlace, ok := payload.Places[0]["place"].(map[string]any)
+					if !ok {
+						t.Fatalf("expected nested place object in native add-place payload: %s", string(body))
+					}
+					if nestedPlace["place_id"] != tt.req.Place.PlaceID {
+						t.Fatalf("expected nested place_id %q, got %v", tt.req.Place.PlaceID, nestedPlace["place_id"])
+					}
+					if tt.req.Place.URL != "" && nestedPlace["url"] != tt.req.Place.URL {
+						t.Fatalf("expected nested url %q, got %v", tt.req.Place.URL, nestedPlace["url"])
+					}
+					if tt.req.Text != "" {
+						text, ok := payload.Places[0]["text"].(map[string]any)
+						if !ok {
+							t.Fatalf("expected text to be a Quill object, got %T in %s", payload.Places[0]["text"], string(body))
+						}
+						ops, ok := text["ops"].([]any)
+						if !ok || len(ops) != 1 {
+							t.Fatalf("expected text.ops with one insert, got %#v", text["ops"])
+						}
+						op, ok := ops[0].(map[string]any)
+						if !ok {
+							t.Fatalf("expected first text op object, got %T", ops[0])
+						}
+						if op["insert"] != tt.req.Text+"\n" {
+							t.Fatalf("expected Quill insert %q, got %v", tt.req.Text+"\n", op["insert"])
+						}
+						if payload.Places[0]["placeNotes"] != tt.req.Text {
+							t.Fatalf("expected placeNotes %q, got %v", tt.req.Text, payload.Places[0]["placeNotes"])
+						}
+					}
+				}
+
+				w.WriteHeader(tt.serverStatus)
+				w.Write([]byte(tt.serverResponse))
+			}))
+			defer server.Close()
+
+			oldBaseURL := BaseURL
+			BaseURL = server.URL
+			defer func() { BaseURL = oldBaseURL }()
+
+			client := NewClient()
+			client.auth = &AuthCredentials{
+				SessionCookie: "test-session",
+				XSRFToken:     "test-token",
+			}
+			logger := logrus.New()
+			logger.SetLevel(logrus.ErrorLevel)
+			client.SetLogger(logger)
+
+			err := client.AddPlace(tt.tripKey, tt.sectionID, tt.req)
+
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestRemovePlace(t *testing.T) {
+	tests := []struct {
+		name         string
+		tripKey      string
+		sectionID    int
+		placeID      int
+		serverStatus int
+		expectError  bool
+	}{
+		{
+			name:         "successful remove",
+			tripKey:      "test-trip",
+			sectionID:    1,
+			placeID:      100,
+			serverStatus: http.StatusOK,
+			expectError:  false,
+		},
+		{
+			name:         "not found",
+			tripKey:      "test-trip",
+			sectionID:    1,
+			placeID:      999,
+			serverStatus: http.StatusNotFound,
+			expectError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "DELETE" {
+					t.Errorf("Expected DELETE request, got %s", r.Method)
+				}
+				w.WriteHeader(tt.serverStatus)
+			}))
+			defer server.Close()
+
+			oldBaseURL := BaseURL
+			BaseURL = server.URL
+			defer func() { BaseURL = oldBaseURL }()
+
+			client := NewClient()
+			client.auth = &AuthCredentials{
+				SessionCookie: "test-session",
+				XSRFToken:     "test-token",
+			}
+			logger := logrus.New()
+			logger.SetLevel(logrus.ErrorLevel)
+			client.SetLogger(logger)
+
+			err := client.RemovePlace(tt.tripKey, tt.sectionID, tt.placeID)
+
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestApplyOperations(t *testing.T) {
+	tests := []struct {
+		name           string
+		tripKey        string
+		ops            []Operation
+		serverResponse string
+		serverStatus   int
+		expectError    bool
+	}{
+		{
+			name:    "successful operations",
+			tripKey: "test-trip",
+			ops: []Operation{
+				{P: []interface{}{"itinerary", "sections", 0, "blocks"}, OD: []interface{}{}, OI: []interface{}{}},
+			},
+			serverResponse: `{"success": true}`,
+			serverStatus:   http.StatusOK,
+			expectError:    false,
+		},
+		{
+			name:           "server error",
+			tripKey:        "test-trip",
+			ops:            []Operation{{P: []interface{}{"invalid"}}},
+			serverResponse: `{"error": "invalid operation"}`,
+			serverStatus:   http.StatusBadRequest,
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "POST" {
+					t.Errorf("Expected POST request, got %s", r.Method)
+				}
+				if !strings.Contains(r.URL.Path, "applyOps") {
+					t.Errorf("Expected path to contain 'applyOps', got %s", r.URL.Path)
+				}
+
+				// Verify request body
+				body, _ := io.ReadAll(r.Body)
+				var opReq OperationRequest
+				if err := json.Unmarshal(body, &opReq); err != nil {
+					t.Errorf("Failed to parse operations: %v", err)
+				}
+
+				w.WriteHeader(tt.serverStatus)
+				w.Write([]byte(tt.serverResponse))
+			}))
+			defer server.Close()
+
+			oldBaseURL := BaseURL
+			BaseURL = server.URL
+			defer func() { BaseURL = oldBaseURL }()
+
+			client := NewClient()
+			client.auth = &AuthCredentials{
+				SessionCookie: "test-session",
+				XSRFToken:     "test-token",
+			}
+			logger := logrus.New()
+			logger.SetLevel(logrus.ErrorLevel)
+			client.SetLogger(logger)
+
+			err := client.ApplyOperations(tt.tripKey, tt.ops)
+
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateAddPlaceRequest(t *testing.T) {
+	tests := []struct {
+		name        string
+		req         AddPlaceRequest
+		expectError bool
+	}{
+		{
+			name: "valid request",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test Place",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 40.7128,
+							Lng: -74.0060,
+						},
+					},
+				},
+				Text: "Test Place",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid latitude (too high)",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 91.0,
+							Lng: 0,
+						},
+					},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid longitude (too low)",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: -181.0,
+						},
+					},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "empty place_id",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "",
+					Name:    "Test",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: 0,
+						},
+					},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "empty name",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "",
+					Geometry: &models.PlaceGeometry{
+						Location: models.PlaceLocation{
+							Lat: 0,
+							Lng: 0,
+						},
+					},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "valid visit time",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+				},
+				StartTime: "09:30",
+				EndTime:   "11:00",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid visit time",
+			req: AddPlaceRequest{
+				Place: models.AddPlaceInfo{
+					PlaceID: "ChIJ123",
+					Name:    "Test",
+				},
+				StartTime: "9am",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateAddPlaceRequest(tt.req)
+			if tt.expectError && err == nil {
+				t.Error("Expected validation error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected validation error: %v", err)
+			}
+		})
+	}
+}

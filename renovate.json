@@ -1,0 +1,39 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "packageRules": [
+    {
+      "description": "Group Go module updates together",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "Go modules",
+      "groupSlug": "go-modules",
+      "separateMajorMinor": false
+    },
+    {
+      "description": "Group Docker image updates together",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "groupName": "Docker images",
+      "groupSlug": "docker-images",
+      "separateMajorMinor": false
+    },
+    {
+      "description": "Group GitHub Actions updates together",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "separateMajorMinor": false
+    }
+  ]
+}
