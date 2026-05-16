@@ -1,0 +1,39 @@
+# Wanderlog CLI Configuration Example
+# Copy this file to $XDG_CONFIG_HOME/wanderlog/config.yaml (usually ~/.config/wanderlog/config.yaml)
+
+# Authentication configuration
+auth:
+  # Email and password (optional but recommended)
+  # When provided along with session tokens, acts as fallback for automatic re-login
+  # when session expires. Session tokens will be automatically refreshed in this file.
+  # WARNING: This stores your password in plain text. Only use in secure environments.
+  email: ""
+  password: ""
+
+  # Session tokens (automatically populated after 'wanderlog login')
+  # These are session credentials obtained after login.
+  # When you run 'wanderlog login', both email/password and session tokens are saved here.
+  session:
+    cookie: ""
+    xsrf_token: ""
+    user_id: ""
+
+# You can also set these via environment variables:
+# WANDERLOG_AUTH_EMAIL
+# WANDERLOG_AUTH_PASSWORD
+# WANDERLOG_AUTH_SESSION_COOKIE
+# WANDERLOG_AUTH_SESSION_XSRF_TOKEN
+# WANDERLOG_AUTH_SESSION_USER_ID
+
+# How it works:
+# 1. If session tokens are present, they will be used first
+# 2. If session tokens are missing/invalid but email/password are present,
+#    the CLI will automatically login and update the session tokens in this file
+# 3. Email/password and session tokens work together for seamless authentication
+
+# Priority order for credentials:
+# 1. Command-line flags (--session, --xsrf)
+# 2. Session tokens from environment variables (WANDERLOG_AUTH_SESSION_*)
+# 3. Session tokens from config file (auth.session.*)
+# 4. System keychain (stored via 'wanderlog login')
+# 5. Email/password from config file (auth.email, auth.password) - auto-login and refresh session
