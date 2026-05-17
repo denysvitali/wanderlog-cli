@@ -2448,10 +2448,7 @@ func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 
 	blockID := request.GetInt("block_id", 0)
 	if blockID <= 0 {
-		blockID = request.GetInt("place_id", 0)
-	}
-	if blockID <= 0 {
-		return mcp.NewToolResultError("block_id is required (place_id is accepted as a deprecated alias for the internal block ID)"), nil
+		return mcp.NewToolResultError("block_id is required"), nil
 	}
 
 	sectionID := request.GetInt("section_id", 0)

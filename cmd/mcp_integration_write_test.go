@@ -499,13 +499,13 @@ func TestMCPIntegration_RemovePlace(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("remove_place_missing_place_id", func(t *testing.T) {
+	t.Run("remove_place_missing_block_id", func(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Name: "remove_place",
 				Arguments: map[string]interface{}{
 					"trip_key": testTripID,
-					// Missing required place_id
+					// Missing required block_id
 				},
 			},
 		}
@@ -521,7 +521,7 @@ func TestMCPIntegration_RemovePlace(t *testing.T) {
 			Params: mcp.CallToolParams{
 				Name: "remove_place",
 				Arguments: map[string]interface{}{
-					"place_id": 12345,
+					"block_id": 12345,
 					// Missing trip_key and no default
 				},
 			},
