@@ -814,16 +814,21 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 		s.AddTool(createTripTool, handleCreateTrip)
 
 		deleteTripTool := mcp.NewTool("delete_trip",
-			mcp.WithDescription("Delete a trip plan"),
-			mcp.WithString("trip_key", mcp.Required(),
-				mcp.Description("Trip key to delete")),
+			mcp.WithDescription("Delete a trip plan. Accepts trip_key or trip_id; if the MCP server was started with --trip-id, the key can be omitted."),
+			mcp.WithString("trip_key",
+				mcp.Description("Trip key to delete (optional if trip_id or a default trip key is set)")),
+			mcp.WithString("trip_id",
+				mcp.Description("Alias for trip_key")),
 		)
 		s.AddTool(deleteTripTool, handleDeleteTrip)
 
 		deleteTripsTool := mcp.NewTool("delete_trips",
 			mcp.WithDescription("Delete multiple trip plans in a single request"),
-			mcp.WithString("trip_keys", mcp.Required(),
-				mcp.Description("Comma-separated list of trip keys to delete")),
+			mcp.WithArray("trip_keys",
+				mcp.Required(),
+				mcp.Description("Trip keys to delete. A legacy comma-separated string is also accepted."),
+				mcp.WithStringItems(mcp.MinLength(1)),
+				mcp.MinItems(1)),
 		)
 		s.AddTool(deleteTripsTool, handleDeleteTrips)
 

@@ -122,6 +122,32 @@ func stringSliceArg(request mcp.CallToolRequest, key string) []any {
 	return result
 }
 
+func stringListArg(request mcp.CallToolRequest, key string) []string {
+	values := request.GetStringSlice(key, nil)
+	if len(values) > 0 {
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		return result
+	}
+
+	value := request.GetString(key, "")
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
 func optionalFloatArg(request mcp.CallToolRequest, key string) *float64 {
 	args := request.GetArguments()
 	if _, ok := args[key]; !ok {
@@ -2946,14 +2972,19 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to create trip '%s' (geo_id=%d, dates %s to %s): %v", title, geoID, startDate, endDate, err)), nil
 	}
 
-	result := fmt.Sprintf("✅ Created trip '%s' (Key: %s, ID: %d)", resp.TripPlan.Title, resp.TripPlan.Key, resp.TripPlan.ID)
-	return mcp.NewToolResultText(result), nil
+	result := map[string]any{
+		"success":  true,
+		"trip_key": resp.TripPlan.Key,
+		"trip_id":  resp.TripPlan.ID,
+		"title":    resp.TripPlan.Title,
+	}
+	return mcp.NewToolResultStructured(result, fmt.Sprintf("Created trip %q (Key: %s, ID: %d)", resp.TripPlan.Title, resp.TripPlan.Key, resp.TripPlan.ID)), nil
 }
 
 func handleDeleteTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey := request.GetString("trip_key", "")
-	if tripKey == "" {
-		return mcp.NewToolResultError("trip_key is required"), nil
+	tripKey, msg := tripKeyArg(ctx, request)
+	if msg != "" {
+		return mcp.NewToolResultError(msg), nil
 	}
 
 	client := wanderlog.NewClient()
@@ -2968,26 +2999,29 @@ func handleDeleteTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete trip %s: %v", tripKey, err)), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("🗑️ Deleted trip %s", tripKey)), nil
+	result := map[string]any{
+		"success":  true,
+		"trip_key": tripKey,
+		"deleted":  true,
+	}
+	return mcp.NewToolResultStructured(result, fmt.Sprintf("Deleted trip %s", tripKey)), nil
 }
 
 func handleDeleteTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKeysStr := request.GetString("trip_keys", "")
-	if tripKeysStr == "" {
-		return mcp.NewToolResultError("trip_keys is required (comma-separated list)"), nil
-	}
-
-	// Parse comma-separated trip keys
-	var tripKeys []string
-	for _, key := range strings.Split(tripKeysStr, ",") {
-		if trimmed := strings.TrimSpace(key); trimmed != "" {
-			tripKeys = append(tripKeys, trimmed)
-		}
-	}
-
+	tripKeys := stringListArg(request, "trip_keys")
 	if len(tripKeys) == 0 {
 		return mcp.NewToolResultError("trip_keys must contain at least one trip key"), nil
 	}
+
+	seen := make(map[string]bool, len(tripKeys))
+	uniqueTripKeys := make([]string, 0, len(tripKeys))
+	for _, tripKey := range tripKeys {
+		if !seen[tripKey] {
+			seen[tripKey] = true
+			uniqueTripKeys = append(uniqueTripKeys, tripKey)
+		}
+	}
+	tripKeys = uniqueTripKeys
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
@@ -3008,11 +3042,23 @@ func handleDeleteTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		}
 	}
 
+	result := map[string]any{
+		"success":       len(failed) == 0,
+		"deleted":       deleted,
+		"failed":        failed,
+		"deleted_count": len(deleted),
+		"total_count":   len(tripKeys),
+	}
 	if len(failed) > 0 {
-		return mcp.NewToolResultError(fmt.Sprintf("Deleted %d/%d trips. Failed to delete: %s", len(deleted), len(tripKeys), strings.Join(failed, "; "))), nil
+		text := fmt.Sprintf("Deleted %d/%d trips. Failed to delete: %s", len(deleted), len(tripKeys), strings.Join(failed, "; "))
+		return &mcp.CallToolResult{
+			IsError:           true,
+			Content:           []mcp.Content{mcp.TextContent{Type: "text", Text: text}},
+			StructuredContent: result,
+		}, nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("🗑️ Deleted %d trips: %s", len(deleted), strings.Join(deleted, ", "))), nil
+	return mcp.NewToolResultStructured(result, fmt.Sprintf("Deleted %d trips: %s", len(deleted), strings.Join(deleted, ", "))), nil
 }
 
 func handleRestoreTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

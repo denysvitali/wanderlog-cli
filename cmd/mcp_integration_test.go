@@ -182,6 +182,21 @@ func TestMCPIntegration_TripPlanReadAliasesRegistered(t *testing.T) {
 	}
 }
 
+func TestMCPIntegration_DeleteToolSchemasAreAgentFriendly(t *testing.T) {
+	tools := createMCPServer(false).ListTools()
+
+	deleteTrip := tools["delete_trip"].Tool
+	assert.Contains(t, deleteTrip.InputSchema.Properties, "trip_key")
+	assert.Contains(t, deleteTrip.InputSchema.Properties, "trip_id")
+	assert.NotContains(t, deleteTrip.InputSchema.Required, "trip_key")
+
+	deleteTrips := tools["delete_trips"].Tool
+	prop, ok := deleteTrips.InputSchema.Properties["trip_keys"].(map[string]any)
+	require.True(t, ok, "trip_keys schema should be an object")
+	assert.Equal(t, "array", prop["type"])
+	assert.Contains(t, deleteTrips.InputSchema.Required, "trip_keys")
+}
+
 func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 	writeTools := []string{
 		"add_checklist_items",

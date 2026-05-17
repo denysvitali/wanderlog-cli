@@ -209,12 +209,83 @@ func skipIntegrationTest(t *testing.T) {
 	}
 }
 
+func skipAuthenticatedIntegrationTest(t *testing.T) {
+	t.Helper()
+	if os.Getenv("INTEGRATION_TESTS") != "1" {
+		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
+	}
+	if os.Getenv("CI") == "true" && !hasIntegrationAuthEnv() {
+		t.Skip("Skipping authenticated integration test. Configure Wanderlog auth secrets to run in CI.")
+	}
+}
+
 func hasIntegrationAuthEnv() bool {
 	hasSessionAuth := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE") != "" &&
 		os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN") != ""
 	hasLoginAuth := os.Getenv("WANDERLOG_AUTH_EMAIL") != "" &&
 		os.Getenv("WANDERLOG_AUTH_PASSWORD") != ""
 	return hasSessionAuth || hasLoginAuth
+}
+
+func createDisposableMCPTrip(t *testing.T, ctx context.Context, title string) string {
+	t.Helper()
+
+	geoID := searchGeoIDForLifecycleTest(t, ctx, "Paris")
+	createReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "create_trip",
+			Arguments: map[string]interface{}{
+				"title":      title,
+				"geo_id":     geoID,
+				"start_date": "2026-07-01",
+				"end_date":   "2026-07-03",
+				"privacy":    "private",
+			},
+		},
+	}
+
+	createResult, err := handleCreateTrip(ctx, createReq)
+	require.NoError(t, err)
+	require.NotNil(t, createResult)
+	require.False(t, createResult.IsError, "create_trip failed: %s", getTextContent(createResult))
+
+	structured, ok := createResult.StructuredContent.(map[string]any)
+	require.True(t, ok, "create_trip returned unexpected structured content type %T", createResult.StructuredContent)
+	tripKey, ok := structured["trip_key"].(string)
+	require.True(t, ok, "create_trip structured content missing trip_key")
+	require.NotEmpty(t, tripKey)
+
+	t.Cleanup(func() {
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+		auth, err := loadAuthFromEnvOrKeychain()
+		if err != nil {
+			t.Logf("cleanup skipped for disposable trip %s: %v", tripKey, err)
+			return
+		}
+		client.SetAuth(auth)
+		if err := client.DeleteTrip(tripKey); err != nil {
+			t.Logf("cleanup delete for disposable trip %s returned: %v", tripKey, err)
+		}
+	})
+
+	return tripKey
+}
+
+func requireTripAbsentFromUserTrips(t *testing.T, tripKey string) {
+	t.Helper()
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	auth, err := loadAuthFromEnvOrKeychain()
+	require.NoError(t, err)
+	client.SetAuth(auth)
+
+	trips, err := client.GetUserTrips()
+	require.NoError(t, err)
+	for _, trip := range trips.Data {
+		require.NotEqual(t, tripKey, trip.Key, "deleted trip %s still appears in user trip list", tripKey)
+	}
 }
 
 // getFirstSectionID gets the first section ID for a trip (first section with any content)
@@ -1312,9 +1383,10 @@ func TestMCPIntegration_CompleteTripLifecycle(t *testing.T) {
 	})
 }
 
-// TestIntegration_DeleteTrips tests the bulk delete_trips tool
-func TestIntegration_DeleteTrips(t *testing.T) {
-	skipIntegrationTest(t)
+// TestIntegration_DeleteTrip tests the single delete_trip tool against a
+// disposable trip so regressions are caught without mutating a shared fixture.
+func TestIntegration_DeleteTrip(t *testing.T) {
+	skipAuthenticatedIntegrationTest(t)
 
 	auth, err := loadAuthFromEnvOrKeychain()
 	if err != nil {
@@ -1323,41 +1395,48 @@ func TestIntegration_DeleteTrips(t *testing.T) {
 	_ = auth
 
 	ctx := context.Background()
+	tripKey := createDisposableMCPTrip(t, ctx, fmt.Sprintf("MCP Delete Test - %d", time.Now().UnixNano()))
 
-	// Create a trip to delete
-	tripTitle := fmt.Sprintf("Delete Test - %d", time.Now().UnixNano())
-	createReq := mcp.CallToolRequest{
+	deleteReq := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
-			Name: "create_trip",
+			Name: "delete_trip",
 			Arguments: map[string]interface{}{
-				"title":      tripTitle,
-				"start_date": "2026-07-01",
-				"end_date":   "2026-07-05",
-				"privacy":    "private",
+				"trip_id": tripKey,
 			},
 		},
 	}
 
-	createResult, err := handleCreateTrip(ctx, createReq)
+	result, err := handleDeleteTrip(ctx, deleteReq)
 	require.NoError(t, err)
-	require.NotNil(t, createResult)
+	require.NotNil(t, result)
+	require.False(t, result.IsError, "delete_trip should not return error: %s", getTextContent(result))
 
-	var tripKey string
-	if !createResult.IsError {
-		textContent := createResult.Content[0].(mcp.TextContent)
-		tripKey = extractTripKey(textContent.Text)
+	structured, ok := result.StructuredContent.(map[string]any)
+	require.True(t, ok, "delete_trip returned unexpected structured content type %T", result.StructuredContent)
+	assert.Equal(t, tripKey, structured["trip_key"])
+	assert.Equal(t, true, structured["deleted"])
+	requireTripAbsentFromUserTrips(t, tripKey)
+}
+
+// TestIntegration_DeleteTrips tests the bulk delete_trips tool.
+func TestIntegration_DeleteTrips(t *testing.T) {
+	skipAuthenticatedIntegrationTest(t)
+
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
 	}
+	_ = auth
 
-	if tripKey == "" {
-		t.Skip("Could not create test trip for deletion test")
-	}
+	ctx := context.Background()
+	tripKey := createDisposableMCPTrip(t, ctx, fmt.Sprintf("MCP Bulk Delete Test - %d", time.Now().UnixNano()))
 
-	// Now delete the trip using handleDeleteTrips with comma-separated keys
+	// Now delete the trip using handleDeleteTrips with structured array input.
 	deleteReq := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "delete_trips",
 			Arguments: map[string]interface{}{
-				"trip_keys": tripKey,
+				"trip_keys": []string{tripKey},
 			},
 		},
 	}
@@ -1369,6 +1448,11 @@ func TestIntegration_DeleteTrips(t *testing.T) {
 	// Should succeed - the single key should be deleted
 	assert.False(t, result.IsError, "delete_trips should not return error: %s", getTextContent(result))
 	assert.Contains(t, getTextContent(result), "Deleted")
+	structured, ok := result.StructuredContent.(map[string]any)
+	require.True(t, ok, "delete_trips returned unexpected structured content type %T", result.StructuredContent)
+	assert.Equal(t, true, structured["success"])
+	assert.Equal(t, 1, structured["deleted_count"])
+	requireTripAbsentFromUserTrips(t, tripKey)
 }
 
 // TestUnit_SearchHotelsErrorPropagation tests that handleSearchHotels returns an error

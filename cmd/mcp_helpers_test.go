@@ -184,6 +184,28 @@ func TestResolveAddPlaceSectionIDAllowsExplicitUnscheduled(t *testing.T) {
 	assert.Equal(t, "general Places to visit list", label)
 }
 
+func TestStringListArgAcceptsArrayAndLegacyCSV(t *testing.T) {
+	arrayRequest := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "delete_trips",
+			Arguments: map[string]any{
+				"trip_keys": []any{"a", " b ", ""},
+			},
+		},
+	}
+	assert.Equal(t, []string{"a", "b"}, stringListArg(arrayRequest, "trip_keys"))
+
+	csvRequest := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "delete_trips",
+			Arguments: map[string]any{
+				"trip_keys": "a, b,,c",
+			},
+		},
+	}
+	assert.Equal(t, []string{"a", "b", "c"}, stringListArg(csvRequest, "trip_keys"))
+}
+
 func TestSplitFlightNumber(t *testing.T) {
 	airline, number := splitFlightNumber(" mu 244 ")
 
