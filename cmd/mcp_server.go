@@ -468,16 +468,21 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 
 		// Remove place from trip tool
 		removePlaceTool := mcp.NewTool("remove_place",
-			mcp.WithDescription("Remove a place from a trip"),
+			mcp.WithDescription("Remove an itinerary place block from a trip. Use block_id from add_place, get_trip, or list_sections; this is not a Google Place ID."),
 			mcp.WithString("trip_key",
 				mcp.Description("The key/ID of the trip to remove the place from (optional if default trip ID is set)"),
 			),
+			mcp.WithString("trip_id",
+				mcp.Description("Alias for trip_key"),
+			),
+			mcp.WithNumber("block_id",
+				mcp.Description("Internal Wanderlog place block ID to remove (preferred). This is not a Google Place ID."),
+			),
 			mcp.WithNumber("place_id",
-				mcp.Required(),
-				mcp.Description("The ID of the place to remove"),
+				mcp.Description("Deprecated alias for block_id. Must be the internal Wanderlog place block ID, not a Google Place ID."),
 			),
 			mcp.WithNumber("section_id",
-				mcp.Description("Section ID to remove the place from (optional)"),
+				mcp.Description("Section ID containing the place block (optional; resolved automatically when omitted)"),
 			),
 		)
 		s.AddTool(removePlaceTool, handleRemovePlace)

@@ -888,6 +888,53 @@ func verifyPlaceVisitTimePersisted(client *wanderlog.Client, tripKey string, sec
 	return fmt.Errorf("write request completed, but visit time was not found when the trip was reloaded")
 }
 
+func findPlaceBlockSectionID(client *wanderlog.Client, tripKey string, blockID int) (int, error) {
+	trip, err := client.GetTrip(tripKey)
+	if err != nil {
+		return 0, fmt.Errorf("getting current trip: %w", err)
+	}
+	for _, section := range trip.TripPlan.Itinerary.Sections {
+		for _, block := range section.Blocks {
+			if block.ID == blockID {
+				if block.Place == nil {
+					return 0, fmt.Errorf("block %d exists in section %d but is not a place block", blockID, section.ID)
+				}
+				return section.ID, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("place block %d not found", blockID)
+}
+
+func verifyRemovedPlacePersisted(client *wanderlog.Client, tripKey string, sectionID, blockID int) error {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+		}
+		trip, err := client.GetTrip(tripKey)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		for _, section := range trip.TripPlan.Itinerary.Sections {
+			if sectionID > 0 && section.ID != sectionID {
+				continue
+			}
+			for _, block := range section.Blocks {
+				if block.ID == blockID {
+					return fmt.Errorf("place block %d still exists in section %d", blockID, section.ID)
+				}
+			}
+		}
+		return nil
+	}
+	if lastErr != nil {
+		return fmt.Errorf("delete request completed, but verification failed while reloading trip: %w", lastErr)
+	}
+	return fmt.Errorf("delete request completed, but removal could not be verified")
+}
+
 func tripHasAddedFlight(trip *wanderlog.TripResponse, sectionID int, airlineIATA string, flightNumber int, departureDate string) bool {
 	if trip == nil {
 		return false
@@ -1382,11 +1429,14 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	if err := verifyAddedPlacePersisted(client, tripKey, sectionID, name, placeID, text); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place '%s' to trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 	}
-	if startTime != "" || endTime != "" {
-		blockID, err := findAddedPlaceBlockID(client, tripKey, sectionID, name, placeID, text)
+	blockID := 0
+	if sectionID > 0 {
+		blockID, err = findAddedPlaceBlockID(client, tripKey, sectionID, name, placeID, text)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to set visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to locate added place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 		}
+	}
+	if startTime != "" || endTime != "" {
 		if err := client.UpdatePlaceVisitTime(tripKey, sectionID, blockID, startTime, endTime); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to set visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 		}
@@ -1395,9 +1445,19 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		}
 	}
 
-	result := fmt.Sprintf("📍 Successfully added place '%s' to trip %s (%s)", name, tripKey, sectionLabel)
+	result := map[string]any{
+		"success":         true,
+		"trip_key":        tripKey,
+		"section_id":      sectionID,
+		"section_label":   sectionLabel,
+		"name":            name,
+		"google_place_id": placeID,
+	}
+	if blockID > 0 {
+		result["block_id"] = blockID
+	}
 
-	return mcp.NewToolResultText(result), nil
+	return mcp.NewToolResultStructured(result, fmt.Sprintf("Added place %q to trip %s (%s, block_id=%d)", name, tripKey, sectionLabel, blockID)), nil
 }
 
 func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -2381,19 +2441,17 @@ func handleUpdateLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp
 }
 
 func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tripKey := request.GetString("trip_key", "")
-	if tripKey == "" {
-		// Try to get from context
-		if defaultTripID, ok := tripIDFromContext(ctx); ok {
-			tripKey = defaultTripID
-		} else {
-			return mcp.NewToolResultError("trip_key is required (either as parameter or default trip ID must be set)"), nil
-		}
+	tripKey, msg := tripKeyArg(ctx, request)
+	if msg != "" {
+		return mcp.NewToolResultError(msg), nil
 	}
 
-	placeID, err := request.RequireInt("place_id")
-	if err != nil {
-		return mcp.NewToolResultError("place_id is required"), nil //nolint:nilerr
+	blockID := request.GetInt("block_id", 0)
+	if blockID <= 0 {
+		blockID = request.GetInt("place_id", 0)
+	}
+	if blockID <= 0 {
+		return mcp.NewToolResultError("block_id is required (place_id is accepted as a deprecated alias for the internal block ID)"), nil
 	}
 
 	sectionID := request.GetInt("section_id", 0)
@@ -2406,17 +2464,29 @@ func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	err = client.RemovePlace(tripKey, sectionID, placeID)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to remove place %d from trip %s (section %d): %v", placeID, tripKey, sectionID, err)), nil
+	if sectionID <= 0 {
+		resolvedSectionID, err := findPlaceBlockSectionID(client, tripKey, blockID)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve section for place block %d in trip %s: %v", blockID, tripKey, err)), nil
+		}
+		sectionID = resolvedSectionID
 	}
 
-	result := fmt.Sprintf("🗑️ Successfully removed place %d from trip %s", placeID, tripKey)
-	if sectionID > 0 {
-		result += fmt.Sprintf(" (Section ID: %d)", sectionID)
+	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, "place", false); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to remove place block %d from trip %s (section %d): %v", blockID, tripKey, sectionID, err)), nil
+	}
+	if err := verifyRemovedPlacePersisted(client, tripKey, sectionID, blockID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify removal of place block %d from trip %s (section %d): %v", blockID, tripKey, sectionID, err)), nil
 	}
 
-	return mcp.NewToolResultText(result), nil
+	result := map[string]any{
+		"success":    true,
+		"trip_key":   tripKey,
+		"section_id": sectionID,
+		"block_id":   blockID,
+		"removed":    true,
+	}
+	return mcp.NewToolResultStructured(result, fmt.Sprintf("Removed place block %d from trip %s (section_id=%d)", blockID, tripKey, sectionID)), nil
 }
 
 // Resource handler

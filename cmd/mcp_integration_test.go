@@ -197,6 +197,16 @@ func TestMCPIntegration_DeleteToolSchemasAreAgentFriendly(t *testing.T) {
 	assert.Contains(t, deleteTrips.InputSchema.Required, "trip_keys")
 }
 
+func TestMCPIntegration_RemovePlaceSchemaUsesBlockID(t *testing.T) {
+	tools := createMCPServer(false).ListTools()
+	removePlace := tools["remove_place"].Tool
+
+	assert.Contains(t, removePlace.InputSchema.Properties, "block_id")
+	assert.Contains(t, removePlace.InputSchema.Properties, "place_id")
+	assert.Contains(t, removePlace.InputSchema.Properties, "trip_id")
+	assert.NotContains(t, removePlace.InputSchema.Required, "place_id")
+}
+
 func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {
 	writeTools := []string{
 		"add_checklist_items",

@@ -541,6 +541,72 @@ func TestMCPIntegration_RemovePlace(t *testing.T) {
 	// 4. Verify it's gone
 }
 
+func TestIntegration_RemovePlaceDisposable(t *testing.T) {
+	skipAuthenticatedIntegrationTest(t)
+
+	auth, err := loadAuthFromEnvOrKeychain()
+	if err != nil {
+		t.Fatalf("Integration test requires authentication: %v", err)
+	}
+	_ = auth
+
+	ctx := context.Background()
+	tripKey := createDisposableMCPTrip(t, ctx, fmt.Sprintf("MCP Remove Place Test - %d", time.Now().UnixNano()))
+	sectionID := getDatedItinerarySectionID(t, tripKey)
+	placeData := searchAndGetPlaceData(t, "Eiffel Tower")
+	placeText := "Added so remove_place can delete this block."
+
+	addReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "add_place",
+			Arguments: map[string]interface{}{
+				"trip_key":   tripKey,
+				"name":       placeData.Name,
+				"place_id":   placeData.PlaceID,
+				"latitude":   placeData.Lat,
+				"longitude":  placeData.Lng,
+				"section_id": sectionID,
+				"text":       placeText,
+			},
+		},
+	}
+	addResult, err := handleAddPlace(ctx, addReq)
+	require.NoError(t, err)
+	require.NotNil(t, addResult)
+	require.False(t, addResult.IsError, "add_place failed: %s", getTextContent(addResult))
+
+	addStructured, ok := addResult.StructuredContent.(map[string]any)
+	require.True(t, ok, "add_place returned unexpected structured content type %T", addResult.StructuredContent)
+	blockID, ok := addStructured["block_id"].(int)
+	require.True(t, ok, "add_place structured content missing integer block_id: %#v", addStructured)
+	require.NotZero(t, blockID)
+
+	removeReq := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "remove_place",
+			Arguments: map[string]interface{}{
+				"trip_id":  tripKey,
+				"block_id": blockID,
+			},
+		},
+	}
+	removeResult, err := handleRemovePlace(ctx, removeReq)
+	require.NoError(t, err)
+	require.NotNil(t, removeResult)
+	require.False(t, removeResult.IsError, "remove_place failed: %s", getTextContent(removeResult))
+
+	removeStructured, ok := removeResult.StructuredContent.(map[string]any)
+	require.True(t, ok, "remove_place returned unexpected structured content type %T", removeResult.StructuredContent)
+	assert.Equal(t, true, removeStructured["removed"])
+	assert.Equal(t, blockID, removeStructured["block_id"])
+	assert.Equal(t, sectionID, removeStructured["section_id"])
+
+	client := wanderlog.NewClient()
+	client.SetLogger(logger)
+	client.SetAuth(auth)
+	require.NoError(t, verifyRemovedPlacePersisted(client, tripKey, sectionID, blockID))
+}
+
 // TestMCPIntegration_WriteOperationsWorkflow tests a complete workflow:
 // Add a place, verify it exists, remove it, verify it's gone
 func TestMCPIntegration_WriteOperationsWorkflow(t *testing.T) {
