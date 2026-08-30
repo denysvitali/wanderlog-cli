@@ -142,9 +142,11 @@ Or use the MCP tool `get_trip` to fetch trip data.
 **Authentication Flow**:
 1. User calls `wanderlog login` with email/password
 2. Client calls `Login()` in `auth.go` which POSTs to `/api/user/login`
-3. Response contains session cookie (`connect.sid`) and XSRF token
+3. Response contains the session cookie (`connect.sid`); the XSRF-TOKEN cookie
+   is optional (Wanderlog stopped issuing and enforcing it in August 2026)
 4. Tokens stored in system keychain via `SaveCredentials()` in `keychain.go`
-5. All subsequent write operations use `addAuthHeaders()` to attach cookies and XSRF token
+5. All subsequent write operations use `addAuthHeaders()` to attach cookies
+   and, when present, the XSRF token
 
 **Write Operations**:
 - Located in `write_ops.go`

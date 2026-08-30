@@ -15,8 +15,8 @@ auth_email=${WANDERLOG_AUTH_EMAIL:-}
 auth_password=${WANDERLOG_AUTH_PASSWORD:-}
 
 if [[ -n $session_cookie || -n $session_xsrf ]]; then
-    if [[ -z $session_cookie || -z $session_xsrf ]]; then
-        echo "Session auth requires both WANDERLOG_AUTH_SESSION_COOKIE and WANDERLOG_AUTH_SESSION_XSRF_TOKEN" >&2
+    if [[ -z $session_cookie ]]; then
+        echo "Session auth requires WANDERLOG_AUTH_SESSION_COOKIE (the XSRF token is optional since Wanderlog stopped issuing it)" >&2
         exit 1
     fi
     has_session_auth=1

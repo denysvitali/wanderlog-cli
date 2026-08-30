@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // ErrSessionRejected identifies a credential pair that the Wanderlog server no
@@ -20,18 +21,16 @@ type AuthCredentials struct {
 	UserID        string
 }
 
-// Validate rejects incomplete credentials. Wanderlog sessions require both the
-// session cookie and its matching XSRF token; treating either one alone as an
-// authenticated session leads to misleading status and failed mutations.
+// Validate rejects incomplete credentials. Wanderlog stopped issuing and
+// enforcing the XSRF-TOKEN cookie in August 2026, so only the session cookie
+// is required; a stored XSRF token, when present, is still sent for
+// compatibility with older sessions.
 func (c *AuthCredentials) Validate() error {
 	if c == nil {
 		return fmt.Errorf("credentials are missing")
 	}
 	if c.SessionCookie == "" {
 		return fmt.Errorf("session cookie is missing")
-	}
-	if c.XSRFToken == "" {
-		return fmt.Errorf("XSRF token is missing")
 	}
 	return nil
 }
@@ -84,13 +83,16 @@ func (c *Client) LoginContext(ctx context.Context, email, password string) (*Aut
 		return nil, fmt.Errorf("login failed: user id not found in response")
 	}
 
-	// Extract session cookie and XSRF token from response headers
+	// Extract session cookie and XSRF token from response headers. Wanderlog
+	// no longer sets XSRF-TOKEN on login (cookie-based CSRF protection was
+	// dropped server-side), so the token is optional; when the server resumes
+	// issuing it under a plain or __Host-prefixed name we still pick it up.
 	var sessionCookie, xsrfToken string
 	for _, cookie := range (&http.Response{Header: resp.Header}).Cookies() {
-		switch cookie.Name {
-		case "connect.sid":
+		switch {
+		case cookie.Name == "connect.sid":
 			sessionCookie = cookie.Value
-		case "XSRF-TOKEN":
+		case isXSRFCookieName(cookie.Name):
 			xsrfToken = cookie.Value
 		}
 	}
@@ -99,7 +101,7 @@ func (c *Client) LoginContext(ctx context.Context, email, password string) (*Aut
 		return nil, fmt.Errorf("session cookie not found in response")
 	}
 	if xsrfToken == "" {
-		return nil, fmt.Errorf("XSRF token not found in response")
+		c.logger.Debug("Login response carried no XSRF-TOKEN cookie; continuing with session-only credentials")
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -153,6 +155,11 @@ func (c *Client) SetAuth(creds *AuthCredentials) {
 	c.auth = &copy
 }
 
+// isXSRFCookieName reports whether a Set-Cookie name carries the XSRF token.
+func isXSRFCookieName(name string) bool {
+	return strings.EqualFold(name, "XSRF-TOKEN") || strings.EqualFold(name, "__Host-XSRF-TOKEN")
+}
+
 // AddAuthHeaders adds authentication headers to a request
 func (c *Client) addAuthHeaders(req *http.Request) error {
 	if err := c.auth.Validate(); err != nil {
@@ -165,12 +172,15 @@ func (c *Client) addAuthHeaders(req *http.Request) error {
 		Value: c.auth.SessionCookie,
 	})
 
-	// Add XSRF token header
-	req.Header.Set("X-XSRF-TOKEN", c.auth.XSRFToken)
-	req.AddCookie(&http.Cookie{
-		Name:  "XSRF-TOKEN",
-		Value: c.auth.XSRFToken,
-	})
+	// Add XSRF token header only when one is available; Wanderlog no longer
+	// requires it, and an empty header would shadow a valid browser cookie.
+	if c.auth.XSRFToken != "" {
+		req.Header.Set("X-XSRF-TOKEN", c.auth.XSRFToken)
+		req.AddCookie(&http.Cookie{
+			Name:  "XSRF-TOKEN",
+			Value: c.auth.XSRFToken,
+		})
+	}
 
 	return nil
 }

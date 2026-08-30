@@ -68,22 +68,44 @@ func TestAddAuthHeaders(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects incomplete credentials", func(t *testing.T) {
+	t.Run("accepts session-only credentials without an XSRF header", func(t *testing.T) {
 		client2 := NewClient()
 		client2.SetAuth(&AuthCredentials{SessionCookie: "session-only"})
 		req, _ := http.NewRequest("GET", "http://example.com/", nil)
-		err := client2.addAuthHeaders(req)
-		if err == nil || !strings.Contains(err.Error(), "XSRF token is missing") {
-			t.Fatalf("expected incomplete credential error, got %v", err)
+		if err := client2.addAuthHeaders(req); err != nil {
+			t.Fatalf("session-only credentials must validate: %v", err)
+		}
+		if got := req.Header.Get("X-XSRF-TOKEN"); got != "" {
+			t.Errorf("unexpected X-XSRF-TOKEN header on session-only credentials: %q", got)
+		}
+		if _, err := req.Cookie("XSRF-TOKEN"); err == nil {
+			t.Error("unexpected XSRF-TOKEN cookie on session-only credentials")
 		}
 	})
 }
 
-func TestEnsureAuthenticatedRejectsPartialExplicitCredentials(t *testing.T) {
+func TestEnsureAuthenticatedAcceptsSessionOnlyExplicitCredentials(t *testing.T) {
+	clearAuthEnvironment(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user" {
+			t.Errorf("unexpected request path: %s", r.URL.Path)
+			return
+		}
+		if got := r.Header.Get("X-XSRF-TOKEN"); got != "" {
+			t.Errorf("session-only credentials must not send an XSRF header, got %q", got)
+		}
+		_, _ = w.Write([]byte(`{"id":42,"email":"user@example.com"}`))
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
 	client := NewClient()
-	err := client.EnsureAuthenticated("session-only", "")
-	if err == nil || !strings.Contains(err.Error(), "XSRF token is missing") {
-		t.Fatalf("expected incomplete credential error, got %v", err)
+	client.SetLogger(newTestLogger(t))
+	if err := client.EnsureAuthenticated("session-only", ""); err != nil {
+		t.Fatalf("session-only explicit credentials must authenticate: %v", err)
+	}
+	if client.auth == nil || client.auth.SessionCookie != "session-only" {
+		t.Fatalf("unexpected authenticated credentials: %+v", client.auth)
 	}
 }
 
@@ -387,7 +409,7 @@ func TestLogin(t *testing.T) {
 		}
 	})
 
-	t.Run("missing xsrf token", func(t *testing.T) {
+	t.Run("login without xsrf token cookie", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Set-Cookie", "connect.sid=session; Path=/; HttpOnly")
 			w.Header().Set("Content-Type", "application/json")
@@ -401,9 +423,39 @@ func TestLogin(t *testing.T) {
 
 		client := NewClient()
 		client.SetLogger(newTestLogger(t))
-		_, err := client.Login("a@b.com", "pass123")
-		if err == nil || !strings.Contains(err.Error(), "XSRF token not found") {
-			t.Fatalf("expected XSRF token error, got: %v", err)
+		creds, err := client.Login("a@b.com", "pass123")
+		if err != nil {
+			t.Fatalf("login without XSRF cookie must succeed: %v", err)
+		}
+		if creds.SessionCookie != "session" {
+			t.Errorf("unexpected session cookie: %s", creds.SessionCookie)
+		}
+		if creds.XSRFToken != "" {
+			t.Errorf("unexpected xsrf token: %s", creds.XSRFToken)
+		}
+	})
+
+	t.Run("login with __Host-prefixed xsrf token cookie", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Set-Cookie", "connect.sid=session; Path=/; HttpOnly")
+			w.Header().Add("Set-Cookie", "__Host-XSRF-TOKEN=host-xsrf; Path=/; Secure")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":true,"user":{"id":42}}`))
+		}))
+		defer server.Close()
+
+		old := BaseURL
+		BaseURL = server.URL
+		defer func() { BaseURL = old }()
+
+		client := NewClient()
+		client.SetLogger(newTestLogger(t))
+		creds, err := client.Login("a@b.com", "pass123")
+		if err != nil {
+			t.Fatalf("login with __Host XSRF cookie must succeed: %v", err)
+		}
+		if creds.XSRFToken != "host-xsrf" {
+			t.Errorf("unexpected xsrf token: %s", creds.XSRFToken)
 		}
 	})
 }

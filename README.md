@@ -134,6 +134,7 @@ wanderlog logout
 
 # Or set credentials via environment variables (not recommended for security)
 export WANDERLOG_AUTH_SESSION_COOKIE="your-session-cookie"
+# Optional: Wanderlog no longer issues or enforces an XSRF token
 export WANDERLOG_AUTH_SESSION_XSRF_TOKEN="your-xsrf-token"
 
 # Or pass as flags (not recommended for security)
