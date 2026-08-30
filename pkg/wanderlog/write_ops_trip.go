@@ -355,6 +355,13 @@ func ValidateVisitTime(value string) error {
 
 // AddPlace adds a place to a trip section
 func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) error {
+	return c.AddPlaceContext(context.Background(), tripKey, sectionID, req)
+}
+
+// AddPlaceContext adds a place to a trip section and binds all place-detail and
+// mutation requests to ctx. A Google place ID is never sent without geometry:
+// when callers omit it, the canonical place details are resolved first.
+func (c *Client) AddPlaceContext(ctx context.Context, tripKey string, sectionID int, req AddPlaceRequest) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for adding places")
 	}
@@ -362,6 +369,32 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	// Validate request
 	if err := ValidateAddPlaceRequest(req); err != nil {
 		return fmt.Errorf("invalid request: %w", err)
+	}
+	if req.Place.Geometry == nil {
+		detailsResponse, err := c.GetPlaceDetailsContext(ctx, req.Place.PlaceID)
+		if err != nil {
+			return fmt.Errorf("resolve place details for %q: %w", req.Place.PlaceID, err)
+		}
+		details := detailsResponse.Data.Details
+		req.Place.Geometry = &models.PlaceGeometry{Location: models.PlaceLocation{
+			Lat: details.Geometry.Location.Lat,
+			Lng: details.Geometry.Location.Lng,
+		}}
+		if req.Place.FormattedAddress == "" {
+			req.Place.FormattedAddress = details.FormattedAddress
+		}
+		if req.Place.Website == "" {
+			req.Place.Website = details.Website
+		}
+		if req.Place.InternationalPhoneNumber == "" {
+			req.Place.InternationalPhoneNumber = details.InternationalPhoneNumber
+		}
+		if len(req.Place.Types) == 0 {
+			req.Place.Types = details.Types
+		}
+		if req.Place.BusinessStatus == "" {
+			req.Place.BusinessStatus = details.BusinessStatus
+		}
 	}
 
 	place := map[string]any{
@@ -448,14 +481,14 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 	var statusCode int
 	var respBody []byte
 	if sectionID > 0 {
-		resp, err := c.apiRequest(context.Background(), http.MethodPost, fmt.Sprintf("tripPlans/%s/sections/%d/places", url.PathEscape(tripKey), sectionID), nil, reqBody, true)
+		resp, err := c.apiRequest(ctx, http.MethodPost, fmt.Sprintf("tripPlans/%s/sections/%d/places", url.PathEscape(tripKey), sectionID), nil, reqBody, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
 		statusCode = resp.StatusCode
 		respBody = resp.Body
 	} else {
-		resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/sections/places", nil, reqBody, true)
+		resp, err := c.apiRequest(ctx, http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/sections/places", nil, reqBody, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}

@@ -97,6 +97,43 @@ jobs:
       - name: Compile every integration-tagged package
         run: go test -tags=integration -run '^$' ./...
 
+  cross-build:
+    name: Cross-build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile all packages
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build ./...
+
+  release-config:
+    name: Validate release configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go run github.com/goreleaser/goreleaser/v2@v2.18.0 check
+
   build:
     name: Build and version smoke test
     runs-on: ubuntu-latest

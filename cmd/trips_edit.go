@@ -60,7 +60,7 @@ Examples:
 			EndTime:   tripsEditEndTime,
 		}
 
-		err = client.AddPlace(tripKey, tripsEditSectionID, req)
+		err = client.AddPlaceContext(cmd.Context(), tripKey, tripsEditSectionID, req)
 		if err != nil {
 			return fmt.Errorf("add place: %w", err)
 		}

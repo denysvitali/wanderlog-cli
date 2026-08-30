@@ -41,3 +41,23 @@ func TestAnalyzeTripRejectsNil(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestAnalyzeTripClassifiesLodgingWithPlaceMetadataAsLodging(t *testing.T) {
+	var trip TripResponse
+	if err := json.Unmarshal([]byte(`{
+		"tripPlan":{"itinerary":{"sections":[{"id":1,"blocks":[{
+			"id":2,"type":"place","place":{"name":"Hotel Example"},
+			"hotel":{"checkInDate":"2026-06-01","checkOutDate":"2026-06-02"}
+		}]}]}},"resources":{"placeMetadata":[]}
+	}`), &trip); err != nil {
+		t.Fatalf("unmarshal fixture: %v", err)
+	}
+
+	got, err := AnalyzeTrip(&trip)
+	if err != nil {
+		t.Fatalf("AnalyzeTrip: %v", err)
+	}
+	if got.Lodgings != 1 || got.PlaceBlocks != 0 {
+		t.Fatalf("expected one lodging and no place block, got %+v", got)
+	}
+}

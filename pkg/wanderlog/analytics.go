@@ -74,15 +74,15 @@ func AnalyzeTrip(trip *TripResponse) (*TripAnalytics, error) {
 		for _, block := range section.Blocks {
 			kind := strings.ToLower(strings.TrimSpace(block.Type))
 			switch {
-			case block.Place != nil || kind == "place":
-				result.PlaceBlocks++
-				load.Places++
 			case block.FlightInfo != nil || kind == "flight":
 				result.Flights++
 			case block.Hotel != nil || kind == "hotel" || kind == "lodging":
 				result.Lodgings++
 			case block.Arrive != nil || kind == "train" || kind == "transit":
 				result.Transit++
+			case block.Place != nil || kind == "place":
+				result.PlaceBlocks++
+				load.Places++
 			case kind == "note" || block.NoteIcon != "":
 				result.Notes++
 			default:

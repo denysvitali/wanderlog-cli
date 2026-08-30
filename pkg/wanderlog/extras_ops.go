@@ -37,6 +37,9 @@ func (c *Client) GetTripLikesBulk(keys []string) (*LikesBulkResponse, error) {
 		return nil, err
 	}
 	result.Likes = parseTripLikesBulk(resp.Body, keys)
+	if result.Likes == nil {
+		c.logger.WithField("tripKeys", keys).Warn("Likes response did not contain a recognized state; leaving like state unknown")
+	}
 	return &result, nil
 }
 
@@ -111,10 +114,10 @@ func collectTripLikes(value any, requestedKeys []string, likes map[string]bool) 
 		}
 	case map[string]any:
 		if key, ok := tripLikeObjectKey(typed); ok {
-			if liked, ok := tripLikeObjectValue(typed); ok {
+			if liked, ok := tripLikeObjectValue(typed); ok && requestedTripLikeKey(key, requestedKeys) {
 				likes[key] = liked
+				return
 			}
-			return
 		}
 		for _, key := range requestedKeys {
 			if candidate, ok := typed[key]; ok {
@@ -129,6 +132,15 @@ func collectTripLikes(value any, requestedKeys []string, likes map[string]bool) 
 			}
 		}
 	}
+}
+
+func requestedTripLikeKey(key string, requestedKeys []string) bool {
+	for _, requested := range requestedKeys {
+		if key == requested {
+			return true
+		}
+	}
+	return false
 }
 
 func tripLikeObjectKey(value map[string]any) (string, bool) {

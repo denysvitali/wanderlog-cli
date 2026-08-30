@@ -127,6 +127,11 @@ func (c *Client) SendTripInvites(tripKey string, req SendInvitesRequest) error {
 
 // ListTripInvites lists all invites that have been sent out for a trip plan
 func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, error) {
+	return c.ListTripInvitesContext(context.Background(), tripKey)
+}
+
+// ListTripInvitesContext lists sent invites and binds the request to ctx.
+func (c *Client) ListTripInvitesContext(ctx context.Context, tripKey string) ([]map[string]interface{}, error) {
 	if c.auth == nil {
 		return nil, fmt.Errorf("authentication required for listing invites")
 	}
@@ -134,7 +139,7 @@ func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, erro
 	c.logger.WithField("tripKey", tripKey).Debug("Listing trip invites")
 
 	// DoAPI strips leading / and api/ prefix, so use "tripPlans/%s/invites"
-	statusCode, respBody, err := c.DoAPI("GET", fmt.Sprintf("tripPlans/%s/invites", tripKey), nil, nil, true)
+	statusCode, respBody, err := c.DoAPIContext(ctx, "GET", "tripPlans/"+url.PathEscape(tripKey)+"/invites", nil, nil, true)
 	if err != nil {
 		return nil, fmt.Errorf("ListTripInvites: %w", err)
 	}
@@ -153,6 +158,11 @@ func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, erro
 
 // SetLike likes or unlikes a trip plan
 func (c *Client) SetLike(tripKey string, liked bool) error {
+	return c.SetLikeContext(context.Background(), tripKey, liked)
+}
+
+// SetLikeContext changes a trip's like state and binds the request to ctx.
+func (c *Client) SetLikeContext(ctx context.Context, tripKey string, liked bool) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for liking trips")
 	}
@@ -168,7 +178,7 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 	}
 
 	// DoAPI strips leading / and api/ prefix, so use "tripPlans/%s/like"
-	statusCode, respBody, err := c.DoAPI("POST", fmt.Sprintf("tripPlans/%s/like", tripKey), body, nil, true)
+	statusCode, respBody, err := c.DoAPIContext(ctx, "POST", "tripPlans/"+url.PathEscape(tripKey)+"/like", body, nil, true)
 	if err != nil {
 		return fmt.Errorf("SetLike: %w", err)
 	}
@@ -205,6 +215,8 @@ func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
 	if liked, known := likes.LikedFor(tripKey); known {
 		result.UserLiked = liked
 		result.UserLikedKnown = true
+	} else {
+		c.logger.WithField("tripKey", tripKey).Warn("Authenticated like state is unknown")
 	}
 	return result, nil
 }

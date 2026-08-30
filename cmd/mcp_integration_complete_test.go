@@ -685,6 +685,7 @@ func TestMCPIntegration_CompleteFeatureTest(t *testing.T) {
 					Name: "delete_trip",
 					Arguments: map[string]interface{}{
 						"trip_key": copiedTripKey,
+						"confirm":  true,
 					},
 				},
 			}

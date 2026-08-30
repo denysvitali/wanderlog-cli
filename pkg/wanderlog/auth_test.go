@@ -412,8 +412,44 @@ func TestSetAuth(t *testing.T) {
 	client := NewClient()
 	creds := &AuthCredentials{SessionCookie: "test", XSRFToken: "xsrf", UserID: "1"}
 	client.SetAuth(creds)
-	if client.auth != creds {
-		t.Error("SetAuth did not store credentials")
+	if client.auth == creds {
+		t.Fatal("SetAuth retained the caller-owned credential pointer")
+	}
+	creds.SessionCookie = "mutated"
+	creds.XSRFToken = "mutated"
+	if client.auth.SessionCookie != "test" || client.auth.XSRFToken != "xsrf" {
+		t.Fatalf("stored credentials changed with caller value: %#v", client.auth)
+	}
+	client.SetAuth(nil)
+	if client.auth != nil {
+		t.Fatal("SetAuth(nil) did not clear credentials")
+	}
+}
+
+func TestLoginRejectsCrossOriginBodyRedirect(t *testing.T) {
+	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			targetCalled := false
+			target := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				targetCalled = true
+			}))
+			defer target.Close()
+			source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Location", target.URL)
+				w.WriteHeader(status)
+			}))
+			defer source.Close()
+
+			client := NewClient(WithBaseURL(source.URL))
+			client.SetLogger(newTestLogger(t))
+			_, err := client.Login("person@example.invalid", "secret-password")
+			if err == nil || !strings.Contains(err.Error(), "cross-origin redirect") {
+				t.Fatalf("expected cross-origin login redirect rejection, got %v", err)
+			}
+			if targetCalled {
+				t.Fatal("cross-origin login redirect replayed the request body")
+			}
+		})
 	}
 }
 

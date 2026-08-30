@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog/models"
 )
 
 type requestContract struct {
@@ -118,7 +120,10 @@ func TestAPIRequestContracts(t *testing.T) {
 		},
 		"AddPlace": func(c *Client) error {
 			return c.AddPlace("trip-key", 7, AddPlaceRequest{
-				Place: AddPlaceInfo{Name: "Tokyo Station", PlaceID: "place-123"},
+				Place: AddPlaceInfo{
+					Name: "Tokyo Station", PlaceID: "place-123",
+					Geometry: &models.PlaceGeometry{Location: models.PlaceLocation{Lat: 35.6812, Lng: 139.7671}},
+				},
 			})
 		},
 		"RemovePlace": func(c *Client) error {

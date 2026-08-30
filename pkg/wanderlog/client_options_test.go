@@ -1,6 +1,7 @@
 package wanderlog
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -100,14 +101,132 @@ func TestWithHTTPClient(t *testing.T) {
 	}
 	client := NewClient(WithBaseURL("https://example.test/api"), WithHTTPClient(injected))
 
-	if client.httpClient != injected {
-		t.Fatal("WithHTTPClient did not preserve the injected client")
+	if client.httpClient == injected {
+		t.Fatal("WithHTTPClient must clone rather than mutate the injected client")
+	}
+	if client.httpClient.Timeout != injected.Timeout {
+		t.Fatal("WithHTTPClient clone did not preserve timeout")
 	}
 	if _, _, err := client.DoAPI(http.MethodGet, "ping", nil, nil, false); err != nil {
 		t.Fatalf("DoAPI: %v", err)
 	}
 	if requests != 1 {
 		t.Fatalf("transport received %d requests, want 1", requests)
+	}
+}
+
+func TestWithHTTPClientCannotBypassCrossOriginRedirectGuard(t *testing.T) {
+	targetCalled := false
+	target := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		targetCalled = true
+		if r.Header.Get("X-XSRF-TOKEN") != "" || r.Header.Get("Cookie") != "" {
+			t.Error("redirect leaked authentication headers")
+		}
+	}))
+	defer target.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusFound)
+	}))
+	defer source.Close()
+
+	callerPolicyCalls := 0
+	injected := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		callerPolicyCalls++
+		return nil
+	}}
+	client := NewClient(WithBaseURL(source.URL), WithHTTPClient(injected))
+	client.SetAuth(&AuthCredentials{SessionCookie: "secret-session", XSRFToken: "secret-xsrf"})
+	_, _, err := client.DoAPI(http.MethodGet, "redirect", nil, nil, true)
+	if err == nil || !strings.Contains(err.Error(), "cross-origin redirect") {
+		t.Fatalf("expected cross-origin redirect rejection, got %v", err)
+	}
+	if targetCalled {
+		t.Fatal("cross-origin redirect target was contacted")
+	}
+	if callerPolicyCalls != 0 {
+		t.Fatalf("caller redirect policy ran %d times before mandatory rejection", callerPolicyCalls)
+	}
+	if injected.CheckRedirect == nil {
+		t.Fatal("constructing a client mutated the injected redirect policy")
+	}
+}
+
+func TestWithHTTPClientComposesCallerRedirectPolicy(t *testing.T) {
+	callerErr := errors.New("caller rejected redirect")
+	targetCalled := false
+	var source *httptest.Server
+	source = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, source.URL+"/target", http.StatusFound)
+			return
+		}
+		targetCalled = true
+		_, _ = io.WriteString(w, "ok")
+	}))
+	defer source.Close()
+
+	callerPolicyCalls := 0
+	injected := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		callerPolicyCalls++
+		return callerErr
+	}}
+	client := NewClient(WithBaseURL(source.URL), WithHTTPClient(injected))
+	_, _, err := client.DoAPI(http.MethodGet, "start", nil, nil, false)
+	if !errors.Is(err, callerErr) {
+		t.Fatalf("error = %v, want caller redirect error", err)
+	}
+	if callerPolicyCalls != 1 {
+		t.Fatalf("caller redirect policy ran %d times, want 1", callerPolicyCalls)
+	}
+	if targetCalled {
+		t.Fatal("caller-rejected same-origin target was contacted")
+	}
+}
+
+func TestWithHTTPClientAllowsCallerApprovedSameOriginRedirect(t *testing.T) {
+	var source *httptest.Server
+	source = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, source.URL+"/target", http.StatusPermanentRedirect)
+			return
+		}
+		_, _ = io.WriteString(w, "approved")
+	}))
+	defer source.Close()
+
+	callerPolicyCalls := 0
+	injected := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		callerPolicyCalls++
+		return nil
+	}}
+	client := NewClient(WithBaseURL(source.URL), WithHTTPClient(injected))
+	status, body, err := client.DoAPI(http.MethodGet, "start", nil, nil, false)
+	if err != nil {
+		t.Fatalf("same-origin redirect: %v", err)
+	}
+	if callerPolicyCalls != 1 || status != http.StatusOK || string(body) != "approved" {
+		t.Fatalf("calls, status, body = %d, %d, %q", callerPolicyCalls, status, body)
+	}
+}
+
+func TestDefaultClientAllowsSameOriginRedirect(t *testing.T) {
+	var source *httptest.Server
+	source = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, source.URL+"/target", http.StatusTemporaryRedirect)
+			return
+		}
+		_, _ = io.WriteString(w, "ok")
+	}))
+	defer source.Close()
+
+	client := NewClient(WithBaseURL(source.URL))
+	status, body, err := client.DoAPI(http.MethodGet, "start", nil, nil, false)
+	if err != nil {
+		t.Fatalf("same-origin redirect: %v", err)
+	}
+	if status != http.StatusOK || string(body) != "ok" {
+		t.Fatalf("status, body = %d, %q", status, body)
 	}
 }
 

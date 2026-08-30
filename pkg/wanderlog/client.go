@@ -56,8 +56,9 @@ func WithBaseURL(baseURL string) ClientOption {
 }
 
 // WithHTTPClient injects the HTTP client used for requests. Its redirect,
-// timeout, cookie-jar, and transport behavior are preserved. Passing nil uses
-// the package's secure default client.
+// timeout, cookie-jar, and transport behavior are preserved, but the client is
+// cloned and its redirect callback is composed with the mandatory same-origin
+// policy. Passing nil uses the package's secure default client.
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(config *clientConfig) {
 		config.httpClient = httpClient
@@ -86,17 +87,18 @@ func NewClient(options ...ClientOption) *Client {
 		}
 	}
 
-	httpClient := config.httpClient
-	if httpClient == nil {
-		httpClient = &http.Client{
-			Timeout:       30 * time.Second,
-			CheckRedirect: sameOriginRedirectPolicy,
-		}
-	}
-	if config.transport != nil {
-		cloned := *httpClient
-		cloned.Transport = config.transport
+	var httpClient *http.Client
+	if config.httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	} else {
+		// Never mutate a caller-owned client. In particular, redirect hardening is
+		// a client invariant and must not be removable through WithHTTPClient.
+		cloned := *config.httpClient
 		httpClient = &cloned
+	}
+	httpClient.CheckRedirect = composeRedirectPolicy(httpClient.CheckRedirect)
+	if config.transport != nil {
+		httpClient.Transport = config.transport
 	}
 	return &Client{
 		httpClient: httpClient,
@@ -107,15 +109,27 @@ func NewClient(options ...ClientOption) *Client {
 }
 
 func sameOriginRedirectPolicy(req *http.Request, via []*http.Request) error {
-	if len(via) == 0 || sameOriginURL(via[0].URL, req.URL) {
+	if len(via) == 0 || sameOriginURL(via[len(via)-1].URL, req.URL) {
 		return nil
 	}
-	for _, previous := range via {
-		if requestHasSensitiveHeaders(previous) {
-			return fmt.Errorf("refusing cross-origin redirect from %s to %s", urlOrigin(via[0].URL), urlOrigin(req.URL))
+	return fmt.Errorf("refusing cross-origin redirect from %s to %s", urlOrigin(via[len(via)-1].URL), urlOrigin(req.URL))
+}
+
+func composeRedirectPolicy(callerPolicy func(*http.Request, []*http.Request) error) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if err := sameOriginRedirectPolicy(req, via); err != nil {
+			return err
 		}
+		if callerPolicy != nil {
+			return callerPolicy(req, via)
+		}
+		// Setting CheckRedirect replaces net/http's built-in ten-redirect limit,
+		// so reproduce it when the caller did not supply a policy.
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after 10 redirects")
+		}
+		return nil
 	}
-	return nil
 }
 
 func urlOrigin(value *url.URL) string {
@@ -123,10 +137,6 @@ func urlOrigin(value *url.URL) string {
 		return "<invalid>"
 	}
 	return (&url.URL{Scheme: value.Scheme, Host: value.Host}).String()
-}
-
-func requestHasSensitiveHeaders(req *http.Request) bool {
-	return req != nil && (req.Header.Get("Authorization") != "" || req.Header.Get("Cookie") != "" || req.Header.Get("X-XSRF-TOKEN") != "")
 }
 
 func sameOriginURL(a, b *url.URL) bool {
@@ -160,6 +170,9 @@ func (c *Client) ensureAuthOrigin(req *http.Request) error {
 }
 
 func (c *Client) SetLogger(logger *logrus.Logger) {
+	if logger == nil {
+		logger = logrus.New()
+	}
 	c.logger = logger
 }
 
@@ -342,13 +355,18 @@ func (c *Client) GetTripSectionsContext(ctx context.Context, key string) ([]ItSe
 
 // SearchPlaces searches for places using Wanderlog's place autocomplete API.
 func (c *Client) SearchPlaces(query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
+	return c.SearchPlacesContext(context.Background(), query, latitude, longitude)
+}
+
+// SearchPlacesContext searches for places and binds the request to ctx.
+func (c *Client) SearchPlacesContext(ctx context.Context, query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
 	c.logger.WithFields(logrus.Fields{
 		"query":     query,
 		"latitude":  latitude,
 		"longitude": longitude,
 	}).Info("Searching places via Wanderlog API")
 
-	results, err := c.searchWanderlogPlaces(query, latitude, longitude)
+	results, err := c.searchWanderlogPlacesContext(ctx, query, latitude, longitude)
 	if err != nil {
 		return results, err
 	}
@@ -383,6 +401,10 @@ func (c *Client) SearchRestaurants(query string, latitude, longitude *float64) (
 }
 
 func (c *Client) searchWanderlogPlaces(query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
+	return c.searchWanderlogPlacesContext(context.Background(), query, latitude, longitude)
+}
+
+func (c *Client) searchWanderlogPlacesContext(ctx context.Context, query string, latitude, longitude *float64) (*PlaceSearchResponse, error) {
 	lat, lng := 0.0, 0.0
 	if latitude != nil {
 		lat = *latitude
@@ -391,7 +413,7 @@ func (c *Client) searchWanderlogPlaces(query string, latitude, longitude *float6
 		lng = *longitude
 	}
 
-	autocompleteResp, err := c.SearchPlacesWithWanderlog(query, lat, lng)
+	autocompleteResp, err := c.SearchPlacesWithWanderlogContext(ctx, query, lat, lng)
 	if err != nil {
 		return &PlaceSearchResponse{Success: false, Places: []SearchResult{}}, err
 	}
@@ -647,11 +669,16 @@ func (c *Client) AutocompleteAirportWithLocation(query string, lat, lng float64)
 // GetFlightStops retrieves flight stops for a given flight.
 // The API requires flightNumber (integer string), airline IATA code (airlineIata), and departure date (departDate).
 func (c *Client) GetFlightStops(flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
+	return c.GetFlightStopsContext(context.Background(), flightNumber, airlineIata, departureDate)
+}
+
+// GetFlightStopsContext retrieves flight stops and binds the request to ctx.
+func (c *Client) GetFlightStopsContext(ctx context.Context, flightNumber, airlineIata, departureDate string) (*FlightStopsResponse, error) {
 	date, err := parseAPIDate(departureDate, "departure")
 	if err != nil {
 		return nil, fmt.Errorf("get flight stops: parsing departure date: %w", err)
 	}
-	resp, err := c.apiRequest(context.Background(), http.MethodGet, "flights/flightStops", apiQuery(map[string]string{
+	resp, err := c.apiRequest(ctx, http.MethodGet, "flights/flightStops", apiQuery(map[string]string{
 		"flightNumber": flightNumber,
 		"airlineIata":  airlineIata,
 		"departDate":   date.Format(apiDateFormat),
@@ -686,6 +713,11 @@ type WanderlogAutocompleteRequest struct {
 
 // SearchPlacesWithWanderlog searches for places using Wanderlog's autocomplete API
 func (c *Client) SearchPlacesWithWanderlog(query string, lat, lng float64) (*WanderlogAutocompleteResponse, error) {
+	return c.SearchPlacesWithWanderlogContext(context.Background(), query, lat, lng)
+}
+
+// SearchPlacesWithWanderlogContext searches autocomplete and binds the request to ctx.
+func (c *Client) SearchPlacesWithWanderlogContext(ctx context.Context, query string, lat, lng float64) (*WanderlogAutocompleteResponse, error) {
 	reqData := WanderlogAutocompleteRequest{
 		Input:        query,
 		SessionToken: fmt.Sprintf("%d", time.Now().UnixNano()), // Simple session token
@@ -705,7 +737,7 @@ func (c *Client) SearchPlacesWithWanderlog(query string, lat, lng float64) (*Wan
 		return nil, err
 	}
 
-	resp, err := c.apiRequest(context.Background(), http.MethodGet, "placesAPI/autocomplete/v2", apiQuery(map[string]string{
+	resp, err := c.apiRequest(ctx, http.MethodGet, "placesAPI/autocomplete/v2", apiQuery(map[string]string{
 		"request": string(reqJSON),
 	}), nil, false)
 	if err != nil {

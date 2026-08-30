@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -59,6 +60,17 @@ func TestRunMCPHTTPServerReturnsConfigurationError(t *testing.T) {
 	err := runMCPHTTPServer(":8080", false, "", "", "", "")
 	if err == nil || !strings.Contains(err.Error(), "bearer token") {
 		t.Fatalf("expected normal configuration error, got %v", err)
+	}
+}
+
+func TestRunMCPServersHonorCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := runMCPStdioServerContext(ctx, false, ""); err != nil {
+		t.Fatalf("stdio cancellation: %v", err)
+	}
+	if err := runMCPHTTPServerContext(ctx, ":0", false, "", "0123456789abcdef", "", ""); err != nil {
+		t.Fatalf("HTTP cancellation: %v", err)
 	}
 }
 

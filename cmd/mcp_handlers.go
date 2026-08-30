@@ -2201,6 +2201,9 @@ func replaceItineraryBlock(ctx context.Context, client *wanderlog.Client, tripKe
 }
 
 func handleDeleteItineraryBlock(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKey, err := resolveTripKey(ctx, request, "trip_key")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -2224,6 +2227,9 @@ func handleDeleteItineraryBlock(ctx context.Context, request mcp.CallToolRequest
 }
 
 func handleDeleteFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKey, err := resolveTripKey(ctx, request, "trip_key")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -2246,6 +2252,9 @@ func handleDeleteFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 }
 
 func handleDeleteLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKey, err := resolveTripKey(ctx, request, "trip_key")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -2469,6 +2478,9 @@ func handleUpdateLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp
 }
 
 func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKey, msg := tripKeyArg(ctx, request)
 	if msg != "" {
 		return mcp.NewToolResultError(msg), nil
@@ -3077,6 +3089,9 @@ func handleCreateTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 }
 
 func handleDeleteTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKey, msg := tripKeyArg(ctx, request)
 	if msg != "" {
 		return mcp.NewToolResultError(msg), nil
@@ -3103,6 +3118,9 @@ func handleDeleteTrip(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 }
 
 func handleDeleteTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKeys := stringListArg(request, "trip_keys")
 	if len(tripKeys) == 0 {
 		return mcp.NewToolResultError("trip_keys must contain at least one trip key"), nil
@@ -3731,6 +3749,9 @@ func handleUpdateTripExpense(ctx context.Context, request mcp.CallToolRequest) (
 }
 
 func handleDeleteTripExpense(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := requireConfirmed(request); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	tripKey, msg := tripKeyArg(ctx, request)
 	if msg != "" {
 		return mcp.NewToolResultError(msg), nil

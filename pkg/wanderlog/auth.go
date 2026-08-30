@@ -145,7 +145,12 @@ func (c *Client) ValidateSessionContext(ctx context.Context) error {
 
 // SetAuth configures the client with authentication credentials
 func (c *Client) SetAuth(creds *AuthCredentials) {
-	c.auth = creds
+	if creds == nil {
+		c.auth = nil
+		return
+	}
+	copy := *creds
+	c.auth = &copy
 }
 
 // AddAuthHeaders adds authentication headers to a request

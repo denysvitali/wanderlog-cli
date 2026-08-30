@@ -475,10 +475,9 @@ This format allows you to easily:
 
 **Coming Soon:**
 - 🔄 **Interactive mode** - explore trips interactively with TUI
-- 🔄 **Trip analytics** - distance, duration, cost analysis
 
 **Partially implemented:**
-- 🔄 **Budget tracking** - budget and expense writes plus CSV export
+- 🔄 **Budget tracking** - budget and expense writes, analytics, plus CSV export
 - 🔄 **Export features** - Google Maps export via `wanderlog export <trip-key>`
 
 **Already implemented:**

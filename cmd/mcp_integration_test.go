@@ -189,12 +189,18 @@ func TestMCPIntegration_DeleteToolSchemasAreAgentFriendly(t *testing.T) {
 	assert.Contains(t, deleteTrip.InputSchema.Properties, "trip_key")
 	assert.Contains(t, deleteTrip.InputSchema.Properties, "trip_id")
 	assert.NotContains(t, deleteTrip.InputSchema.Required, "trip_key")
+	assert.Contains(t, deleteTrip.InputSchema.Required, "confirm")
 
 	deleteTrips := tools["delete_trips"].Tool
 	prop, ok := deleteTrips.InputSchema.Properties["trip_keys"].(map[string]any)
 	require.True(t, ok, "trip_keys schema should be an object")
 	assert.Equal(t, "array", prop["type"])
 	assert.Contains(t, deleteTrips.InputSchema.Required, "trip_keys")
+	assert.Contains(t, deleteTrips.InputSchema.Required, "confirm")
+
+	for _, name := range []string{"delete_flight", "delete_lodging", "delete_itinerary_block", "delete_trip_expense", "remove_place"} {
+		assert.Contains(t, tools[name].Tool.InputSchema.Required, "confirm", "%s", name)
+	}
 }
 
 func TestMCPIntegration_RemovePlaceSchemaUsesBlockID(t *testing.T) {
@@ -204,6 +210,20 @@ func TestMCPIntegration_RemovePlaceSchemaUsesBlockID(t *testing.T) {
 	assert.Contains(t, removePlace.InputSchema.Properties, "block_id")
 	assert.NotContains(t, removePlace.InputSchema.Properties, "place_id")
 	assert.Contains(t, removePlace.InputSchema.Properties, "trip_id")
+	assert.Contains(t, removePlace.InputSchema.Required, "block_id")
+	assert.Contains(t, removePlace.InputSchema.Required, "confirm")
+}
+
+func TestMCPDestructiveHandlersRejectMissingConfirmationBeforeAuthentication(t *testing.T) {
+	request := mcp.CallToolRequest{Params: mcp.CallToolParams{
+		Name:      "delete_trip",
+		Arguments: map[string]interface{}{"trip_key": "trip"},
+	}}
+	result, err := handleDeleteTrip(context.Background(), request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, getTextContent(result), "confirm must be true")
 }
 
 func TestMCPIntegration_WriteToolRegistrationMode(t *testing.T) {

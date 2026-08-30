@@ -18,6 +18,8 @@ type AssistantStreamEvent struct {
 	Type    string          `json:"type"`
 	Data    json.RawMessage `json:"data,omitempty"`
 	Success *bool           `json:"success,omitempty"`
+	Message string          `json:"message,omitempty"`
+	Error   json.RawMessage `json:"error,omitempty"`
 }
 
 // AssistantTextResponse is the accumulated synchronous response returned by

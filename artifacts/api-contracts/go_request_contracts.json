@@ -190,9 +190,20 @@
       "addDuplicates": false,
       "places": [
         {
+          "geometry": {
+            "location": {
+              "lat": 35.6812,
+              "lng": 139.7671
+            }
+          },
           "name": "Tokyo Station",
           "place": {
-            "geometry": null,
+            "geometry": {
+              "location": {
+                "lat": 35.6812,
+                "lng": 139.7671
+              }
+            },
             "name": "Tokyo Station",
             "placeId": "place-123",
             "place_id": "place-123"

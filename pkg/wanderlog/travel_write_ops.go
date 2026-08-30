@@ -109,6 +109,7 @@ func (c *Client) AddFlightReservation(req AddFlightReservationRequest) (*TravelM
 }
 
 func (c *Client) AddFlightReservationContext(ctx context.Context, req AddFlightReservationRequest) (*TravelMutationResult, error) {
+	ctx = normalizeTravelContext(ctx)
 	if err := validateTravelMutationContext(ctx, req.TripKey); err != nil {
 		return nil, err
 	}
@@ -125,13 +126,11 @@ func (c *Client) AddFlightReservationContext(ctx context.Context, req AddFlightR
 	if req.ArrivalDate == "" {
 		req.ArrivalDate = req.DepartureDate
 	}
-
-	sectionID, err := c.ensureTravelSection(ctx, req.TripKey, "flights")
-	if err != nil {
-		return nil, fmt.Errorf("resolve Flights section: %w", err)
+	if err := validateTravelDateTimeRange(req.DepartureDate, req.DepartureTime, req.ArrivalDate, req.ArrivalTime); err != nil {
+		return nil, err
 	}
 	departAirport, arriveAirport := map[string]any(nil), map[string]any(nil)
-	stops, stopsErr := c.GetFlightStops(strconv.Itoa(number), airline, req.DepartureDate)
+	stops, stopsErr := c.GetFlightStopsContext(ctx, strconv.Itoa(number), airline, req.DepartureDate)
 	if stopsErr == nil && stops != nil && len(stops.Data) > 0 {
 		first := stops.Data[0]
 		if first.Depart.Airport.IATA != "" {
@@ -147,15 +146,18 @@ func (c *Client) AddFlightReservationContext(ctx context.Context, req AddFlightR
 			req.ArrivalTime = first.Arrive.Time
 		}
 	}
+	if err := validateTravelDateTimeRange(req.DepartureDate, req.DepartureTime, req.ArrivalDate, req.ArrivalTime); err != nil {
+		return nil, err
+	}
 	departAirport = applyTravelAirportOverride(departAirport, req.DepartureAirport)
 	arriveAirport = applyTravelAirportOverride(arriveAirport, req.ArrivalAirport)
 	if departAirport != nil {
-		if place := c.travelGooglePlaceForAirport(departAirport); place != nil {
+		if place := c.travelGooglePlaceForAirport(ctx, departAirport); place != nil {
 			departAirport["googlePlace"] = place
 		}
 	}
 	if arriveAirport != nil {
-		if place := c.travelGooglePlaceForAirport(arriveAirport); place != nil {
+		if place := c.travelGooglePlaceForAirport(ctx, arriveAirport); place != nil {
 			arriveAirport["googlePlace"] = place
 		}
 	}
@@ -175,7 +177,7 @@ func (c *Client) AddFlightReservationContext(ctx context.Context, req AddFlightR
 		"flightInfo": map[string]any{"airline": map[string]any{"iata": airline}, "number": number},
 		"text":       travelQuillText(req.Notes), "travelerNames": []any{},
 	}
-	blockID, err := c.appendTravelBlock(ctx, req.TripKey, sectionID, block)
+	sectionID, blockID, err := c.addTravelBlock(ctx, req.TripKey, "flights", block)
 	if err != nil {
 		return nil, fmt.Errorf("add flight %s: %w", req.FlightNumber, err)
 	}
@@ -231,6 +233,16 @@ func (c *Client) UpdateFlightReservation(req UpdateFlightReservationRequest) (*T
 		if req.ArrivalAirport != nil {
 			travelSetAirport(block, "arrive", *req.ArrivalAirport)
 		}
+		if req.DepartureDate != nil || req.DepartureTime != nil || req.ArrivalDate != nil || req.ArrivalTime != nil {
+			depart := travelChildMap(block, "depart")
+			arrive := travelChildMap(block, "arrive")
+			if err := validateTravelDateTimeRange(
+				travelString(depart["date"]), travelString(depart["time"]),
+				travelString(arrive["date"]), travelString(arrive["time"]),
+			); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -248,35 +260,26 @@ func (c *Client) AddLodgingReservation(req AddLodgingReservationRequest) (*Trave
 }
 
 func (c *Client) AddLodgingReservationContext(ctx context.Context, req AddLodgingReservationRequest) (*TravelMutationResult, error) {
+	ctx = normalizeTravelContext(ctx)
 	if err := validateTravelMutationContext(ctx, req.TripKey); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(req.Name) == "" && strings.TrimSpace(req.PlaceID) == "" {
 		return nil, fmt.Errorf("name or place ID is required")
 	}
-	if err := validateTravelDate("check-in date", req.CheckIn, true); err != nil {
+	if err := validateTravelLodgingRange(req.CheckIn, req.CheckOut); err != nil {
 		return nil, err
 	}
-	if err := validateTravelDate("check-out date", req.CheckOut, true); err != nil {
-		return nil, err
-	}
-	if req.CheckOut < req.CheckIn {
-		return nil, fmt.Errorf("check-out date must not be before check-in date")
-	}
-	place, canonicalName, err := c.resolveTravelPlace(req.Name, req.PlaceID, req.Latitude, req.Longitude, true)
+	place, canonicalName, err := c.resolveTravelPlace(ctx, req.Name, req.PlaceID, req.Latitude, req.Longitude, true)
 	if err != nil {
 		return nil, err
-	}
-	sectionID, err := c.ensureTravelSection(ctx, req.TripKey, "hotels")
-	if err != nil {
-		return nil, fmt.Errorf("resolve Lodging section: %w", err)
 	}
 	hotel := map[string]any{"checkIn": req.CheckIn, "checkOut": req.CheckOut, "travelerNames": req.TravelerNames, "confirmationNumber": nil}
 	if req.ConfirmationNumber != "" {
 		hotel["confirmationNumber"] = req.ConfirmationNumber
 	}
 	block := map[string]any{"type": "place", "place": place, "hotel": hotel, "text": travelQuillText(req.Notes), "imageSize": "small", "travelMode": nil, "reactions": []any{}}
-	blockID, err := c.appendTravelBlock(ctx, req.TripKey, sectionID, block)
+	sectionID, blockID, err := c.addTravelBlock(ctx, req.TripKey, "hotels", block)
 	if err != nil {
 		return nil, fmt.Errorf("add lodging %s: %w", canonicalName, err)
 	}
@@ -304,7 +307,7 @@ func (c *Client) UpdateLodgingReservation(req UpdateLodgingReservationRequest) (
 			if req.Longitude != nil {
 				lng = *req.Longitude
 			}
-			place, _, err := c.resolveTravelPlace(name, *req.PlaceID, lat, lng, false)
+			place, _, err := c.resolveTravelPlace(context.Background(), name, *req.PlaceID, lat, lng, false)
 			if err != nil {
 				return err
 			}
@@ -329,6 +332,11 @@ func (c *Client) UpdateLodgingReservation(req UpdateLodgingReservationRequest) (
 				return err
 			}
 			hotel["checkOut"] = *req.CheckOut
+		}
+		if req.CheckIn != nil || req.CheckOut != nil {
+			if err := validateTravelLodgingRange(travelString(hotel["checkIn"]), travelString(hotel["checkOut"])); err != nil {
+				return err
+			}
 		}
 		if req.ConfirmationNumber != nil {
 			hotel["confirmationNumber"] = *req.ConfirmationNumber
@@ -356,6 +364,7 @@ func (c *Client) AddTrainReservation(req AddTrainReservationRequest) (*TravelMut
 }
 
 func (c *Client) AddTrainReservationContext(ctx context.Context, req AddTrainReservationRequest) (*TravelMutationResult, error) {
+	ctx = normalizeTravelContext(ctx)
 	if err := validateTravelMutationContext(ctx, req.TripKey); err != nil {
 		return nil, err
 	}
@@ -371,24 +380,23 @@ func (c *Client) AddTrainReservationContext(ctx context.Context, req AddTrainRes
 	if req.ArrivalDate == "" {
 		req.ArrivalDate = req.DepartureDate
 	}
-	depart, _, err := c.resolveTravelPlace(req.Departure.Name, req.Departure.PlaceID, req.Departure.Latitude, req.Departure.Longitude, false)
+	if err := validateTravelDateTimeRange(req.DepartureDate, req.DepartureTime, req.ArrivalDate, req.ArrivalTime); err != nil {
+		return nil, err
+	}
+	depart, _, err := c.resolveTravelPlace(ctx, req.Departure.Name, req.Departure.PlaceID, req.Departure.Latitude, req.Departure.Longitude, false)
 	if err != nil {
 		return nil, fmt.Errorf("departure stop: %w", err)
 	}
-	arrive, _, err := c.resolveTravelPlace(req.Arrival.Name, req.Arrival.PlaceID, req.Arrival.Latitude, req.Arrival.Longitude, false)
+	arrive, _, err := c.resolveTravelPlace(ctx, req.Arrival.Name, req.Arrival.PlaceID, req.Arrival.Latitude, req.Arrival.Longitude, false)
 	if err != nil {
 		return nil, fmt.Errorf("arrival stop: %w", err)
-	}
-	sectionID, err := c.ensureTravelSection(ctx, req.TripKey, "transit")
-	if err != nil {
-		return nil, fmt.Errorf("resolve Transit section: %w", err)
 	}
 	block := map[string]any{
 		"type": "train", "carrier": strings.TrimSpace(req.Carrier), "confirmationNumber": req.ConfirmationNumber,
 		"depart": map[string]any{"place": depart, "date": req.DepartureDate, "time": req.DepartureTime},
 		"arrive": map[string]any{"place": arrive, "date": req.ArrivalDate, "time": req.ArrivalTime}, "text": travelQuillText(req.Notes),
 	}
-	blockID, err := c.appendTravelBlock(ctx, req.TripKey, sectionID, block)
+	sectionID, blockID, err := c.addTravelBlock(ctx, req.TripKey, "transit", block)
 	if err != nil {
 		return nil, fmt.Errorf("add train %s: %w", req.Carrier, err)
 	}
@@ -407,6 +415,13 @@ func validateTravelMutationContext(ctx context.Context, tripKey string) error {
 		return err
 	}
 	return nil
+}
+
+func normalizeTravelContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
 
 func validateTravelBlockRequest(tripKey string, blockID int) error {
@@ -430,6 +445,65 @@ func validateTravelDate(name, value string, required bool) error {
 		return fmt.Errorf("invalid %s %q: use YYYY-MM-DD", name, value)
 	}
 	return nil
+}
+
+func validateTravelTime(name, value string) error {
+	if value == "" {
+		return nil
+	}
+	if _, err := time.Parse("15:04", value); err != nil {
+		return fmt.Errorf("invalid %s %q: use HH:MM 24-hour time", name, value)
+	}
+	return nil
+}
+
+func validateTravelDateTimeRange(departureDate, departureTime, arrivalDate, arrivalTime string) error {
+	if err := validateTravelDate("departure date", departureDate, true); err != nil {
+		return err
+	}
+	if err := validateTravelDate("arrival date", arrivalDate, true); err != nil {
+		return err
+	}
+	if err := validateTravelTime("departure time", departureTime); err != nil {
+		return err
+	}
+	if err := validateTravelTime("arrival time", arrivalTime); err != nil {
+		return err
+	}
+
+	departure, _ := time.Parse("2006-01-02", departureDate)
+	arrival, _ := time.Parse("2006-01-02", arrivalDate)
+	if arrival.Before(departure) {
+		return fmt.Errorf("arrival date must not be before departure date")
+	}
+	if arrival.Equal(departure) && departureTime != "" && arrivalTime != "" {
+		departureClock, _ := time.Parse("15:04", departureTime)
+		arrivalClock, _ := time.Parse("15:04", arrivalTime)
+		if arrivalClock.Before(departureClock) {
+			return fmt.Errorf("arrival time must not be before departure time on the same date")
+		}
+	}
+	return nil
+}
+
+func validateTravelLodgingRange(checkIn, checkOut string) error {
+	if err := validateTravelDate("check-in date", checkIn, true); err != nil {
+		return err
+	}
+	if err := validateTravelDate("check-out date", checkOut, true); err != nil {
+		return err
+	}
+	start, _ := time.Parse("2006-01-02", checkIn)
+	end, _ := time.Parse("2006-01-02", checkOut)
+	if end.Before(start) {
+		return fmt.Errorf("check-out date must not be before check-in date")
+	}
+	return nil
+}
+
+func travelString(value any) string {
+	text, _ := value.(string)
+	return text
 }
 
 func parseTravelFlightNumber(value string) (string, int, error) {
@@ -504,12 +578,12 @@ func applyTravelAirportOverride(airport map[string]any, code string) map[string]
 	return airport
 }
 
-func (c *Client) travelGooglePlaceForAirport(airport map[string]any) map[string]any {
+func (c *Client) travelGooglePlaceForAirport(ctx context.Context, airport map[string]any) map[string]any {
 	iata, _ := airport["iata"].(string)
 	name, _ := airport["name"].(string)
 	city, _ := airport["cityName"].(string)
 	query := strings.TrimSpace(city + " " + name + " airport")
-	results, err := c.SearchPlaces(query, nil, nil)
+	results, err := c.SearchPlacesContext(ctx, query, nil, nil)
 	if err != nil || results == nil || !results.Success || len(results.Places) == 0 {
 		return nil
 	}
@@ -520,7 +594,7 @@ func (c *Client) travelGooglePlaceForAirport(airport map[string]any) map[string]
 			break
 		}
 	}
-	details, err := c.GetPlaceDetails(match.PlaceID)
+	details, err := c.GetPlaceDetailsContext(ctx, match.PlaceID)
 	if err != nil || details == nil || !details.Success {
 		return nil
 	}
@@ -533,14 +607,14 @@ func (c *Client) travelGooglePlaceForAirport(airport map[string]any) map[string]
 	}
 }
 
-func (c *Client) resolveTravelPlace(name, placeID string, latitude, longitude float64, requireCoordinates bool) (map[string]any, string, error) {
+func (c *Client) resolveTravelPlace(ctx context.Context, name, placeID string, latitude, longitude float64, requireCoordinates bool) (map[string]any, string, error) {
 	name, placeID = strings.TrimSpace(name), strings.TrimSpace(placeID)
 	if name == "" && placeID == "" {
 		return nil, "", fmt.Errorf("name or place ID is required")
 	}
 	place := map[string]any{"name": name}
 	if placeID != "" {
-		details, err := c.GetPlaceDetails(placeID)
+		details, err := c.GetPlaceDetailsContext(ctx, placeID)
 		if err != nil {
 			return nil, "", fmt.Errorf("fetch place details for %s: %w", placeID, err)
 		}
@@ -570,35 +644,99 @@ func (c *Client) resolveTravelPlace(name, placeID string, latitude, longitude fl
 	return place, name, nil
 }
 
-func (c *Client) ensureTravelSection(ctx context.Context, tripKey, kind string) (int, error) {
-	heading, icon, color := "Flights", "plane", "#3498db"
+func travelSectionPresentation(kind string) (heading, icon, color string) {
+	heading, icon, color = "Flights", "plane", "#3498db"
 	switch kind {
 	case "hotels":
 		heading, icon, color = "Hotels and lodging", "bed", "#9b59b6"
 	case "transit":
 		heading, icon, color = "Transit", "subway", "#17b978"
 	}
-	sectionID := 0
-	err := c.retryJSON0MutationContext(ctx, tripKey, "EnsureTravelSection", func(ctx context.Context) ([]Operation, error) {
+	return heading, icon, color
+}
+
+func findTravelSectionIndex(sections []ItSections, kind, heading string) int {
+	for index, section := range sections {
+		if section.Type == kind || (kind == "hotels" && section.Type == "lodging") {
+			return index
+		}
+	}
+	for index, section := range sections {
+		if strings.EqualFold(strings.TrimSpace(section.Heading), heading) {
+			return index
+		}
+	}
+	return -1
+}
+
+func newTravelSection(kind string, sectionID int, blocks []any) map[string]any {
+	heading, icon, color := travelSectionPresentation(kind)
+	return map[string]any{
+		"id":               sectionID,
+		"heading":          heading,
+		"type":             kind,
+		"mode":             "placeList",
+		"placeMarkerColor": color,
+		"placeMarkerIcon":  icon,
+		"text":             travelQuillText(""),
+		"blocks":           blocks,
+	}
+}
+
+func prepareTravelBlock(block map[string]any, blockID int) (map[string]any, error) {
+	rebuiltBlock, err := travelCloneMap(block)
+	if err != nil {
+		return nil, fmt.Errorf("copy travel block: %w", err)
+	}
+	rebuiltBlock["id"] = blockID
+	rebuiltBlock["addedBy"] = map[string]any{"type": "user"}
+	rebuiltBlock["attachments"] = []any{}
+	rebuiltBlock["upvotedBy"] = []any{}
+	return rebuiltBlock, nil
+}
+
+// addTravelBlock atomically creates a missing reservation section with its
+// first block, or appends to an existing section. Every conflict rebuilds IDs
+// and insertion positions from a fresh snapshot.
+func (c *Client) addTravelBlock(ctx context.Context, tripKey, kind string, block map[string]any) (int, int, error) {
+	heading, _, _ := travelSectionPresentation(kind)
+	sectionID, blockID := 0, 0
+	err := c.retryJSON0MutationContext(ctx, tripKey, "AddTravelBlock", func(ctx context.Context) ([]Operation, error) {
 		trip, err := c.GetTripContext(ctx, tripKey)
 		if err != nil {
 			return nil, fmt.Errorf("get current trip: %w", err)
 		}
-		for _, section := range trip.TripPlan.Itinerary.Sections {
-			if section.Type == kind || strings.EqualFold(section.Heading, heading) || section.PlaceMarkerIcon == icon {
-				sectionID = section.ID
-				return nil, nil
+		sections := trip.TripPlan.Itinerary.Sections
+		maxID := travelMaxItineraryID(trip)
+		sectionIdx := findTravelSectionIndex(sections, kind, heading)
+		if sectionIdx >= 0 {
+			sectionID = sections[sectionIdx].ID
+			if sectionID <= 0 {
+				return nil, fmt.Errorf("%s section is missing a positive ID", heading)
 			}
+			blockID = maxID + 1
+			rebuiltBlock, err := prepareTravelBlock(block, blockID)
+			if err != nil {
+				return nil, err
+			}
+			position := len(sections[sectionIdx].Blocks)
+			return []Operation{InsertInList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, position, rebuiltBlock)}, nil
 		}
-		sectionID = travelMaxItineraryID(trip) + 1
-		section := map[string]any{"id": sectionID, "heading": heading, "type": kind, "mode": "placeList", "placeMarkerColor": color, "placeMarkerIcon": icon, "text": travelQuillText(""), "blocks": []any{}}
-		position := travelSectionInsertPosition(kind, trip.TripPlan.Itinerary.Sections)
+
+		sectionID = maxID + 1
+		blockID = maxID + 2
+		rebuiltBlock, err := prepareTravelBlock(block, blockID)
+		if err != nil {
+			return nil, err
+		}
+		section := newTravelSection(kind, sectionID, []any{rebuiltBlock})
+		position := travelSectionInsertPosition(kind, sections)
 		return []Operation{InsertInList([]interface{}{"itinerary", "sections"}, position, section)}, nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return sectionID, nil
+	return sectionID, blockID, nil
 }
 
 func travelMaxItineraryID(trip *TripResponse) int {
@@ -649,14 +787,10 @@ func (c *Client) appendTravelBlock(ctx context.Context, tripKey string, sectionI
 			return nil, fmt.Errorf("section %d not found", sectionID)
 		}
 		blockID = travelMaxItineraryID(trip) + 1
-		rebuiltBlock, err := travelCloneMap(block)
+		rebuiltBlock, err := prepareTravelBlock(block, blockID)
 		if err != nil {
-			return nil, fmt.Errorf("copy travel block: %w", err)
+			return nil, err
 		}
-		rebuiltBlock["id"] = blockID
-		rebuiltBlock["addedBy"] = map[string]any{"type": "user"}
-		rebuiltBlock["attachments"] = []any{}
-		rebuiltBlock["upvotedBy"] = []any{}
 		position := len(trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks)
 		return []Operation{InsertInList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, position, rebuiltBlock)}, nil
 	})

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -91,9 +92,9 @@ Examples:
 			if err != nil {
 				return err
 			}
-			return runMCPHTTPServer(httpAddr, enableWrite, tripID, httpToken, tlsCert, tlsKey)
+			return runMCPHTTPServerContext(cmd.Context(), httpAddr, enableWrite, tripID, httpToken, tlsCert, tlsKey)
 		}
-		return runMCPStdioServer(enableWrite, tripID)
+		return runMCPStdioServerContext(cmd.Context(), enableWrite, tripID)
 	},
 }
 
@@ -344,6 +345,9 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.WithNumber("section_id",
 				mcp.Description("Section ID containing the flight block (optional)"),
 			),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent deletion"),
+			),
 		)
 		s.AddTool(deleteFlightTool, handleDeleteFlight)
 
@@ -443,6 +447,9 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.WithNumber("section_id",
 				mcp.Description("Section ID containing the lodging block (optional)"),
 			),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent deletion"),
+			),
 		)
 		s.AddTool(deleteLodgingTool, handleDeleteLodging)
 
@@ -512,10 +519,14 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 				mcp.Description("Alias for trip_key"),
 			),
 			mcp.WithNumber("block_id",
+				mcp.Required(),
 				mcp.Description("Internal Wanderlog place block ID to remove. This is returned by add_place and is not a Google Place ID."),
 			),
 			mcp.WithNumber("section_id",
 				mcp.Description("Section ID containing the place block (optional; resolved automatically when omitted)"),
+			),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent removal"),
 			),
 		)
 		s.AddTool(removePlaceTool, handleRemovePlace)
@@ -619,6 +630,9 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.WithString("expected_type",
 				mcp.Description("Optional guard, e.g. flight, place, note, checklist"),
 			),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent deletion"),
+			),
 		)
 		s.AddTool(deleteItineraryBlockTool, handleDeleteItineraryBlock)
 
@@ -708,6 +722,9 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 			mcp.WithNumber("expense_id",
 				mcp.Required(),
 				mcp.Description("Expense ID"),
+			),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent deletion"),
 			),
 		)
 		s.AddTool(deleteTripExpenseTool, handleDeleteTripExpense)
@@ -857,6 +874,8 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 				mcp.Description("Trip key to delete (optional if trip_id or a default trip key is set)")),
 			mcp.WithString("trip_id",
 				mcp.Description("Alias for trip_key")),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent deletion")),
 		)
 		s.AddTool(deleteTripTool, handleDeleteTrip)
 
@@ -867,6 +886,8 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 				mcp.Description("Trip keys to delete. A legacy comma-separated string is also accepted."),
 				mcp.WithStringItems(mcp.MinLength(1)),
 				mcp.MinItems(1)),
+			mcp.WithBoolean("confirm", mcp.Required(),
+				mcp.Description("Must be true to confirm permanent deletion")),
 		)
 		s.AddTool(deleteTripsTool, handleDeleteTrips)
 
@@ -969,7 +990,10 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	return s
 }
 
-func runMCPStdioServer(enableWrite bool, tripID string) error {
+func runMCPStdioServerContext(ctx context.Context, enableWrite bool, tripID string) error {
+	if ctx == nil {
+		return fmt.Errorf("serving MCP on stdio: nil context")
+	}
 	readOnly := !enableWrite
 	s := createMCPServer(readOnly)
 
@@ -984,16 +1008,16 @@ func runMCPStdioServer(enableWrite bool, tripID string) error {
 	}
 	logger.WithFields(logFields).Info("Starting Wanderlog MCP server on stdio")
 
-	var err error
+	stdioServer := server.NewStdioServer(s)
 	if tripID != "" {
-		// Use context function to inject trip ID
-		err = server.ServeStdio(s, server.WithStdioContextFunc(func(ctx context.Context) context.Context {
+		server.WithStdioContextFunc(func(ctx context.Context) context.Context {
 			return withTripID(ctx, tripID)
-		}))
-	} else {
-		err = server.ServeStdio(s)
+		})(stdioServer)
 	}
-
+	err := stdioServer.Listen(ctx, os.Stdin, os.Stdout)
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("serving MCP on stdio: %w", err)
 	}
@@ -1003,6 +1027,16 @@ func runMCPStdioServer(enableWrite bool, tripID string) error {
 const maxMCPHTTPRequestBytes = 1 << 20
 
 func runMCPHTTPServer(addr string, enableWrite bool, tripID, token, tlsCert, tlsKey string) error {
+	return runMCPHTTPServerContext(context.Background(), addr, enableWrite, tripID, token, tlsCert, tlsKey)
+}
+
+func runMCPHTTPServerContext(ctx context.Context, addr string, enableWrite bool, tripID, token, tlsCert, tlsKey string) error {
+	if ctx == nil {
+		return fmt.Errorf("serving HTTP MCP: nil context")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	listenAddr, err := validateMCPHTTPConfig(addr, token, tlsCert, tlsKey)
 	if err != nil {
 		return fmt.Errorf("invalid HTTP MCP configuration: %w", err)
@@ -1044,10 +1078,25 @@ func runMCPHTTPServer(addr string, enableWrite bool, tripID, token, tlsCert, tls
 	mux.Handle("/mcp", mcpHTTPMiddleware(httpServer, token))
 	standardServer.Handler = mux
 
-	if err := httpServer.Start(listenAddr); err != nil {
-		return fmt.Errorf("serving HTTP MCP: %w", err)
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- httpServer.Start(listenAddr) }()
+	select {
+	case err := <-serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("serving HTTP MCP: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutting down HTTP MCP: %w", err)
+		}
+		if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("serving HTTP MCP: %w", err)
+		}
+		return nil
 	}
-	return nil
 }
 
 func validateMCPHTTPConfig(addr, token, tlsCert, tlsKey string) (string, error) {

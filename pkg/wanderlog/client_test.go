@@ -402,3 +402,12 @@ func TestSetLogger(t *testing.T) {
 		t.Error("SetLogger did not set the logger correctly")
 	}
 }
+
+func TestSetLoggerNilRestoresSafeDefault(t *testing.T) {
+	client := NewClient()
+	client.SetLogger(nil)
+	if client.logger == nil {
+		t.Fatal("SetLogger(nil) left the client with a nil logger")
+	}
+	client.logger.Debug("nil logger fallback is usable")
+}

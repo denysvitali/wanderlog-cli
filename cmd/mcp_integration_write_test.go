@@ -587,6 +587,7 @@ func TestIntegration_RemovePlaceDisposable(t *testing.T) {
 			Arguments: map[string]interface{}{
 				"trip_id":  tripKey,
 				"block_id": blockID,
+				"confirm":  true,
 			},
 		},
 	}
@@ -968,6 +969,7 @@ func TestMCPIntegration_BudgetExpenseWorkflow(t *testing.T) {
 				Name: "delete_trip",
 				Arguments: map[string]interface{}{
 					"trip_key": tripKey,
+					"confirm":  true,
 				},
 			},
 		}
@@ -1039,6 +1041,7 @@ func TestMCPIntegration_BudgetExpenseWorkflow(t *testing.T) {
 			Arguments: map[string]interface{}{
 				"trip_key":   tripKey,
 				"expense_id": addParsed.Expense.ID,
+				"confirm":    true,
 			},
 		},
 	}
@@ -1468,6 +1471,7 @@ func TestIntegration_DeleteTrip(t *testing.T) {
 			Name: "delete_trip",
 			Arguments: map[string]interface{}{
 				"trip_id": tripKey,
+				"confirm": true,
 			},
 		},
 	}
@@ -1503,6 +1507,7 @@ func TestIntegration_DeleteTrips(t *testing.T) {
 			Name: "delete_trips",
 			Arguments: map[string]interface{}{
 				"trip_keys": []string{tripKey},
+				"confirm":   true,
 			},
 		},
 	}

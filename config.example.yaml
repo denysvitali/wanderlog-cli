@@ -2,17 +2,17 @@
 # Copy this file to $XDG_CONFIG_HOME/wanderlog/config.yaml (usually ~/.config/wanderlog/config.yaml)
 
 # Authentication configuration
+#
+# Prefer `wanderlog login`: the password is used only for that login request
+# and is never persisted. Session credentials are stored in the native system
+# keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
 auth:
-  # Email and password (optional but recommended)
-  # When provided along with session tokens, acts as fallback for automatic re-login
-  # when session expires. Session tokens will be automatically refreshed in this file.
-  # WARNING: This stores your password in plain text. Only use in secure environments.
+  # Email is optional metadata. To automate a login, provide the password only
+  # through WANDERLOG_AUTH_PASSWORD; never put it in this file.
   email: ""
-  password: ""
 
-  # Session tokens (automatically populated after 'wanderlog login')
-  # These are session credentials obtained after login.
-  # When you run 'wanderlog login', both email/password and session tokens are saved here.
+  # Legacy compatibility only. New logins keep session credentials in the
+  # system keychain. If these fields are used, protect this file with mode 0600.
   session:
     cookie: ""
     xsrf_token: ""
@@ -26,14 +26,14 @@ auth:
 # WANDERLOG_AUTH_SESSION_USER_ID
 
 # How it works:
-# 1. If session tokens are present, they will be used first
-# 2. If session tokens are missing/invalid but email/password are present,
-#    the CLI will automatically login and update the session tokens in this file
-# 3. Email/password and session tokens work together for seamless authentication
+# 1. Explicit session environment variables or flags are used when supplied.
+# 2. Otherwise the CLI loads session credentials from the system keychain.
+# 3. WANDERLOG_AUTH_EMAIL plus WANDERLOG_AUTH_PASSWORD can refresh a rejected
+#    session without persisting the password.
 
 # Priority order for credentials:
 # 1. Command-line flags (--session, --xsrf)
 # 2. Session tokens from environment variables (WANDERLOG_AUTH_SESSION_*)
 # 3. Session tokens from config file (auth.session.*)
 # 4. System keychain (stored via 'wanderlog login')
-# 5. Email/password from config file (auth.email, auth.password) - auto-login and refresh session
+# 5. Environment-only email/password fallback for session refresh
