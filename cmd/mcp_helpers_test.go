@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -163,7 +164,7 @@ func TestResolveAddPlaceSectionIDRejectsImplicitUnscheduled(t *testing.T) {
 		},
 	}
 
-	_, _, err := resolveAddPlaceSectionID(nil, "trip-key", request)
+	_, _, err := resolveAddPlaceSectionID(context.Background(), nil, "trip-key", request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "section_id must be a positive itinerary section ID")
 }
@@ -178,7 +179,7 @@ func TestResolveAddPlaceSectionIDAllowsExplicitUnscheduled(t *testing.T) {
 		},
 	}
 
-	sectionID, label, err := resolveAddPlaceSectionID(nil, "trip-key", request)
+	sectionID, label, err := resolveAddPlaceSectionID(context.Background(), nil, "trip-key", request)
 	require.NoError(t, err)
 	assert.Equal(t, 0, sectionID)
 	assert.Equal(t, "general Places to visit list", label)

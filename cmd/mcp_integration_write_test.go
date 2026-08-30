@@ -604,7 +604,7 @@ func TestIntegration_RemovePlaceDisposable(t *testing.T) {
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
 	client.SetAuth(auth)
-	require.NoError(t, verifyRemovedPlacePersisted(client, tripKey, sectionID, blockID))
+	require.NoError(t, verifyRemovedPlacePersisted(context.Background(), client, tripKey, sectionID, blockID))
 }
 
 // TestMCPIntegration_WriteOperationsWorkflow tests a complete workflow:
@@ -1534,9 +1534,11 @@ func TestUnit_SearchHotelsErrorPropagation(t *testing.T) {
 	defer server.Close()
 
 	// Save original BaseURL
-	oldBaseURL := wanderlog.BaseURL
-	wanderlog.BaseURL = server.URL
-	defer func() { wanderlog.BaseURL = oldBaseURL }()
+	oldBaseURL := wanderlog.BaseURL //nolint:staticcheck // verifies the deprecated command-wide compatibility path
+	wanderlog.BaseURL = server.URL  //nolint:staticcheck // see rationale above
+	defer func() {
+		wanderlog.BaseURL = oldBaseURL //nolint:staticcheck // restore compatibility state
+	}()
 
 	ctx := context.Background()
 	request := mcp.CallToolRequest{

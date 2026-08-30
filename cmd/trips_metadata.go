@@ -16,6 +16,7 @@ var tripsUpdateCmd = &cobra.Command{
 
 Examples:
   wanderlog trips update abc123xyz --title "New Title"
+  wanderlog trips update abc123xyz --title ""
   wanderlog trips update abc123xyz --start 2024-06-01 --end 2024-06-15
   wanderlog trips update abc123xyz --privacy public`,
 	Args: cobra.ExactArgs(1),
@@ -26,7 +27,7 @@ Examples:
 		if err := validateDateFlagE(updateEndDate, "end"); err != nil {
 			return err
 		}
-		if tripsUpdateTitle == "" && updateStartDate == "" && updateEndDate == "" && updatePrivacy == "" {
+		if !cmd.Flags().Changed("title") && !cmd.Flags().Changed("start") && !cmd.Flags().Changed("end") && !cmd.Flags().Changed("privacy") {
 			return fmt.Errorf("at least one of --title, --start, --end, or --privacy is required")
 		}
 
@@ -36,10 +37,11 @@ Examples:
 		}
 
 		err = client.UpdateTrip(args[0], wanderlog.UpdateTripRequest{
-			Title:     tripsUpdateTitle,
-			StartDate: updateStartDate,
-			EndDate:   updateEndDate,
-			Privacy:   updatePrivacy,
+			Title:      tripsUpdateTitle,
+			ClearTitle: cmd.Flags().Changed("title") && tripsUpdateTitle == "",
+			StartDate:  updateStartDate,
+			EndDate:    updateEndDate,
+			Privacy:    updatePrivacy,
 		})
 		if err != nil {
 			return fmt.Errorf("update trip: %w", err)

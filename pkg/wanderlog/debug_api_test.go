@@ -182,7 +182,9 @@ func testGetLikeCountRaw(client *Client, tripKey string, logger *logrus.Logger) 
 	logger.Info("=== Testing GetLikeCount (raw) ===")
 
 	// GetLikesBulk expects POST with JSON body: {"keys": [tripKey]}
-	url := BaseURL + "/tripPlans/likes/bulk"
+	// The extracted web bundle uses POST /api/tripPlans/likes. The former
+	// hand-written /likes/bulk probe was not an endpoint present in the bundle.
+	url := BaseURL + "/tripPlans/likes"
 	logger.Infof("URL: %s", url)
 
 	body, _ := json.Marshal(map[string][]string{"keys": {tripKey}})

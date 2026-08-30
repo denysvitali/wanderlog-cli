@@ -18,28 +18,91 @@ import (
 const (
 	ClientVersion           = "2"
 	DefaultUserAgent        = "wanderlog-cli/1.0"
+	DefaultBaseURL          = "https://wanderlog.com/api"
 	MaxAPIResponseBodyBytes = 10 << 20
 )
 
-var (
-	BaseURL = "https://wanderlog.com/api"
-)
+// BaseURL is retained for source compatibility with callers that used it to
+// configure clients before per-client options were available. NewClient
+// snapshots its value; changing BaseURL does not affect an existing client.
+// New code should use WithBaseURL instead.
+//
+// Deprecated: use WithBaseURL.
+var BaseURL = DefaultBaseURL
 
 type Client struct {
 	httpClient *http.Client
 	logger     *logrus.Logger
 	userAgent  string
 	auth       *AuthCredentials
+	baseURL    string
 }
 
-func NewClient() *Client {
-	return &Client{
-		httpClient: &http.Client{
+type clientConfig struct {
+	baseURL    string
+	httpClient *http.Client
+	transport  http.RoundTripper
+}
+
+// ClientOption configures one Client without changing process-wide state.
+type ClientOption func(*clientConfig)
+
+// WithBaseURL directs a client to a specific Wanderlog-compatible API base
+// URL. The value is copied when the client is constructed.
+func WithBaseURL(baseURL string) ClientOption {
+	return func(config *clientConfig) {
+		config.baseURL = baseURL
+	}
+}
+
+// WithHTTPClient injects the HTTP client used for requests. Its redirect,
+// timeout, cookie-jar, and transport behavior are preserved. Passing nil uses
+// the package's secure default client.
+func WithHTTPClient(httpClient *http.Client) ClientOption {
+	return func(config *clientConfig) {
+		config.httpClient = httpClient
+	}
+}
+
+// WithTransport injects a transport while preserving all other HTTP client
+// settings. When combined with WithHTTPClient, the supplied client is cloned
+// before its transport is changed.
+func WithTransport(transport http.RoundTripper) ClientOption {
+	return func(config *clientConfig) {
+		config.transport = transport
+	}
+}
+
+// NewClient constructs an isolated API client. For backwards compatibility,
+// it snapshots the deprecated BaseURL variable as its initial base URL. Prefer
+// WithBaseURL when a non-default endpoint is needed.
+func NewClient(options ...ClientOption) *Client {
+	config := clientConfig{
+		baseURL: BaseURL,
+	}
+	for _, option := range options {
+		if option != nil {
+			option(&config)
+		}
+	}
+
+	httpClient := config.httpClient
+	if httpClient == nil {
+		httpClient = &http.Client{
 			Timeout:       30 * time.Second,
 			CheckRedirect: sameOriginRedirectPolicy,
-		},
-		logger:    logrus.New(),
-		userAgent: DefaultUserAgent,
+		}
+	}
+	if config.transport != nil {
+		cloned := *httpClient
+		cloned.Transport = config.transport
+		httpClient = &cloned
+	}
+	return &Client{
+		httpClient: httpClient,
+		logger:     logrus.New(),
+		userAgent:  DefaultUserAgent,
+		baseURL:    config.baseURL,
 	}
 }
 
@@ -85,8 +148,8 @@ func readAPIResponseBody(body io.Reader) ([]byte, error) {
 	return data, nil
 }
 
-func ensureAuthOrigin(req *http.Request) error {
-	base, err := url.Parse(BaseURL)
+func (c *Client) ensureAuthOrigin(req *http.Request) error {
+	base, err := url.Parse(c.baseURL)
 	if err != nil {
 		return fmt.Errorf("parsing Wanderlog API origin: %w", err)
 	}
@@ -128,15 +191,14 @@ func (c *Client) DoAPI(method, path string, body []byte, headers map[string]stri
 // cancels the in-flight HTTP request. DoAPI remains available for callers that
 // do not need cancellation.
 func (c *Client) DoAPIContext(ctx context.Context, method, path string, body []byte, headers map[string]string, authenticated bool) (int, []byte, error) {
+	operation := apiRequestOperation(method, path)
 	if ctx == nil {
-		return 0, nil, fmt.Errorf("creating request: nil context")
+		return 0, nil, newAPIError(operation, 0, "creating request: nil context", nil, nil)
 	}
 
-	apiURL := path
-	if !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
-		trimmed := strings.TrimPrefix(path, "/")
-		trimmed = strings.TrimPrefix(trimmed, "api/")
-		apiURL = fmt.Sprintf("%s/%s", BaseURL, trimmed)
+	apiURL, err := c.buildAPIURL(path, nil)
+	if err != nil {
+		return 0, nil, newAPIError(operation, 0, "building request URL: "+err.Error(), nil, err)
 	}
 
 	var reader io.Reader
@@ -146,7 +208,7 @@ func (c *Client) DoAPIContext(ctx context.Context, method, path string, body []b
 
 	req, err := http.NewRequestWithContext(ctx, method, apiURL, reader)
 	if err != nil {
-		return 0, nil, fmt.Errorf("creating request: %w", err)
+		return 0, nil, newAPIError(operation, 0, "creating request: "+err.Error(), nil, err)
 	}
 
 	req.Header.Set("User-Agent", c.userAgent)
@@ -158,7 +220,7 @@ func (c *Client) DoAPIContext(ctx context.Context, method, path string, body []b
 	}
 
 	if authenticated {
-		if err := ensureAuthOrigin(req); err != nil {
+		if err := c.ensureAuthOrigin(req); err != nil {
 			return 0, nil, err
 		}
 		if err := c.addAuthHeaders(req); err != nil {
@@ -168,17 +230,17 @@ func (c *Client) DoAPIContext(ctx context.Context, method, path string, body []b
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("making request: %w", err)
+		return 0, nil, newAPIError(operation, 0, "making request: "+err.Error(), nil, err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := readAPIResponseBody(resp.Body)
 	if err != nil {
-		return resp.StatusCode, respBody, fmt.Errorf("reading response body: %w", err)
+		return resp.StatusCode, respBody, newAPIError(operation, resp.StatusCode, "reading response body: "+err.Error(), respBody, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp.StatusCode, respBody, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, truncateForLog(string(respBody), 500))
+		return resp.StatusCode, respBody, apiHTTPError(operation, resp.StatusCode, respBody)
 	}
 
 	return resp.StatusCode, respBody, nil
@@ -219,7 +281,7 @@ func (c *Client) GetTripContext(ctx context.Context, key string) (*TripResponse,
 	}
 
 	if trip.Error != "" {
-		return nil, fmt.Errorf("API error: %s", trip.Error)
+		return nil, newAPIError("GetTrip", resp.StatusCode, trip.Error, resp.Body, nil)
 	}
 
 	return &trip, nil
@@ -240,7 +302,7 @@ func (c *Client) GetTripRaw(key string) (map[string]any, error) {
 		return nil, err
 	}
 	if msg, ok := trip["error"].(string); ok && msg != "" {
-		return nil, fmt.Errorf("API error: %s", msg)
+		return nil, newAPIError("GetTrip", resp.StatusCode, msg, resp.Body, nil)
 	}
 	return trip, nil
 }
@@ -267,20 +329,12 @@ func (c *Client) GetTripSectionsContext(ctx context.Context, key string) ([]ItSe
 		"bodySize":   len(resp.Body),
 	}).Debug("GetTripSections API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GetTripSections: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var response struct {
 		Success bool         `json:"success"`
 		Data    []ItSections `json:"data"`
 	}
-	if err := json.Unmarshal(resp.Body, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode sections response: %w", err)
-	}
-
-	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
+	if err := decodeAPIBody("GetTripSections", resp.StatusCode, resp.Body, &response); err != nil {
+		return nil, err
 	}
 
 	return response.Data, nil

@@ -34,7 +34,7 @@ Examples:
 			return fmt.Errorf("place name is required (--name)")
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
@@ -91,12 +91,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.RemovePlace(tripKey, tripsEditSectionID, placeIDInt)
+		err = client.RemovePlaceContext(cmd.Context(), tripKey, tripsEditSectionID, placeIDInt)
 		if err != nil {
 			return fmt.Errorf("remove place: %w", err)
 		}
@@ -126,12 +126,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.ClearSectionBlocks(tripKey, sectionID)
+		err = client.ClearSectionBlocksContext(cmd.Context(), tripKey, sectionID)
 		if err != nil {
 			return fmt.Errorf("clear section: %w", err)
 		}
@@ -158,12 +158,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.DeleteSection(tripKey, sectionID)
+		err = client.DeleteSectionContext(cmd.Context(), tripKey, sectionID)
 		if err != nil {
 			return fmt.Errorf("delete section: %w", err)
 		}
@@ -198,12 +198,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.NukeTripPlaces(tripKey)
+		err = client.NukeTripPlacesContext(cmd.Context(), tripKey)
 		if err != nil {
 			return fmt.Errorf("nuke trip places: %w", err)
 		}
@@ -223,7 +223,7 @@ Examples:
   wanderlog trips edit move-place abc123xyz 12345 --from-section 100 --to-section 200 --position 0`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
@@ -232,7 +232,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		if err := client.MovePlace(args[0], placeID, tripsEditMoveFromSection, tripsEditMoveToSection, tripsEditMovePosition); err != nil {
+		if err := client.MovePlaceContext(cmd.Context(), args[0], placeID, tripsEditMoveFromSection, tripsEditMoveToSection, tripsEditMovePosition); err != nil {
 			return fmt.Errorf("move place: %w", err)
 		}
 		return printSuccess(outputFormat, "Moved place", map[string]interface{}{"tripKey": args[0], "placeId": placeID})
@@ -248,7 +248,7 @@ Examples:
   wanderlog trips edit reorder-places abc123xyz 123 --place-ids "456,789,012"`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
@@ -261,7 +261,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		if err := client.ReorderPlaces(args[0], sectionID, placeIDs); err != nil {
+		if err := client.ReorderPlacesContext(cmd.Context(), args[0], sectionID, placeIDs); err != nil {
 			return fmt.Errorf("reorder places: %w", err)
 		}
 		return printSuccess(outputFormat, "Reordered places", map[string]interface{}{"tripKey": args[0], "sectionId": sectionID, "placeIds": placeIDs})
@@ -278,7 +278,7 @@ Examples:
   wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30 --end-time 11:00`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
@@ -287,7 +287,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		if err := client.UpdatePlaceVisitTime(args[0], tripsEditSectionID, placeID, tripsEditStartTime, tripsEditEndTime); err != nil {
+		if err := client.UpdatePlaceVisitTimeContext(cmd.Context(), args[0], tripsEditSectionID, placeID, tripsEditStartTime, tripsEditEndTime); err != nil {
 			return fmt.Errorf("update place visit time: %w", err)
 		}
 		return printSuccess(outputFormat, "Updated place visit time", map[string]interface{}{

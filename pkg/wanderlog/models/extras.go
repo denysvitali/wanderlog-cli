@@ -11,6 +11,17 @@ type LikesBulkRequest struct {
 type LikesBulkResponse struct {
 	Success bool            `json:"success"`
 	Data    json.RawMessage `json:"data,omitempty"`
+	Likes   map[string]bool `json:"-"`
+}
+
+// LikedFor returns the authenticated user's like state when the server
+// provided an unambiguous value for key.
+func (r *LikesBulkResponse) LikedFor(key string) (liked bool, known bool) {
+	if r == nil || r.Likes == nil {
+		return false, false
+	}
+	liked, known = r.Likes[key]
+	return liked, known
 }
 
 // CreateTripFromFlightsResponse wraps the response from

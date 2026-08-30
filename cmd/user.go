@@ -12,15 +12,19 @@ import (
 )
 
 var (
-	userEmailLookup  string
-	userBlockID      string
-	userUsername     string
-	userKVValue      string
-	userUTCOffset    int
-	userFollowingIDs []string
-	userNotifOffset  int
-	userNotifIDs     []string
-	userSettingsBody string
+	userEmailLookup    string
+	userBlockID        string
+	userUsername       string
+	userKVValue        string
+	userUTCOffset      int
+	userFollowingIDs   []string
+	userNotifOffset    int
+	userNotifIDs       []string
+	userSettingsBody   string
+	userUpdateName     string
+	userUpdateUsername string
+	userUpdateBio      string
+	userUpdateLocation string
 )
 
 var userCmd = &cobra.Command{
@@ -68,6 +72,40 @@ Examples:
 			return fmt.Errorf("get profile: %w", err)
 		}
 		return ui.PrintJSON(resp)
+	},
+}
+
+var userUpdateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Update the authenticated user's profile",
+	Long: `Update one or more profile fields. Passing an empty value explicitly
+clears bio or location.
+
+Examples:
+  wanderlog user update --name "Ada Lovelace" --location London
+  wanderlog user update --bio ""`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !cmd.Flags().Changed("name") && !cmd.Flags().Changed("username") &&
+			!cmd.Flags().Changed("bio") && !cmd.Flags().Changed("location") {
+			return fmt.Errorf("at least one of --name, --username, --bio, or --location is required")
+		}
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
+		profile, err := client.UpdateMe(wanderlog.UpdateUserRequest{
+			Name:          userUpdateName,
+			Username:      userUpdateUsername,
+			Bio:           userUpdateBio,
+			Location:      userUpdateLocation,
+			ClearBio:      cmd.Flags().Changed("bio") && userUpdateBio == "",
+			ClearLocation: cmd.Flags().Changed("location") && userUpdateLocation == "",
+		})
+		if err != nil {
+			return fmt.Errorf("update profile: %w", err)
+		}
+		return ui.PrintJSON(profile)
 	},
 }
 
@@ -338,6 +376,7 @@ func init() {
 	rootCmd.AddCommand(userCmd)
 	userCmd.AddCommand(
 		userProfileCmd,
+		userUpdateCmd,
 		userNotificationsCmd,
 		userNotificationsMarkReadCmd,
 		userSettingsGetCmd,
@@ -364,9 +403,14 @@ func init() {
 	userBlockCmd.Flags().StringVar(&userBlockID, "user-id", "", "User ID to block")
 	userUsernameTakenCmd.Flags().StringVar(&userUsername, "username", "", "Username to check")
 	userLogoutServerCmd.Flags().Bool("clear", false, "Also clear locally stored credentials")
+	userUpdateCmd.Flags().StringVar(&userUpdateName, "name", "", "Display name")
+	userUpdateCmd.Flags().StringVar(&userUpdateUsername, "username", "", "Username")
+	userUpdateCmd.Flags().StringVar(&userUpdateBio, "bio", "", "Profile bio (pass an empty value to clear)")
+	userUpdateCmd.Flags().StringVar(&userUpdateLocation, "location", "", "Profile location (pass an empty value to clear)")
 
 	for _, command := range []*cobra.Command{
 		userProfileCmd,
+		userUpdateCmd,
 		userNotificationsCmd,
 		userNotificationsMarkReadCmd,
 		userSettingsGetCmd,

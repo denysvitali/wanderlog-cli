@@ -45,4 +45,7 @@ type UpdateTripRequest struct {
 	StartDate string `json:"startDate,omitempty"`
 	EndDate   string `json:"endDate,omitempty"`
 	Privacy   string `json:"privacy,omitempty"`
+	// ClearTitle distinguishes an explicitly empty title from an omitted title.
+	// It is a client-side instruction and is not sent as an API field.
+	ClearTitle bool `json:"-"`
 }

@@ -22,9 +22,10 @@ type apiResponse struct {
 }
 
 func (c *Client) apiRequest(ctx context.Context, method, path string, query url.Values, body []byte, authenticated bool) (*apiResponse, error) {
-	apiURL, err := buildAPIURL(path, query)
+	operation := apiRequestOperation(method, path)
+	apiURL, err := c.buildAPIURL(path, query)
 	if err != nil {
-		return nil, err
+		return nil, newAPIError(operation, 0, "building request URL: "+err.Error(), nil, err)
 	}
 
 	var reader io.Reader
@@ -34,7 +35,7 @@ func (c *Client) apiRequest(ctx context.Context, method, path string, query url.
 
 	req, err := http.NewRequestWithContext(ctx, method, apiURL, reader)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, newAPIError(operation, 0, "creating request: "+err.Error(), nil, err)
 	}
 
 	req.Header.Set("User-Agent", c.userAgent)
@@ -42,14 +43,14 @@ func (c *Client) apiRequest(ctx context.Context, method, path string, query url.
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if authenticated {
-		if err := ensureAuthOrigin(req); err != nil {
+		if err := c.ensureAuthOrigin(req); err != nil {
 			return nil, err
 		}
 		if err := c.addAuthHeaders(req); err != nil {
 			return nil, fmt.Errorf("adding auth headers: %w", err)
 		}
 	} else if c.auth != nil {
-		if err := ensureAuthOrigin(req); err != nil {
+		if err := c.ensureAuthOrigin(req); err != nil {
 			return nil, err
 		}
 		if err := c.addAuthHeaders(req); err != nil {
@@ -59,13 +60,13 @@ func (c *Client) apiRequest(ctx context.Context, method, path string, query url.
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("making request: %w", err)
+		return nil, newAPIError(operation, 0, "making request: "+err.Error(), nil, err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := readAPIResponseBody(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
+		return nil, newAPIError(operation, resp.StatusCode, "reading response body: "+err.Error(), respBody, err)
 	}
 
 	return &apiResponse{
@@ -88,14 +89,14 @@ func (c *Client) apiJSON(ctx context.Context, method, path string, query url.Val
 	return c.apiRequest(ctx, method, path, query, encoded, authenticated)
 }
 
-func buildAPIURL(path string, query url.Values) (string, error) {
+func (c *Client) buildAPIURL(path string, query url.Values) (string, error) {
 	var raw string
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		raw = path
 	} else {
 		trimmed := strings.TrimPrefix(path, "/")
 		trimmed = strings.TrimPrefix(trimmed, "api/")
-		raw = strings.TrimRight(BaseURL, "/") + "/" + trimmed
+		raw = strings.TrimRight(c.baseURL, "/") + "/" + trimmed
 	}
 
 	parsed, err := url.Parse(raw)
@@ -124,20 +125,16 @@ func apiQuery(values map[string]string) url.Values {
 
 func decodeAPIBody(opName string, statusCode int, body []byte, out any) error {
 	if statusCode < 200 || statusCode >= 300 {
-		bodyText := string(body)
-		if msg, ok := knownWanderlogServerError(opName, bodyText); ok {
-			return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, msg)
-		}
-		return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, truncateForLog(bodyText, 500))
+		return apiHTTPError(opName, statusCode, body)
 	}
 	if failure := explicitAPIFailure(body); failure != "" {
-		return fmt.Errorf("%s: %s", opName, failure)
+		return newAPIError(opName, statusCode, failure, body, nil)
 	}
 	if out == nil || len(body) == 0 {
 		return nil
 	}
 	if err := json.Unmarshal(body, out); err != nil {
-		return fmt.Errorf("%s: decoding response: %w", opName, err)
+		return newAPIError(opName, statusCode, "decoding response: "+err.Error(), body, err)
 	}
 	return nil
 }
@@ -148,20 +145,16 @@ func decodeAPIBody(opName string, statusCode int, body []byte, out any) error {
 // ShareDB document. json.Number preserves the server's exact numeric token.
 func decodeAPIBodyPreserveNumbers(opName string, statusCode int, body []byte, out any) error {
 	if statusCode < 200 || statusCode >= 300 {
-		bodyText := string(body)
-		if msg, ok := knownWanderlogServerError(opName, bodyText); ok {
-			return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, msg)
-		}
-		return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, truncateForLog(bodyText, 500))
+		return apiHTTPError(opName, statusCode, body)
 	}
 	if failure := explicitAPIFailure(body); failure != "" {
-		return fmt.Errorf("%s: %s", opName, failure)
+		return newAPIError(opName, statusCode, failure, body, nil)
 	}
 	if out == nil || len(body) == 0 {
 		return nil
 	}
 	if err := decodeJSONPreserveNumbers(body, out); err != nil {
-		return fmt.Errorf("%s: decoding response: %w", opName, err)
+		return newAPIError(opName, statusCode, "decoding response: "+err.Error(), body, err)
 	}
 	return nil
 }

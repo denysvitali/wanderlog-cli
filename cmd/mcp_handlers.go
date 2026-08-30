@@ -227,11 +227,11 @@ func handleListTrips(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	client.SetLogger(logger)
 
 	// Ensure authentication
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	trips, err := client.GetUserTrips()
+	trips, err := client.GetUserTripsContext(ctx)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trips: %v", err)), nil
 	}
@@ -283,11 +283,11 @@ func handleGetTripWithDefaultFormat(ctx context.Context, request mcp.CallToolReq
 	client.SetLogger(logger)
 
 	// Ensure authentication
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip: %v", err)), nil
 	}
@@ -324,11 +324,11 @@ func handleGetItinerary(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
 
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip: %v", err)), nil
 	}
@@ -360,12 +360,12 @@ func handleListPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	client.SetLogger(logger)
 
 	// Ensure authentication
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
 	// Use GetTrip instead of GetTripPlaces to get the full place metadata
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip: %v", err)), nil
 	}
@@ -439,11 +439,11 @@ func handleListSections(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	client.SetLogger(logger)
 
 	// Ensure authentication
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip: %v", err)), nil
 	}
@@ -495,7 +495,7 @@ func handleGetFlights(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
@@ -561,11 +561,11 @@ func handleGetTripSections(ctx context.Context, request mcp.CallToolRequest) (*m
 	client.SetLogger(logger)
 
 	// Ensure authentication
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	sections, err := client.GetTripSections(tripKey)
+	sections, err := client.GetTripSectionsContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip sections: %v", err)), nil
 	}
@@ -646,12 +646,12 @@ func availableSectionDates(sections []wanderlog.ItSections) string {
 	return strings.Join(dates, ", ")
 }
 
-func loadSectionsForResolution(client *wanderlog.Client, tripKey string) ([]wanderlog.ItSections, error) {
+func loadSectionsForResolution(ctx context.Context, client *wanderlog.Client, tripKey string) ([]wanderlog.ItSections, error) {
 	// First try GetTrip which includes full section data
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		// GetTrip failed, try the dedicated sections endpoint as fallback
-		sections, secErr := client.GetTripSections(tripKey)
+		sections, secErr := client.GetTripSectionsContext(ctx, tripKey)
 		if secErr != nil {
 			return nil, fmt.Errorf("GetTrip failed: %w, GetTripSections also failed: %w", err, secErr)
 		}
@@ -666,7 +666,7 @@ func loadSectionsForResolution(client *wanderlog.Client, tripKey string) ([]wand
 	// GetTrip succeeded but returned 0 sections - try dedicated endpoint
 	// This handles cases where the trip exists but the full trip response
 	// has an empty sections array while the sections endpoint returns data
-	sections, err := client.GetTripSections(tripKey)
+	sections, err := client.GetTripSectionsContext(ctx, tripKey)
 	if err != nil {
 		return nil, fmt.Errorf("GetTrip returned no sections and GetTripSections failed: %w", err)
 	}
@@ -699,7 +699,7 @@ func resolveSectionFromList(sections []wanderlog.ItSections, sectionID int, hasS
 	return 0, "", fmt.Errorf("no itinerary section found for date %s; available dated sections: %s", sectionDate, availableSectionDates(sections))
 }
 
-func resolveAddPlaceSectionID(client *wanderlog.Client, tripKey string, request mcp.CallToolRequest) (int, string, error) {
+func resolveAddPlaceSectionID(ctx context.Context, client *wanderlog.Client, tripKey string, request mcp.CallToolRequest) (int, string, error) {
 	unscheduled := request.GetBool("unscheduled", false)
 	sectionDate, err := validateDateArgument("section_date", request.GetString("section_date", ""), false)
 	if err != nil {
@@ -725,7 +725,7 @@ func resolveAddPlaceSectionID(client *wanderlog.Client, tripKey string, request 
 		return 0, "", fmt.Errorf("section_id or section_date is required. Use list_sections to find dated sections, or pass unscheduled=true to add to the general Places to visit list")
 	}
 
-	sections, err := loadSectionsForResolution(client, tripKey)
+	sections, err := loadSectionsForResolution(ctx, client, tripKey)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to resolve section: %w", err)
 	}
@@ -799,13 +799,15 @@ func tripHasAddedPlaceWithText(trip *wanderlog.TripResponse, sectionID int, name
 	return false
 }
 
-func verifyAddedPlacePersisted(client *wanderlog.Client, tripKey string, sectionID int, name, placeID, text string) error {
+func verifyAddedPlacePersisted(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID int, name, placeID, text string) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -823,13 +825,15 @@ func verifyAddedPlacePersisted(client *wanderlog.Client, tripKey string, section
 	return fmt.Errorf("write request completed, but the place was not found when the trip was reloaded")
 }
 
-func findAddedPlaceBlockID(client *wanderlog.Client, tripKey string, sectionID int, name, placeID, text string) (int, error) {
+func findAddedPlaceBlockID(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID int, name, placeID, text string) (int, error) {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return 0, err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -855,13 +859,15 @@ func findAddedPlaceBlockID(client *wanderlog.Client, tripKey string, sectionID i
 	return 0, fmt.Errorf("write request completed, but the added place block was not found when the trip was reloaded")
 }
 
-func verifyPlaceVisitTimePersisted(client *wanderlog.Client, tripKey string, sectionID, placeID int, startTime, endTime string) error {
+func verifyPlaceVisitTimePersisted(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID, placeID int, startTime, endTime string) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -889,8 +895,8 @@ func verifyPlaceVisitTimePersisted(client *wanderlog.Client, tripKey string, sec
 	return fmt.Errorf("write request completed, but visit time was not found when the trip was reloaded")
 }
 
-func findPlaceBlockSectionID(client *wanderlog.Client, tripKey string, blockID int) (int, error) {
-	trip, err := client.GetTrip(tripKey)
+func findPlaceBlockSectionID(ctx context.Context, client *wanderlog.Client, tripKey string, blockID int) (int, error) {
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return 0, fmt.Errorf("getting current trip: %w", err)
 	}
@@ -907,13 +913,15 @@ func findPlaceBlockSectionID(client *wanderlog.Client, tripKey string, blockID i
 	return 0, fmt.Errorf("place block %d not found", blockID)
 }
 
-func verifyRemovedPlacePersisted(client *wanderlog.Client, tripKey string, sectionID, blockID int) error {
+func verifyRemovedPlacePersisted(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID, blockID int) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -1020,7 +1028,7 @@ func maxItineraryItemID(trip *wanderlog.TripResponse) int {
 	return maxID
 }
 
-func createFlightsSection(client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
+func createFlightsSection(ctx context.Context, client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
 	if trip == nil {
 		return 0, fmt.Errorf("trip response is nil")
 	}
@@ -1039,34 +1047,36 @@ func createFlightsSection(client *wanderlog.Client, tripKey string, trip *wander
 	}
 	position := sectionIndexToAddSectionType("flights", trip.TripPlan.Itinerary.Sections)
 	op := wanderlog.InsertInList([]interface{}{"itinerary", "sections"}, position, section)
-	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+	if err := client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op}); err != nil {
 		return 0, err
 	}
 	return sectionID, nil
 }
 
-func ensureFlightsSectionID(client *wanderlog.Client, tripKey string) (int, string, error) {
-	trip, err := client.GetTrip(tripKey)
+func ensureFlightsSectionID(ctx context.Context, client *wanderlog.Client, tripKey string) (int, string, error) {
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return 0, "", fmt.Errorf("getting current trip: %w", err)
 	}
 	if sectionID := findFlightsSectionID(trip); sectionID > 0 {
 		return sectionID, fmt.Sprintf("Flights section ID %d", sectionID), nil
 	}
-	sectionID, err := createFlightsSection(client, tripKey, trip)
+	sectionID, err := createFlightsSection(ctx, client, tripKey, trip)
 	if err != nil {
 		return 0, "", fmt.Errorf("creating Flights section: %w", err)
 	}
 	return sectionID, fmt.Sprintf("Flights section ID %d", sectionID), nil
 }
 
-func verifyAddedFlightPersisted(client *wanderlog.Client, tripKey string, sectionID int, airlineIATA string, flightNumber int, departureDate string) error {
+func verifyAddedFlightPersisted(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID int, airlineIATA string, flightNumber int, departureDate string) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -1081,13 +1091,15 @@ func verifyAddedFlightPersisted(client *wanderlog.Client, tripKey string, sectio
 	return fmt.Errorf("write request completed, but %s%d on %s was not found when the trip was reloaded", airlineIATA, flightNumber, departureDate)
 }
 
-func verifyAddedLodgingPersisted(client *wanderlog.Client, tripKey string, sectionID int, name, placeID, checkIn, checkOut string) error {
+func verifyAddedLodgingPersisted(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID int, name, placeID, checkIn, checkOut string) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -1102,11 +1114,11 @@ func verifyAddedLodgingPersisted(client *wanderlog.Client, tripKey string, secti
 	return fmt.Errorf("write request completed, but lodging was not found when the trip was reloaded")
 }
 
-func appendItineraryBlock(client *wanderlog.Client, tripKey string, sectionID int, block map[string]any) error {
+func appendItineraryBlock(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID int, block map[string]any) error {
 	if err := validateBlockSchema(block); err != nil {
 		return fmt.Errorf("invalid block schema: %w", err)
 	}
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
@@ -1148,7 +1160,18 @@ func appendItineraryBlock(client *wanderlog.Client, tripKey string, sectionID in
 		position,
 		block,
 	)
-	return client.ApplyOperations(tripKey, []wanderlog.Operation{op})
+	return client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op})
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func splitFlightNumber(flightNumber string) (string, int) {
@@ -1342,7 +1365,7 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	sectionID, sectionLabel, err := resolveAddPlaceSectionID(client, tripKey, request)
+	sectionID, sectionLabel, err := resolveAddPlaceSectionID(ctx, client, tripKey, request)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -1354,7 +1377,7 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	if placeID != "" {
 		logger.WithField("place_id", placeID).Debug("Fetching place details to get coordinates")
 
-		placeDetails, err = client.GetPlaceDetails(placeID)
+		placeDetails, err = client.GetPlaceDetailsContext(ctx, placeID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to fetch place details for coordinates: %v. Please provide latitude and longitude parameters.", err)), nil
 		}
@@ -1427,12 +1450,12 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place '%s' to trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 	}
-	if err := verifyAddedPlacePersisted(client, tripKey, sectionID, name, placeID, text); err != nil {
+	if err := verifyAddedPlacePersisted(ctx, client, tripKey, sectionID, name, placeID, text); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add place '%s' to trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 	}
 	blockID := 0
 	if sectionID > 0 {
-		blockID, err = findAddedPlaceBlockID(client, tripKey, sectionID, name, placeID, text)
+		blockID, err = findAddedPlaceBlockID(ctx, client, tripKey, sectionID, name, placeID, text)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to locate added place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 		}
@@ -1441,7 +1464,7 @@ func handleAddPlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		if err := client.UpdatePlaceVisitTime(tripKey, sectionID, blockID, startTime, endTime); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to set visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 		}
-		if err := verifyPlaceVisitTimePersisted(client, tripKey, sectionID, blockID, startTime, endTime); err != nil {
+		if err := verifyPlaceVisitTimePersisted(ctx, client, tripKey, sectionID, blockID, startTime, endTime); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to verify visit time for place '%s' in trip %s (section %s): %v", name, tripKey, sectionLabel, err)), nil
 		}
 	}
@@ -1497,7 +1520,7 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	sectionID, sectionLabel, err := ensureFlightsSectionID(client, tripKey)
+	sectionID, sectionLabel, err := ensureFlightsSectionID(ctx, client, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve Flights section for trip %s: %v", tripKey, err)), nil
 	}
@@ -1602,10 +1625,10 @@ func handleAddFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		}
 	}
 
-	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
+	if err := appendItineraryBlock(ctx, client, tripKey, sectionID, block); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add flight %s to trip %s (%s): %v", flightNumber, tripKey, sectionLabel, err)), nil
 	}
-	if err := verifyAddedFlightPersisted(client, tripKey, sectionID, airlineIATA, flightNum, departureDate); err != nil {
+	if err := verifyAddedFlightPersisted(ctx, client, tripKey, sectionID, airlineIATA, flightNum, departureDate); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add flight %s to trip %s (%s): %v", flightNumber, tripKey, sectionLabel, err)), nil
 	}
 
@@ -1634,7 +1657,7 @@ func findLodgingSectionID(trip *wanderlog.TripResponse) int {
 	return 0
 }
 
-func createLodgingSection(client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
+func createLodgingSection(ctx context.Context, client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
 	if trip == nil {
 		return 0, fmt.Errorf("trip response is nil")
 	}
@@ -1642,7 +1665,7 @@ func createLodgingSection(client *wanderlog.Client, tripKey string, trip *wander
 	section := newLodgingSection(sectionID)
 	position := sectionIndexToAddSectionType("hotels", trip.TripPlan.Itinerary.Sections)
 	op := wanderlog.InsertInList([]interface{}{"itinerary", "sections"}, position, section)
-	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+	if err := client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op}); err != nil {
 		return 0, err
 	}
 	return sectionID, nil
@@ -1687,15 +1710,15 @@ func sectionIndexToAddSectionType(sectionType string, sections []wanderlog.ItSec
 	return len(sections)
 }
 
-func ensureLodgingSectionID(client *wanderlog.Client, tripKey string) (int, string, error) {
-	trip, err := client.GetTrip(tripKey)
+func ensureLodgingSectionID(ctx context.Context, client *wanderlog.Client, tripKey string) (int, string, error) {
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return 0, "", fmt.Errorf("getting current trip: %w", err)
 	}
 	if sectionID := findLodgingSectionID(trip); sectionID > 0 {
 		return sectionID, fmt.Sprintf("Lodging section ID %d", sectionID), nil
 	}
-	sectionID, err := createLodgingSection(client, tripKey, trip)
+	sectionID, err := createLodgingSection(ctx, client, tripKey, trip)
 	if err != nil {
 		return 0, "", fmt.Errorf("creating Hotels and lodging section: %w", err)
 	}
@@ -1752,7 +1775,7 @@ func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	sectionID, sectionLabel, err := ensureLodgingSectionID(client, tripKey)
+	sectionID, sectionLabel, err := ensureLodgingSectionID(ctx, client, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve Lodging section for trip %s: %v", tripKey, err)), nil
 	}
@@ -1806,10 +1829,10 @@ func handleAddLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		"reactions":  []any{},
 	}
 
-	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
+	if err := appendItineraryBlock(ctx, client, tripKey, sectionID, block); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add lodging %s to trip %s (%s): %v", placeName, tripKey, sectionLabel, err)), nil
 	}
-	if err := verifyAddedLodgingPersisted(client, tripKey, sectionID, placeName, placeID, checkIn, checkOut); err != nil {
+	if err := verifyAddedLodgingPersisted(ctx, client, tripKey, sectionID, placeName, placeID, checkIn, checkOut); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add lodging %s to trip %s (%s): %v", placeName, tripKey, sectionLabel, err)), nil
 	}
 
@@ -1859,7 +1882,7 @@ func newTransitSection(sectionID int) map[string]any {
 	}
 }
 
-func createTransitSection(client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
+func createTransitSection(ctx context.Context, client *wanderlog.Client, tripKey string, trip *wanderlog.TripResponse) (int, error) {
 	if trip == nil {
 		return 0, fmt.Errorf("trip response is nil")
 	}
@@ -1867,21 +1890,21 @@ func createTransitSection(client *wanderlog.Client, tripKey string, trip *wander
 	section := newTransitSection(sectionID)
 	position := sectionIndexToAddSectionType("transit", trip.TripPlan.Itinerary.Sections)
 	op := wanderlog.InsertInList([]interface{}{"itinerary", "sections"}, position, section)
-	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+	if err := client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op}); err != nil {
 		return 0, err
 	}
 	return sectionID, nil
 }
 
-func ensureTransitSectionID(client *wanderlog.Client, tripKey string) (int, string, error) {
-	trip, err := client.GetTrip(tripKey)
+func ensureTransitSectionID(ctx context.Context, client *wanderlog.Client, tripKey string) (int, string, error) {
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return 0, "", fmt.Errorf("getting current trip: %w", err)
 	}
 	if sectionID := findTransitSectionID(trip); sectionID > 0 {
 		return sectionID, fmt.Sprintf("Transit section ID %d", sectionID), nil
 	}
-	sectionID, err := createTransitSection(client, tripKey, trip)
+	sectionID, err := createTransitSection(ctx, client, tripKey, trip)
 	if err != nil {
 		return 0, "", fmt.Errorf("creating Transit section: %w", err)
 	}
@@ -1922,13 +1945,15 @@ func tripHasAddedTrain(trip *wanderlog.TripResponse, sectionID int, carrier, dep
 	return false
 }
 
-func verifyAddedTrainPersisted(client *wanderlog.Client, tripKey string, sectionID int, carrier, departDate, departPlaceID, arrivePlaceID string) error {
+func verifyAddedTrainPersisted(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID int, carrier, departDate, departPlaceID, arrivePlaceID string) error {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+			if err := waitForRetry(ctx, time.Duration(attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
-		trip, err := client.GetTrip(tripKey)
+		trip, err := client.GetTripContext(ctx, tripKey)
 		if err != nil {
 			lastErr = err
 			continue
@@ -1945,13 +1970,13 @@ func verifyAddedTrainPersisted(client *wanderlog.Client, tripKey string, section
 
 // resolveTrainStop builds the full place sub-object for a train depart/arrive
 // stop, fetching Google place details when a place_id is given.
-func resolveTrainStop(client *wanderlog.Client, label, placeName, placeID string, latitude, longitude float64) (map[string]any, error) {
+func resolveTrainStop(ctx context.Context, client *wanderlog.Client, label, placeName, placeID string, latitude, longitude float64) (map[string]any, error) {
 	if placeID == "" && placeName == "" {
 		return nil, fmt.Errorf("%s_place_id or %s_name is required", label, label)
 	}
 	place := minimalPlaceForBlock(placeName, placeID, latitude, longitude)
 	if placeID != "" {
-		details, err := client.GetPlaceDetails(placeID)
+		details, err := client.GetPlaceDetailsContext(ctx, placeID)
 		if err != nil {
 			return nil, fmt.Errorf("fetching %s place details for %s: %w", label, placeID, err)
 		}
@@ -2017,16 +2042,16 @@ func handleAddTrain(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	departPlace, err := resolveTrainStop(client, "departure", departureName, departurePlaceID, departureLat, departureLng)
+	departPlace, err := resolveTrainStop(ctx, client, "departure", departureName, departurePlaceID, departureLat, departureLng)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	arrivePlace, err := resolveTrainStop(client, "arrival", arrivalName, arrivalPlaceID, arrivalLat, arrivalLng)
+	arrivePlace, err := resolveTrainStop(ctx, client, "arrival", arrivalName, arrivalPlaceID, arrivalLat, arrivalLng)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	sectionID, sectionLabel, err := ensureTransitSectionID(client, tripKey)
+	sectionID, sectionLabel, err := ensureTransitSectionID(ctx, client, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve Transit section for trip %s: %v", tripKey, err)), nil
 	}
@@ -2048,10 +2073,10 @@ func handleAddTrain(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		"text": quillTextForString(notes),
 	}
 
-	if err := appendItineraryBlock(client, tripKey, sectionID, block); err != nil {
+	if err := appendItineraryBlock(ctx, client, tripKey, sectionID, block); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add train (%s) to trip %s (%s): %v", carrier, tripKey, sectionLabel, err)), nil
 	}
-	if err := verifyAddedTrainPersisted(client, tripKey, sectionID, carrier, departureDate, departurePlaceID, arrivalPlaceID); err != nil {
+	if err := verifyAddedTrainPersisted(ctx, client, tripKey, sectionID, carrier, departureDate, departurePlaceID, arrivalPlaceID); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add train (%s) to trip %s (%s): %v", carrier, tripKey, sectionLabel, err)), nil
 	}
 
@@ -2125,8 +2150,8 @@ func cloneMap(value map[string]any) (map[string]any, error) {
 	return cloned, nil
 }
 
-func deleteItineraryBlock(client *wanderlog.Client, tripKey string, sectionID, blockID int, expectedType string, requireHotel bool) error {
-	trip, err := client.GetTripRaw(tripKey)
+func deleteItineraryBlock(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID, blockID int, expectedType string, requireHotel bool) error {
+	trip, err := client.GetTripRawContext(ctx, tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
@@ -2147,11 +2172,11 @@ func deleteItineraryBlock(client *wanderlog.Client, tripKey string, sectionID, b
 		blockIdx,
 		oldBlock,
 	)
-	return client.ApplyOperations(tripKey, []wanderlog.Operation{op})
+	return client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op})
 }
 
-func replaceItineraryBlock(client *wanderlog.Client, tripKey string, sectionID, blockID int, update func(map[string]any) error) error {
-	trip, err := client.GetTripRaw(tripKey)
+func replaceItineraryBlock(ctx context.Context, client *wanderlog.Client, tripKey string, sectionID, blockID int, update func(map[string]any) error) error {
+	trip, err := client.GetTripRawContext(ctx, tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
@@ -2172,7 +2197,7 @@ func replaceItineraryBlock(client *wanderlog.Client, tripKey string, sectionID, 
 		oldBlock,
 		newBlock,
 	)
-	return client.ApplyOperations(tripKey, []wanderlog.Operation{op})
+	return client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op})
 }
 
 func handleDeleteItineraryBlock(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -2192,7 +2217,7 @@ func handleDeleteItineraryBlock(ctx context.Context, request mcp.CallToolRequest
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, expectedType, false); err != nil {
+	if err := deleteItineraryBlock(ctx, client, tripKey, sectionID, blockID, expectedType, false); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete block %d from trip %s: %v", blockID, tripKey, err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Deleted block %d from trip %s", blockID, tripKey)), nil
@@ -2214,7 +2239,7 @@ func handleDeleteFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, "flight", false); err != nil {
+	if err := deleteItineraryBlock(ctx, client, tripKey, sectionID, blockID, "flight", false); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete flight block %d from trip %s: %v", blockID, tripKey, err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Deleted flight block %d from trip %s", blockID, tripKey)), nil
@@ -2236,7 +2261,7 @@ func handleDeleteLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, "place", true); err != nil {
+	if err := deleteItineraryBlock(ctx, client, tripKey, sectionID, blockID, "place", true); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete lodging block %d from trip %s: %v", blockID, tripKey, err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Deleted lodging block %d from trip %s", blockID, tripKey)), nil
@@ -2258,7 +2283,7 @@ func handleUpdateFlight(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	err = replaceItineraryBlock(client, tripKey, sectionID, blockID, func(block map[string]any) error {
+	err = replaceItineraryBlock(ctx, client, tripKey, sectionID, blockID, func(block map[string]any) error {
 		if block["type"] != "flight" {
 			return fmt.Errorf("block %d is not a flight block", blockID)
 		}
@@ -2372,7 +2397,7 @@ func handleUpdateLodging(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	if err := client.EnsureAuthenticated("", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	err = replaceItineraryBlock(client, tripKey, sectionID, blockID, func(block map[string]any) error {
+	err = replaceItineraryBlock(ctx, client, tripKey, sectionID, blockID, func(block map[string]any) error {
 		if block["type"] != "place" {
 			return fmt.Errorf("block %d is not a place/lodging block", blockID)
 		}
@@ -2465,17 +2490,17 @@ func handleRemovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	}
 
 	if sectionID <= 0 {
-		resolvedSectionID, err := findPlaceBlockSectionID(client, tripKey, blockID)
+		resolvedSectionID, err := findPlaceBlockSectionID(ctx, client, tripKey, blockID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to resolve section for place block %d in trip %s: %v", blockID, tripKey, err)), nil
 		}
 		sectionID = resolvedSectionID
 	}
 
-	if err := deleteItineraryBlock(client, tripKey, sectionID, blockID, "place", false); err != nil {
+	if err := deleteItineraryBlock(ctx, client, tripKey, sectionID, blockID, "place", false); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to remove place block %d from trip %s (section %d): %v", blockID, tripKey, sectionID, err)), nil
 	}
-	if err := verifyRemovedPlacePersisted(client, tripKey, sectionID, blockID); err != nil {
+	if err := verifyRemovedPlacePersisted(ctx, client, tripKey, sectionID, blockID); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify removal of place block %d from trip %s (section %d): %v", blockID, tripKey, sectionID, err)), nil
 	}
 
@@ -3406,7 +3431,7 @@ func handleMovePlace(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	err = client.MovePlace(tripKey, placeID, fromSectionID, toSectionID, position)
+	err = client.MovePlaceContext(ctx, tripKey, placeID, fromSectionID, toSectionID, position)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to move place %d from section %d to section %d in trip %s: %v", placeID, fromSectionID, toSectionID, tripKey, err)), nil
 	}
@@ -3458,11 +3483,11 @@ func handleReorderPlaces(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	client.SetLogger(logger)
 
 	// Ensure authentication
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
 
-	err = client.ReorderPlaces(tripKey, sectionID, placeIDs)
+	err = client.ReorderPlacesContext(ctx, tripKey, sectionID, placeIDs)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to reorder %d places in section %d for trip %s: %v", len(placeIDs), sectionID, tripKey, err)), nil
 	}
@@ -3492,10 +3517,10 @@ func handleUpdatePlaceNotes(ctx context.Context, request mcp.CallToolRequest) (*
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	trip, err := client.GetTrip(tripKey)
+	trip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get trip %s: %v", tripKey, err)), nil
 	}
@@ -3521,10 +3546,10 @@ func handleUpdatePlaceNotes(ctx context.Context, request mcp.CallToolRequest) (*
 		oldText,
 		quillTextForString(notes),
 	)
-	if err := client.ApplyOperations(tripKey, []wanderlog.Operation{op}); err != nil {
+	if err := client.ApplyOperationsContext(ctx, tripKey, []wanderlog.Operation{op}); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to update notes for place %d in trip %s: %v", placeID, tripKey, err)), nil
 	}
-	updatedTrip, err := client.GetTrip(tripKey)
+	updatedTrip, err := client.GetTripContext(ctx, tripKey)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify notes update for place %d in trip %s: %v", placeID, tripKey, err)), nil
 	}
@@ -3564,13 +3589,13 @@ func handleUpdatePlaceVisitTime(ctx context.Context, request mcp.CallToolRequest
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := client.UpdatePlaceVisitTime(tripKey, sectionID, placeID, startTime, endTime); err != nil {
+	if err := client.UpdatePlaceVisitTimeContext(ctx, tripKey, sectionID, placeID, startTime, endTime); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to update visit time for place %d in trip %s: %v", placeID, tripKey, err)), nil
 	}
-	if err := verifyPlaceVisitTimePersisted(client, tripKey, sectionID, placeID, startTime, endTime); err != nil {
+	if err := verifyPlaceVisitTimePersisted(ctx, client, tripKey, sectionID, placeID, startTime, endTime); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to verify visit time for place %d in trip %s: %v", placeID, tripKey, err)), nil
 	}
 
@@ -3593,10 +3618,10 @@ func handleSetTripBudget(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := client.SetTripBudget(tripKey, *amount, currency); err != nil {
+	if err := client.SetTripBudgetContext(ctx, tripKey, *amount, currency); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to set trip budget: %v", err)), nil
 	}
 	return mcp.NewToolResultStructuredOnly(map[string]any{
@@ -3645,10 +3670,10 @@ func handleAddTripExpense(ctx context.Context, request mcp.CallToolRequest) (*mc
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	expense, err := client.AddTripExpense(tripKey, req)
+	expense, err := client.AddTripExpenseContext(ctx, tripKey, req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to add trip expense: %v", err)), nil
 	}
@@ -3691,10 +3716,10 @@ func handleUpdateTripExpense(ctx context.Context, request mcp.CallToolRequest) (
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	expense, err := client.UpdateTripExpense(tripKey, expenseID, req)
+	expense, err := client.UpdateTripExpenseContext(ctx, tripKey, expenseID, req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to update trip expense: %v", err)), nil
 	}
@@ -3717,10 +3742,10 @@ func handleDeleteTripExpense(ctx context.Context, request mcp.CallToolRequest) (
 
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
-	if err := client.EnsureAuthenticated("", ""); err != nil {
+	if err := client.EnsureAuthenticatedContext(ctx, "", ""); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := client.DeleteTripExpense(tripKey, expenseID); err != nil {
+	if err := client.DeleteTripExpenseContext(ctx, tripKey, expenseID); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete trip expense: %v", err)), nil
 	}
 	return mcp.NewToolResultStructuredOnly(map[string]any{

@@ -139,20 +139,13 @@ func (c *Client) ListTripInvites(tripKey string) ([]map[string]interface{}, erro
 		return nil, fmt.Errorf("ListTripInvites: %w", err)
 	}
 
-	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("ListTripInvites: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
-	}
-
 	// Parse response - API returns {success, data: [...]}
 	var resp struct {
 		Success bool                     `json:"success"`
 		Data    []map[string]interface{} `json:"data"`
 	}
-	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, fmt.Errorf("ListTripInvites: decoding response: %w", err)
-	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ListTripInvites: API returned success=false")
+	if err := decodeAPIBody("ListTripInvites", statusCode, respBody, &resp); err != nil {
+		return nil, err
 	}
 
 	return resp.Data, nil
@@ -199,10 +192,21 @@ func (c *Client) GetLikeCount(tripKey string) (*LikeCount, error) {
 		return nil, fmt.Errorf("GetLikeCount: getting trip: %w", err)
 	}
 
-	return &LikeCount{
-		Count:     trip.TripPlan.LikeCount,
-		UserLiked: false, // UserLiked requires the /likeCount endpoint which doesn't exist
-	}, nil
+	result := &LikeCount{Count: trip.TripPlan.LikeCount}
+	if c.auth == nil {
+		return result, nil
+	}
+
+	likes, err := c.GetTripLikesBulk([]string{tripKey})
+	if err != nil {
+		c.logger.WithError(err).WithField("tripKey", tripKey).Warn("Could not determine authenticated like state")
+		return result, nil
+	}
+	if liked, known := likes.LikedFor(tripKey); known {
+		result.UserLiked = liked
+		result.UserLikedKnown = true
+	}
+	return result, nil
 }
 
 // AddCollaborator adds a new collaborator to a trip plan with edit access
@@ -282,13 +286,9 @@ func (c *Client) GetOrCreateShareKey(editKey string, permissions ShareKeyPermiss
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GetOrCreateShareKey: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var shareKeyResp ShareKeyResponse
-	if err := json.Unmarshal(resp.Body, &shareKeyResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := decodeAPIBody("GetOrCreateShareKey", resp.StatusCode, resp.Body, &shareKeyResp); err != nil {
+		return nil, err
 	}
 
 	c.logger.WithField("shareKey", shareKeyResp.ShareKey).Info("Successfully created/got share key")

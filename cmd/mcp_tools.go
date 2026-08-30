@@ -1317,7 +1317,7 @@ func handleClearSectionBlocks(ctx context.Context, request mcp.CallToolRequest) 
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := client.ClearSectionBlocks(tripKey, sectionID); err != nil {
+	if err := client.ClearSectionBlocksContext(ctx, tripKey, sectionID); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Cleared section %d", sectionID)), nil
@@ -1340,7 +1340,7 @@ func handleDeleteSection(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := client.DeleteSection(tripKey, sectionID); err != nil {
+	if err := client.DeleteSectionContext(ctx, tripKey, sectionID); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Deleted section %d", sectionID)), nil
@@ -1359,7 +1359,7 @@ func handleNukeTripPlaces(ctx context.Context, request mcp.CallToolRequest) (*mc
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Authentication failed: %v", err)), nil
 	}
-	if err := client.NukeTripPlaces(tripKey); err != nil {
+	if err := client.NukeTripPlacesContext(ctx, tripKey); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed: %v", err)), nil
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Removed all place blocks from %s", tripKey)), nil

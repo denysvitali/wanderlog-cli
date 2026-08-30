@@ -137,5 +137,10 @@ func TestDoAPIContextRejectsNilContext(t *testing.T) {
 	client := NewClient()
 	//nolint:staticcheck // Explicitly verifies the defensive nil-context contract.
 	_, _, err := client.DoAPIContext(nil, http.MethodGet, "health", nil, nil, false)
-	require.EqualError(t, err, "creating request: nil context")
+	require.EqualError(t, err, "GET health: creating request: nil context")
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, "GET health", apiErr.Operation)
+	assert.Zero(t, apiErr.HTTPStatus)
+	assert.False(t, apiErr.Retryable)
 }

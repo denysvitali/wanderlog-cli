@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,10 +16,14 @@ import (
 )
 
 func newClientE(requireAuth bool) (*wanderlog.Client, error) {
+	return newClientContextE(context.Background(), requireAuth)
+}
+
+func newClientContextE(ctx context.Context, requireAuth bool) (*wanderlog.Client, error) {
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
 	if requireAuth {
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
+		if err := client.EnsureAuthenticatedContext(ctx, sessionCookie, xsrfToken); err != nil {
 			return nil, fmt.Errorf("authentication required: %w", err)
 		}
 		return client, nil

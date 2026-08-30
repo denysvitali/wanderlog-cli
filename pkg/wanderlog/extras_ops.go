@@ -36,7 +36,127 @@ func (c *Client) GetTripLikesBulk(keys []string) (*LikesBulkResponse, error) {
 	if err := decodeAPIBody("GetTripLikesBulk", resp.StatusCode, resp.Body, &result); err != nil {
 		return nil, err
 	}
+	result.Likes = parseTripLikesBulk(resp.Body, keys)
 	return &result, nil
+}
+
+func parseTripLikesBulk(body []byte, requestedKeys []string) map[string]bool {
+	var envelope any
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil
+	}
+	likes := make(map[string]bool)
+	collectTripLikes(envelope, requestedKeys, likes)
+	if len(likes) == 0 {
+		return nil
+	}
+	return likes
+}
+
+func collectTripLikes(value any, requestedKeys []string, likes map[string]bool) {
+	switch typed := value.(type) {
+	case bool:
+		if len(requestedKeys) == 1 {
+			likes[requestedKeys[0]] = typed
+		}
+	case string:
+		for _, key := range requestedKeys {
+			if typed == key {
+				likes[key] = true
+				return
+			}
+		}
+	case []any:
+		if len(typed) == len(requestedKeys) {
+			allBoolean := true
+			for i, item := range typed {
+				liked, ok := item.(bool)
+				if !ok {
+					allBoolean = false
+					break
+				}
+				likes[requestedKeys[i]] = liked
+			}
+			if allBoolean {
+				return
+			}
+			for _, key := range requestedKeys {
+				delete(likes, key)
+			}
+		}
+		allKeys := true
+		for _, item := range typed {
+			if _, ok := item.(string); !ok {
+				allKeys = false
+				break
+			}
+		}
+		if allKeys {
+			for _, key := range requestedKeys {
+				likes[key] = false
+			}
+			for _, item := range typed {
+				key := item.(string)
+				for _, requested := range requestedKeys {
+					if key == requested {
+						likes[requested] = true
+						break
+					}
+				}
+			}
+			return
+		}
+		for _, item := range typed {
+			collectTripLikes(item, requestedKeys, likes)
+		}
+	case map[string]any:
+		if key, ok := tripLikeObjectKey(typed); ok {
+			if liked, ok := tripLikeObjectValue(typed); ok {
+				likes[key] = liked
+			}
+			return
+		}
+		for _, key := range requestedKeys {
+			if candidate, ok := typed[key]; ok {
+				if liked, ok := tripLikeBool(candidate); ok {
+					likes[key] = liked
+				}
+			}
+		}
+		for _, field := range []string{"data", "likes", "tripPlanLikes", "likedTripPlans", "likedKeys"} {
+			if nested, ok := typed[field]; ok {
+				collectTripLikes(nested, requestedKeys, likes)
+			}
+		}
+	}
+}
+
+func tripLikeObjectKey(value map[string]any) (string, bool) {
+	for _, field := range []string{"key", "tripKey", "tripPlanKey", "id"} {
+		if key, ok := value[field].(string); ok && key != "" {
+			return key, true
+		}
+	}
+	return "", false
+}
+
+func tripLikeObjectValue(value map[string]any) (bool, bool) {
+	for _, field := range []string{"liked", "isLiked", "userLiked", "value"} {
+		if candidate, ok := value[field]; ok {
+			return tripLikeBool(candidate)
+		}
+	}
+	return false, false
+}
+
+func tripLikeBool(value any) (bool, bool) {
+	if liked, ok := value.(bool); ok {
+		return liked, true
+	}
+	if object, ok := value.(map[string]any); ok {
+		return tripLikeObjectValue(object)
+	}
+	return false, false
 }
 
 // CreateTripFromFlights seeds a new trip plan from a flights payload. The

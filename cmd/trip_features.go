@@ -45,7 +45,7 @@ var updateTripCmd = &cobra.Command{
 		if err := validateDateFlagE(updateEndDate, "end"); err != nil {
 			return err
 		}
-		if updateTitle == "" && updateStartDate == "" && updateEndDate == "" && updatePrivacy == "" {
+		if !cmd.Flags().Changed("title") && !cmd.Flags().Changed("start") && !cmd.Flags().Changed("end") && !cmd.Flags().Changed("privacy") {
 			return fmt.Errorf("at least one of --title, --start, --end, or --privacy is required")
 		}
 
@@ -54,10 +54,11 @@ var updateTripCmd = &cobra.Command{
 			return err
 		}
 		err = client.UpdateTrip(args[0], wanderlog.UpdateTripRequest{
-			Title:     updateTitle,
-			StartDate: updateStartDate,
-			EndDate:   updateEndDate,
-			Privacy:   updatePrivacy,
+			Title:      updateTitle,
+			ClearTitle: cmd.Flags().Changed("title") && updateTitle == "",
+			StartDate:  updateStartDate,
+			EndDate:    updateEndDate,
+			Privacy:    updatePrivacy,
 		})
 		if err != nil {
 			return fmt.Errorf("update trip: %w", err)

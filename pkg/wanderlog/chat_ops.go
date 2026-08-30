@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
@@ -41,7 +40,7 @@ func (c *Client) GetTripPlanAssistantText(req AssistantTextRequest) (*AssistantT
 		return nil, fmt.Errorf("GetTripPlanAssistantText: marshaling request: %w", err)
 	}
 
-	apiURL, err := buildAPIURL("chat/tripPlanAssistant/getText/v2", nil)
+	apiURL, err := c.buildAPIURL("chat/tripPlanAssistant/getText/v2", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +62,11 @@ func (c *Client) GetTripPlanAssistantText(req AssistantTextRequest) (*AssistantT
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		raw, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("GetTripPlanAssistantText: HTTP %d: %s", resp.StatusCode, truncateForLog(string(raw), 500))
+		raw, readErr := readAPIResponseBody(resp.Body)
+		if readErr != nil {
+			return nil, newAPIError("GetTripPlanAssistantText", resp.StatusCode, "reading response body: "+readErr.Error(), raw, readErr)
+		}
+		return nil, apiHTTPError("GetTripPlanAssistantText", resp.StatusCode, raw)
 	}
 
 	var result AssistantTextResponse
@@ -77,7 +79,7 @@ func (c *Client) GetTripPlanAssistantText(req AssistantTextRequest) (*AssistantT
 		}
 		var event AssistantStreamEvent
 		if err := json.Unmarshal(line, &event); err != nil {
-			return nil, fmt.Errorf("GetTripPlanAssistantText: parsing stream chunk %q: %w", line, err)
+			return nil, newAPIError("GetTripPlanAssistantText", resp.StatusCode, "parsing stream chunk: "+err.Error(), line, err)
 		}
 		switch event.Type {
 		case "chatMetadata":
@@ -95,7 +97,7 @@ func (c *Client) GetTripPlanAssistantText(req AssistantTextRequest) (*AssistantT
 		result.Events = append(result.Events, event)
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("GetTripPlanAssistantText: reading stream: %w", err)
+		return nil, newAPIError("GetTripPlanAssistantText", resp.StatusCode, "reading stream: "+err.Error(), nil, err)
 	}
 	return &result, nil
 }

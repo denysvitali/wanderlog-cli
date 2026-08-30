@@ -73,6 +73,34 @@ func TestUpdateTripRejectsInvalidProspectiveDatesBeforeMutation(t *testing.T) {
 	}
 }
 
+func TestUpdateTripCanExplicitlyClearTitle(t *testing.T) {
+	var operationRequest OperationRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"success":true,"tripPlan":{"key":"trip","title":"Old title","itinerary":{"sections":[]}},"resources":{}}`))
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&operationRequest); err != nil {
+			t.Fatalf("decode operations: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	defer server.Close()
+	withTestBaseURL(t, server)
+
+	err := authenticatedTestClient().UpdateTrip("trip", UpdateTripRequest{ClearTitle: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(operationRequest.Ops) != 1 {
+		t.Fatalf("operations = %#v, want exactly one title replacement", operationRequest.Ops)
+	}
+	op := operationRequest.Ops[0]
+	if len(op.P) != 1 || op.P[0] != "title" || op.OD != "Old title" || op.OI != "" {
+		t.Fatalf("operation = %#v, want title replacement to empty string", op)
+	}
+}
+
 func TestCreateTripRejectsInvalidDatesBeforeRequest(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -63,10 +63,10 @@ func (c *Client) UpdateMe(req UpdateUserRequest) (*UserProfile, error) {
 	if req.Username != "" {
 		body["username"] = req.Username
 	}
-	if req.Bio != "" {
+	if req.Bio != "" || req.ClearBio {
 		body["bio"] = req.Bio
 	}
-	if req.Location != "" {
+	if req.Location != "" || req.ClearLocation {
 		body["location"] = req.Location
 	}
 	resp, err := c.apiJSON(context.Background(), http.MethodPost, "user", nil, body, true)
@@ -114,16 +114,9 @@ func (c *Client) GetNotifications(offset int) (*NotificationsResponse, error) {
 		return nil, fmt.Errorf("GetNotifications: %w", err)
 	}
 
-	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("GetNotifications: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
-	}
-
 	var result NotificationsResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("GetNotifications: decoding response: %w", err)
-	}
-	if !result.Success {
-		return nil, fmt.Errorf("GetNotifications: API returned success=false")
+	if err := decodeAPIBody("GetNotifications", statusCode, respBody, &result); err != nil {
+		return nil, err
 	}
 	return &result, nil
 }

@@ -9,4 +9,7 @@ type SetLikeRequest struct {
 type LikeCount struct {
 	Count     int  `json:"count"`
 	UserLiked bool `json:"userLiked"`
+	// UserLikedKnown distinguishes a confirmed false value from an unavailable
+	// authenticated like state. UserLiked remains for source compatibility.
+	UserLikedKnown bool `json:"userLikedKnown"`
 }

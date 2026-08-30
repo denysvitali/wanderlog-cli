@@ -3,7 +3,6 @@ package wanderlog
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -23,12 +22,9 @@ func (c *Client) GetGlobalConfig() (*GlobalConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("GetGlobalConfig: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
 	var cfg GlobalConfig
-	if err := json.Unmarshal(resp.Body, &cfg); err != nil {
-		return nil, fmt.Errorf("GetGlobalConfig: decoding response: %w", err)
+	if err := decodeAPIBody("GetGlobalConfig", resp.StatusCode, resp.Body, &cfg); err != nil {
+		return nil, err
 	}
 	cfg.Raw = json.RawMessage(resp.Body)
 	return &cfg, nil

@@ -46,7 +46,7 @@ Examples:
 			return fmt.Errorf("place name is required")
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
@@ -105,12 +105,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.RemovePlace(tripKey, sectionIDFlag, placeIDInt)
+		err = client.RemovePlaceContext(cmd.Context(), tripKey, sectionIDFlag, placeIDInt)
 		if err != nil {
 			return fmt.Errorf("remove place: %w", err)
 		}
@@ -140,12 +140,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.ClearSectionBlocks(tripKey, sectionID)
+		err = client.ClearSectionBlocksContext(cmd.Context(), tripKey, sectionID)
 		if err != nil {
 			return fmt.Errorf("clear section: %w", err)
 		}
@@ -172,12 +172,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.DeleteSection(tripKey, sectionID)
+		err = client.DeleteSectionContext(cmd.Context(), tripKey, sectionID)
 		if err != nil {
 			return fmt.Errorf("delete section: %w", err)
 		}
@@ -212,12 +212,12 @@ Examples:
 			return err
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
 
-		err = client.NukeTripPlaces(tripKey)
+		err = client.NukeTripPlacesContext(cmd.Context(), tripKey)
 		if err != nil {
 			return fmt.Errorf("nuke trip places: %w", err)
 		}

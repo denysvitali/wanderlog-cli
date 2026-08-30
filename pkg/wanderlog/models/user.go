@@ -20,13 +20,15 @@ type UserProfile struct {
 	Raw                 json.RawMessage `json:"-"`
 }
 
-// UpdateUserRequest is the generic payload for POST /api/user; only non-empty
-// fields are included in the JSON sent to the server.
+// UpdateUserRequest is the generic payload for POST /api/user. ClearBio and
+// ClearLocation distinguish explicitly empty values from omitted fields.
 type UpdateUserRequest struct {
-	Name     string `json:"name,omitempty"`
-	Username string `json:"username,omitempty"`
-	Bio      string `json:"bio,omitempty"`
-	Location string `json:"location,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Username      string `json:"username,omitempty"`
+	Bio           string `json:"bio,omitempty"`
+	Location      string `json:"location,omitempty"`
+	ClearBio      bool   `json:"-"`
+	ClearLocation bool   `json:"-"`
 }
 
 // NotificationsResponse represents the paged notification inbox.

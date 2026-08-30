@@ -56,7 +56,7 @@ func (c *Client) GetTripExpensesCSV(tripKey string) ([]byte, error) {
 		return nil, err
 	}
 	if apiResp.StatusCode < 200 || apiResp.StatusCode >= 300 {
-		return apiResp.Body, fmt.Errorf("GetTripExpensesCSV: HTTP %d: %s", apiResp.StatusCode, truncateForLog(string(apiResp.Body), 500))
+		return apiResp.Body, apiHTTPError("GetTripExpensesCSV", apiResp.StatusCode, apiResp.Body)
 	}
 	return apiResp.Body, nil
 }

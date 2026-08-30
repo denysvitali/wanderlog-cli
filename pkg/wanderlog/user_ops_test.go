@@ -146,9 +146,13 @@ func TestIsUsernameTaken(t *testing.T) {
 }
 
 func TestUpdateMe(t *testing.T) {
+	var requestBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" || r.URL.Path != "/user" {
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":1,"username":"me","name":"Updated"}`))
@@ -162,6 +166,28 @@ func TestUpdateMe(t *testing.T) {
 	}
 	if profile.Name != "Updated" {
 		t.Errorf("unexpected name: %s", profile.Name)
+	}
+}
+
+func TestUpdateMeCanExplicitlyClearOptionalFields(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"id":1,"username":"me","bio":"","location":""}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	if _, err := client.UpdateMe(UpdateUserRequest{ClearBio: true, ClearLocation: true}); err != nil {
+		t.Fatalf("UpdateMe: %v", err)
+	}
+	if bio, ok := requestBody["bio"]; !ok || bio != "" {
+		t.Fatalf("bio was not explicitly cleared: %#v", requestBody)
+	}
+	if location, ok := requestBody["location"]; !ok || location != "" {
+		t.Fatalf("location was not explicitly cleared: %#v", requestBody)
 	}
 }
 

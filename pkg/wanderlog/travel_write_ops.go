@@ -571,10 +571,6 @@ func (c *Client) resolveTravelPlace(name, placeID string, latitude, longitude fl
 }
 
 func (c *Client) ensureTravelSection(ctx context.Context, tripKey, kind string) (int, error) {
-	trip, err := c.GetTripContext(ctx, tripKey)
-	if err != nil {
-		return 0, fmt.Errorf("get current trip: %w", err)
-	}
 	heading, icon, color := "Flights", "plane", "#3498db"
 	switch kind {
 	case "hotels":
@@ -582,15 +578,24 @@ func (c *Client) ensureTravelSection(ctx context.Context, tripKey, kind string) 
 	case "transit":
 		heading, icon, color = "Transit", "subway", "#17b978"
 	}
-	for _, section := range trip.TripPlan.Itinerary.Sections {
-		if section.Type == kind || strings.EqualFold(section.Heading, heading) || section.PlaceMarkerIcon == icon {
-			return section.ID, nil
+	sectionID := 0
+	err := c.retryJSON0MutationContext(ctx, tripKey, "EnsureTravelSection", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("get current trip: %w", err)
 		}
-	}
-	sectionID := travelMaxItineraryID(trip) + 1
-	section := map[string]any{"id": sectionID, "heading": heading, "type": kind, "mode": "placeList", "placeMarkerColor": color, "placeMarkerIcon": icon, "text": travelQuillText(""), "blocks": []any{}}
-	position := travelSectionInsertPosition(kind, trip.TripPlan.Itinerary.Sections)
-	if err := c.ApplyOperations(tripKey, []Operation{InsertInList([]interface{}{"itinerary", "sections"}, position, section)}); err != nil {
+		for _, section := range trip.TripPlan.Itinerary.Sections {
+			if section.Type == kind || strings.EqualFold(section.Heading, heading) || section.PlaceMarkerIcon == icon {
+				sectionID = section.ID
+				return nil, nil
+			}
+		}
+		sectionID = travelMaxItineraryID(trip) + 1
+		section := map[string]any{"id": sectionID, "heading": heading, "type": kind, "mode": "placeList", "placeMarkerColor": color, "placeMarkerIcon": icon, "text": travelQuillText(""), "blocks": []any{}}
+		position := travelSectionInsertPosition(kind, trip.TripPlan.Itinerary.Sections)
+		return []Operation{InsertInList([]interface{}{"itinerary", "sections"}, position, section)}, nil
+	})
+	if err != nil {
 		return 0, err
 	}
 	return sectionID, nil
@@ -633,22 +638,29 @@ func travelSectionInsertPosition(kind string, sections []ItSections) int {
 }
 
 func (c *Client) appendTravelBlock(ctx context.Context, tripKey string, sectionID int, block map[string]any) (int, error) {
-	trip, err := c.GetTripContext(ctx, tripKey)
+	blockID := 0
+	err := c.retryJSON0MutationContext(ctx, tripKey, "AppendTravelBlock", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("get current trip: %w", err)
+		}
+		sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
+		if sectionIdx < 0 {
+			return nil, fmt.Errorf("section %d not found", sectionID)
+		}
+		blockID = travelMaxItineraryID(trip) + 1
+		rebuiltBlock, err := travelCloneMap(block)
+		if err != nil {
+			return nil, fmt.Errorf("copy travel block: %w", err)
+		}
+		rebuiltBlock["id"] = blockID
+		rebuiltBlock["addedBy"] = map[string]any{"type": "user"}
+		rebuiltBlock["attachments"] = []any{}
+		rebuiltBlock["upvotedBy"] = []any{}
+		position := len(trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks)
+		return []Operation{InsertInList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, position, rebuiltBlock)}, nil
+	})
 	if err != nil {
-		return 0, fmt.Errorf("get current trip: %w", err)
-	}
-	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
-	if sectionIdx < 0 {
-		return 0, fmt.Errorf("section %d not found", sectionID)
-	}
-	blockID := travelMaxItineraryID(trip) + 1
-	block["id"] = blockID
-	block["addedBy"] = map[string]any{"type": "user"}
-	block["attachments"] = []any{}
-	block["upvotedBy"] = []any{}
-	position := len(trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks)
-	op := InsertInList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, position, block)
-	if err := c.ApplyOperations(tripKey, []Operation{op}); err != nil {
 		return 0, err
 	}
 	return blockID, nil
@@ -704,45 +716,58 @@ func travelCloneMap(value map[string]any) (map[string]any, error) {
 }
 
 func (c *Client) replaceTravelBlock(tripKey string, sectionID, blockID int, update func(map[string]any) error) error {
-	trip, err := c.GetTripRaw(tripKey)
-	if err != nil {
-		return err
-	}
-	sectionIdx, blockIdx, oldBlock, err := travelFindRawBlock(trip, sectionID, blockID)
-	if err != nil {
-		return err
-	}
-	newBlock, err := travelCloneMap(oldBlock)
-	if err != nil {
-		return err
-	}
-	if err := update(newBlock); err != nil {
-		return err
-	}
-	return c.ApplyOperations(tripKey, []Operation{ReplaceInList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, blockIdx, oldBlock, newBlock)})
+	return c.replaceTravelBlockContext(context.Background(), tripKey, sectionID, blockID, update)
+}
+
+func (c *Client) replaceTravelBlockContext(ctx context.Context, tripKey string, sectionID, blockID int, update func(map[string]any) error) error {
+	return c.retryJSON0MutationContext(ctx, tripKey, "UpdateTravelBlock", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
+		if err != nil {
+			return nil, err
+		}
+		sectionIdx, blockIdx, oldBlock, err := travelFindRawBlock(trip, sectionID, blockID)
+		if err != nil {
+			return nil, err
+		}
+		newBlock, err := travelCloneMap(oldBlock)
+		if err != nil {
+			return nil, err
+		}
+		if err := update(newBlock); err != nil {
+			return nil, err
+		}
+		return []Operation{ReplaceInList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, blockIdx, oldBlock, newBlock)}, nil
+	})
 }
 
 func (c *Client) deleteTravelReservation(req DeleteTravelReservationRequest, expectedType string, requireHotel bool, kind string) (*TravelMutationResult, error) {
+	return c.deleteTravelReservationContext(context.Background(), req, expectedType, requireHotel, kind)
+}
+
+func (c *Client) deleteTravelReservationContext(ctx context.Context, req DeleteTravelReservationRequest, expectedType string, requireHotel bool, kind string) (*TravelMutationResult, error) {
 	if err := validateTravelBlockRequest(req.TripKey, req.BlockID); err != nil {
 		return nil, err
 	}
-	trip, err := c.GetTripRaw(req.TripKey)
-	if err != nil {
-		return nil, err
-	}
-	sectionIdx, blockIdx, oldBlock, err := travelFindRawBlock(trip, req.SectionID, req.BlockID)
-	if err != nil {
-		return nil, err
-	}
-	if oldBlock["type"] != expectedType {
-		return nil, fmt.Errorf("block %d has type %q, expected %q", req.BlockID, oldBlock["type"], expectedType)
-	}
-	if requireHotel {
-		if _, ok := oldBlock["hotel"]; !ok {
-			return nil, fmt.Errorf("block %d is not a lodging block", req.BlockID)
+	err := c.retryJSON0MutationContext(ctx, req.TripKey, "DeleteTravelBlock", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, req.TripKey)
+		if err != nil {
+			return nil, err
 		}
-	}
-	if err := c.ApplyOperations(req.TripKey, []Operation{DeleteFromList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, blockIdx, oldBlock)}); err != nil {
+		sectionIdx, blockIdx, oldBlock, err := travelFindRawBlock(trip, req.SectionID, req.BlockID)
+		if err != nil {
+			return nil, err
+		}
+		if oldBlock["type"] != expectedType {
+			return nil, fmt.Errorf("block %d has type %q, expected %q", req.BlockID, oldBlock["type"], expectedType)
+		}
+		if requireHotel {
+			if _, ok := oldBlock["hotel"]; !ok {
+				return nil, fmt.Errorf("block %d is not a lodging block", req.BlockID)
+			}
+		}
+		return []Operation{DeleteFromList([]interface{}{"itinerary", "sections", sectionIdx, "blocks"}, blockIdx, oldBlock)}, nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &TravelMutationResult{Success: true, TripKey: req.TripKey, SectionID: req.SectionID, BlockID: req.BlockID, Kind: kind, Message: fmt.Sprintf("Deleted %s block %d", kind, req.BlockID)}, nil

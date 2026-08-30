@@ -26,11 +26,11 @@ var tripsBudgetSetCmd = &cobra.Command{
 		if tripsBudgetCurrency == "" {
 			return fmt.Errorf("currency is required (--currency)")
 		}
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
-		if err := client.SetTripBudget(args[0], tripsBudgetAmount, tripsBudgetCurrency); err != nil {
+		if err := client.SetTripBudgetContext(cmd.Context(), args[0], tripsBudgetAmount, tripsBudgetCurrency); err != nil {
 			return fmt.Errorf("set budget: %w", err)
 		}
 		return printSuccess(outputFormat, "Set trip budget", map[string]interface{}{
@@ -73,11 +73,11 @@ var tripsExpensesAddCmd = &cobra.Command{
 			req.BlockID = &tripsExpenseBlockID
 		}
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
-		expense, err := client.AddTripExpense(args[0], req)
+		expense, err := client.AddTripExpenseContext(cmd.Context(), args[0], req)
 		if err != nil {
 			return fmt.Errorf("add expense: %w", err)
 		}
@@ -132,11 +132,11 @@ var tripsExpensesUpdateCmd = &cobra.Command{
 		}
 		req.ClearAssociatedDate = tripsExpenseClearAssociatedDate
 
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
-		expense, err := client.UpdateTripExpense(args[0], expenseID, req)
+		expense, err := client.UpdateTripExpenseContext(cmd.Context(), args[0], expenseID, req)
 		if err != nil {
 			return fmt.Errorf("update expense: %w", err)
 		}
@@ -153,11 +153,11 @@ var tripsExpensesDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		client, err := newClientE(true)
+		client, err := newClientContextE(cmd.Context(), true)
 		if err != nil {
 			return err
 		}
-		if err := client.DeleteTripExpense(args[0], expenseID); err != nil {
+		if err := client.DeleteTripExpenseContext(cmd.Context(), args[0], expenseID); err != nil {
 			return fmt.Errorf("delete expense: %w", err)
 		}
 		return printSuccess(outputFormat, "Deleted expense", map[string]interface{}{"tripKey": args[0], "expenseId": expenseID})

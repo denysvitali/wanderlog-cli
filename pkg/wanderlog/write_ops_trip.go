@@ -186,15 +186,32 @@ func (c *Client) DeleteTrip(tripKey string) error {
 
 // UpdateTrip updates trip metadata (title, dates, privacy) using ShareDB operations
 func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
+	return c.UpdateTripContext(context.Background(), tripKey, req)
+}
+
+// UpdateTripContext updates trip metadata and binds all fetch/apply attempts to
+// ctx. A ShareDB conflict triggers a fresh fetch and operation rebuild.
+func (c *Client) UpdateTripContext(ctx context.Context, tripKey string, req UpdateTripRequest) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for updating trips")
 	}
 
-	// First, get current trip to get old values for operations
-	trip, err := c.GetTrip(tripKey)
+	err := c.retryJSON0MutationContext(ctx, tripKey, "UpdateTrip", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("getting current trip: %w", err)
+		}
+		return buildUpdateTripOperations(trip, req)
+	})
 	if err != nil {
-		return fmt.Errorf("getting current trip: %w", err)
+		return fmt.Errorf("applying operations: %w", err)
 	}
+
+	c.logger.WithField("tripKey", tripKey).Info("Successfully updated trip")
+	return nil
+}
+
+func buildUpdateTripOperations(trip *TripResponse, req UpdateTripRequest) ([]Operation, error) {
 	nextStartDate := trip.TripPlan.StartDate
 	if req.StartDate != "" {
 		nextStartDate = req.StartDate
@@ -205,14 +222,14 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 	}
 	if req.StartDate != "" || req.EndDate != "" {
 		if err := validateProspectiveDates(nextStartDate, nextEndDate); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// Build operations to replace fields
 	ops := []models.Operation{}
 
-	if req.Title != "" && req.Title != trip.TripPlan.Title {
+	if (req.Title != "" || req.ClearTitle) && req.Title != trip.TripPlan.Title {
 		ops = append(ops, models.ReplaceInObject(
 			[]interface{}{"title"},
 			trip.TripPlan.Title,
@@ -238,7 +255,7 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 	if nextStartDate != "" && nextEndDate != "" {
 		days, err := tripDays(nextStartDate, nextEndDate)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if days != trip.TripPlan.Days {
 			ops = append(ops, models.ReplaceInObject(
@@ -258,27 +275,9 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 	}
 
 	if len(ops) == 0 {
-		c.logger.Debug("No changes to apply")
-		return nil
+		return nil, nil
 	}
-
-	c.logger.WithFields(map[string]interface{}{
-		"tripKey":   tripKey,
-		"title":     req.Title,
-		"startDate": req.StartDate,
-		"endDate":   req.EndDate,
-		"privacy":   req.Privacy,
-		"numOps":    len(ops),
-	}).Debug("Updating trip via operations")
-
-	// Apply the operations
-	if err := c.ApplyOperations(tripKey, ops); err != nil {
-		return fmt.Errorf("applying operations: %w", err)
-	}
-
-	c.logger.WithField("tripKey", tripKey).Info("Successfully updated trip")
-
-	return nil
+	return ops, nil
 }
 
 func tripDays(startDate, endDate string) (int, error) {

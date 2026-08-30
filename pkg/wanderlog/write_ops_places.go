@@ -10,6 +10,11 @@ import (
 
 // RemovePlace removes a place from a trip section
 func (c *Client) RemovePlace(tripKey string, sectionID, placeID int) error {
+	return c.RemovePlaceContext(context.Background(), tripKey, sectionID, placeID)
+}
+
+// RemovePlaceContext removes a place and binds all network I/O to ctx.
+func (c *Client) RemovePlaceContext(ctx context.Context, tripKey string, sectionID, placeID int) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for removing places")
 	}
@@ -24,14 +29,14 @@ func (c *Client) RemovePlace(tripKey string, sectionID, placeID int) error {
 	var statusCode int
 	var respBody []byte
 	if sectionID > 0 {
-		resp, err := c.apiJSON(context.Background(), http.MethodDelete, fmt.Sprintf("tripPlans/%s/sections/%d/places", url.PathEscape(tripKey), sectionID), nil, body, true)
+		resp, err := c.apiJSON(ctx, http.MethodDelete, fmt.Sprintf("tripPlans/%s/sections/%d/places", url.PathEscape(tripKey), sectionID), nil, body, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
 		statusCode = resp.StatusCode
 		respBody = resp.Body
 	} else {
-		resp, err := c.apiJSON(context.Background(), http.MethodDelete, "tripPlans/"+url.PathEscape(tripKey)+"/sections/places", nil, body, true)
+		resp, err := c.apiJSON(ctx, http.MethodDelete, "tripPlans/"+url.PathEscape(tripKey)+"/sections/places", nil, body, true)
 		if err != nil {
 			return fmt.Errorf("making request: %w", err)
 		}
@@ -53,6 +58,11 @@ func (c *Client) RemovePlace(tripKey string, sectionID, placeID int) error {
 
 // ApplyOperations applies a batch of operations to a trip (for complex edits)
 func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
+	return c.ApplyOperationsContext(context.Background(), tripKey, ops)
+}
+
+// ApplyOperationsContext applies operations and binds the request to ctx.
+func (c *Client) ApplyOperationsContext(ctx context.Context, tripKey string, ops []Operation) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for applying operations")
 	}
@@ -67,7 +77,7 @@ func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
 		"operations": len(ops),
 	}).Debug("Applying operations to trip")
 
-	resp, err := c.apiRequest(context.Background(), http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/applyOps", nil, reqBody, true)
+	resp, err := c.apiRequest(ctx, http.MethodPost, "tripPlans/"+url.PathEscape(tripKey)+"/applyOps", nil, reqBody, true)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
@@ -93,29 +103,35 @@ func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
 
 // ClearSectionBlocks removes all blocks from a specific section using operational transforms
 func (c *Client) ClearSectionBlocks(tripKey string, sectionID int) error {
+	return c.ClearSectionBlocksContext(context.Background(), tripKey, sectionID)
+}
+
+// ClearSectionBlocksContext clears a section and binds all network I/O to ctx.
+func (c *Client) ClearSectionBlocksContext(ctx context.Context, tripKey string, sectionID int) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for clearing section blocks")
 	}
 
-	trip, err := c.GetTripRaw(tripKey)
-	if err != nil {
-		return fmt.Errorf("getting current trip: %w", err)
-	}
-	sectionIdx, section, err := findRawItinerarySection(trip, sectionID)
-	if err != nil {
-		return err
-	}
-	oldBlocks, err := rawBlocks(section)
-	if err != nil {
-		return fmt.Errorf("section %d: %w", sectionID, err)
-	}
-	if len(oldBlocks) == 0 {
-		return nil
-	}
+	err := c.retryJSON0MutationContext(ctx, tripKey, "ClearSectionBlocks", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("getting current trip: %w", err)
+		}
+		sectionIdx, section, err := findRawItinerarySection(trip, sectionID)
+		if err != nil {
+			return nil, err
+		}
+		oldBlocks, err := rawBlocks(section)
+		if err != nil {
+			return nil, fmt.Errorf("section %d: %w", sectionID, err)
+		}
+		if len(oldBlocks) == 0 {
+			return nil, nil
+		}
 
-	clearOp := ReplaceInObject([]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, []any{})
-
-	err = c.ApplyOperations(tripKey, []Operation{clearOp})
+		clearOp := ReplaceInObject([]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, []any{})
+		return []Operation{clearOp}, nil
+	})
 	if err != nil {
 		return fmt.Errorf("failed to clear section blocks: %w", err)
 	}
@@ -130,27 +146,31 @@ func (c *Client) ClearSectionBlocks(tripKey string, sectionID int) error {
 
 // DeleteSection removes an entire section from a trip using operational transforms
 func (c *Client) DeleteSection(tripKey string, sectionID int) error {
+	return c.DeleteSectionContext(context.Background(), tripKey, sectionID)
+}
+
+// DeleteSectionContext deletes a section and binds all network I/O to ctx.
+func (c *Client) DeleteSectionContext(ctx context.Context, tripKey string, sectionID int) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for deleting sections")
 	}
 
-	trip, err := c.GetTripRaw(tripKey)
-	if err != nil {
-		return fmt.Errorf("getting current trip: %w", err)
-	}
-	sectionIdx, oldSection, err := findRawItinerarySection(trip, sectionID)
-	if err != nil {
-		return err
-	}
+	err := c.retryJSON0MutationContext(ctx, tripKey, "DeleteSection", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("getting current trip: %w", err)
+		}
+		sectionIdx, oldSection, err := findRawItinerarySection(trip, sectionID)
+		if err != nil {
+			return nil, err
+		}
 
-	// Create an operation to remove the section
-	deleteOp := DeleteFromList(
-		[]any{"itinerary", "sections"},
-		sectionIdx,
-		oldSection,
-	)
-
-	err = c.ApplyOperations(tripKey, []Operation{deleteOp})
+		return []Operation{DeleteFromList(
+			[]any{"itinerary", "sections"},
+			sectionIdx,
+			oldSection,
+		)}, nil
+	})
 	if err != nil {
 		return fmt.Errorf("failed to delete section: %w", err)
 	}
@@ -166,57 +186,71 @@ func (c *Client) DeleteSection(tripKey string, sectionID int) error {
 // NukeTripPlaces removes all place blocks from all sections in a trip using operational transforms
 // This function first fetches the trip to determine which sections exist, then clears them
 func (c *Client) NukeTripPlaces(tripKey string) error {
+	return c.NukeTripPlacesContext(context.Background(), tripKey)
+}
+
+// NukeTripPlacesContext removes all place blocks and binds all network I/O to ctx.
+func (c *Client) NukeTripPlacesContext(ctx context.Context, tripKey string) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for nuking trip places")
 	}
 
-	trip, err := c.GetTripRaw(tripKey)
-	if err != nil {
-		return fmt.Errorf("failed to fetch trip: %w", err)
-	}
-
-	sections, err := rawItinerarySections(trip)
-	if err != nil {
-		return err
-	}
-	operations := make([]Operation, 0, len(sections)+1)
 	removedPlaces := 0
-	for sectionIdx, sectionAny := range sections {
-		section, ok := sectionAny.(map[string]any)
-		if !ok {
-			return fmt.Errorf("itinerary section %d has unexpected type %T", sectionIdx, sectionAny)
-		}
-		oldBlocks, err := rawBlocks(section)
+	didWork := false
+	err := c.retryJSON0MutationContext(ctx, tripKey, "NukeTripPlaces", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
 		if err != nil {
-			return fmt.Errorf("itinerary section %d: %w", sectionIdx, err)
+			return nil, fmt.Errorf("failed to fetch trip: %w", err)
 		}
-		newBlocks := make([]any, 0, len(oldBlocks))
-		for _, block := range oldBlocks {
-			if rawBlockIsPlace(block) {
-				removedPlaces++
-				continue
-			}
-			newBlocks = append(newBlocks, block)
-		}
-		if len(newBlocks) != len(oldBlocks) {
-			operations = append(operations, ReplaceInObject(
-				[]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, newBlocks,
-			))
-		}
-	}
 
-	if resources, ok := trip["resources"].(map[string]any); ok {
-		if metadata, exists := resources["placeMetadata"]; exists && !rawContainerEmpty(metadata) {
-			emptyMetadata, err := emptyRawContainer(metadata)
-			if err != nil {
-				return fmt.Errorf("resources.placeMetadata: %w", err)
-			}
-			operations = append(operations, ReplaceInObject(
-				[]any{"resources", "placeMetadata"}, metadata, emptyMetadata,
-			))
+		sections, err := rawItinerarySections(trip)
+		if err != nil {
+			return nil, err
 		}
+		operations := make([]Operation, 0, len(sections)+1)
+		removedPlaces = 0
+		for sectionIdx, sectionAny := range sections {
+			section, ok := sectionAny.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("itinerary section %d has unexpected type %T", sectionIdx, sectionAny)
+			}
+			oldBlocks, err := rawBlocks(section)
+			if err != nil {
+				return nil, fmt.Errorf("itinerary section %d: %w", sectionIdx, err)
+			}
+			newBlocks := make([]any, 0, len(oldBlocks))
+			for _, block := range oldBlocks {
+				if rawBlockIsPlace(block) {
+					removedPlaces++
+					continue
+				}
+				newBlocks = append(newBlocks, block)
+			}
+			if len(newBlocks) != len(oldBlocks) {
+				operations = append(operations, ReplaceInObject(
+					[]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, newBlocks,
+				))
+			}
+		}
+
+		if resources, ok := trip["resources"].(map[string]any); ok {
+			if metadata, exists := resources["placeMetadata"]; exists && !rawContainerEmpty(metadata) {
+				emptyMetadata, err := emptyRawContainer(metadata)
+				if err != nil {
+					return nil, fmt.Errorf("resources.placeMetadata: %w", err)
+				}
+				operations = append(operations, ReplaceInObject(
+					[]any{"resources", "placeMetadata"}, metadata, emptyMetadata,
+				))
+			}
+		}
+		didWork = len(operations) > 0
+		return operations, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to nuke trip places: %w", err)
 	}
-	if len(operations) == 0 {
+	if !didWork {
 		c.logger.WithField("tripKey", tripKey).Info("No place blocks found in trip, nothing to clear")
 		return nil
 	}
@@ -225,11 +259,6 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 		"tripKey":       tripKey,
 		"placesRemoved": removedPlaces,
 	}).Debug("Removing place blocks from trip")
-
-	err = c.ApplyOperations(tripKey, operations)
-	if err != nil {
-		return fmt.Errorf("failed to nuke trip places: %w", err)
-	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"tripKey": tripKey,
@@ -241,21 +270,23 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 
 // MovePlace moves a place from one section to another at a specific position
 func (c *Client) MovePlace(tripKey string, placeID, fromSectionID, toSectionID, position int) error {
+	return c.MovePlaceContext(context.Background(), tripKey, placeID, fromSectionID, toSectionID, position)
+}
+
+// MovePlaceContext moves a place and binds all network I/O to ctx.
+func (c *Client) MovePlaceContext(ctx context.Context, tripKey string, placeID, fromSectionID, toSectionID, position int) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for moving places")
 	}
 
-	trip, err := c.GetTripRaw(tripKey)
+	err := c.retryJSON0MutationContext(ctx, tripKey, "MovePlace", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("getting current trip: %w", err)
+		}
+		return movePlaceRawOperations(trip, placeID, fromSectionID, toSectionID, position)
+	})
 	if err != nil {
-		return fmt.Errorf("getting current trip: %w", err)
-	}
-
-	ops, err := movePlaceRawOperations(trip, placeID, fromSectionID, toSectionID, position)
-	if err != nil {
-		return err
-	}
-
-	if err := c.ApplyOperations(tripKey, ops); err != nil {
 		return fmt.Errorf("applying move operations: %w", err)
 	}
 
@@ -272,21 +303,23 @@ func (c *Client) MovePlace(tripKey string, placeID, fromSectionID, toSectionID, 
 
 // ReorderPlaces reorders places within a section by replacing the blocks list
 func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) error {
+	return c.ReorderPlacesContext(context.Background(), tripKey, sectionID, placeIDs)
+}
+
+// ReorderPlacesContext reorders places and binds all network I/O to ctx.
+func (c *Client) ReorderPlacesContext(ctx context.Context, tripKey string, sectionID int, placeIDs []int) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for reordering places")
 	}
 
-	trip, err := c.GetTripRaw(tripKey)
+	err := c.retryJSON0MutationContext(ctx, tripKey, "ReorderPlaces", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("getting current trip: %w", err)
+		}
+		return reorderPlacesRawOperations(trip, sectionID, placeIDs)
+	})
 	if err != nil {
-		return fmt.Errorf("getting current trip: %w", err)
-	}
-
-	ops, err := reorderPlacesRawOperations(trip, sectionID, placeIDs)
-	if err != nil {
-		return err
-	}
-
-	if err := c.ApplyOperations(tripKey, ops); err != nil {
 		return fmt.Errorf("applying reorder operations: %w", err)
 	}
 
@@ -301,6 +334,11 @@ func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) er
 
 // UpdatePlaceVisitTime sets the displayed visit time for a place block.
 func (c *Client) UpdatePlaceVisitTime(tripKey string, sectionID, placeID int, startTime, endTime string) error {
+	return c.UpdatePlaceVisitTimeContext(context.Background(), tripKey, sectionID, placeID, startTime, endTime)
+}
+
+// UpdatePlaceVisitTimeContext updates visit times and binds all network I/O to ctx.
+func (c *Client) UpdatePlaceVisitTimeContext(ctx context.Context, tripKey string, sectionID, placeID int, startTime, endTime string) error {
 	if c.auth == nil {
 		return fmt.Errorf("authentication required for updating place visit time")
 	}
@@ -314,16 +352,14 @@ func (c *Client) UpdatePlaceVisitTime(tripKey string, sectionID, placeID int, st
 		return fmt.Errorf("end_time: %w", err)
 	}
 
-	trip, err := c.GetTripRaw(tripKey)
+	err := c.retryJSON0MutationContext(ctx, tripKey, "UpdatePlaceVisitTime", func(ctx context.Context) ([]Operation, error) {
+		trip, err := c.GetTripRawContext(ctx, tripKey)
+		if err != nil {
+			return nil, fmt.Errorf("getting current trip: %w", err)
+		}
+		return updatePlaceVisitTimeRawOperations(trip, sectionID, placeID, startTime, endTime)
+	})
 	if err != nil {
-		return fmt.Errorf("getting current trip: %w", err)
-	}
-
-	ops, err := updatePlaceVisitTimeRawOperations(trip, sectionID, placeID, startTime, endTime)
-	if err != nil {
-		return err
-	}
-	if err := c.ApplyOperations(tripKey, ops); err != nil {
 		return fmt.Errorf("applying visit time operations: %w", err)
 	}
 

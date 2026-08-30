@@ -3,7 +3,6 @@ package wanderlog
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 )
 
 // decodeOptionalMutationBody is for endpoints whose successful response is
@@ -21,14 +20,10 @@ func decodeOptionalMutationBody(opName string, statusCode int, body []byte) erro
 // the API can report failures as {"success":false} with HTTP 200.
 func decodeMutationBody(opName string, statusCode int, body []byte, out any) error {
 	if statusCode < 200 || statusCode >= 300 {
-		bodyText := string(body)
-		if msg, ok := knownWanderlogServerError(opName, bodyText); ok {
-			return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, msg)
-		}
-		return fmt.Errorf("%s: HTTP %d: %s", opName, statusCode, truncateForLog(bodyText, 500))
+		return apiHTTPError(opName, statusCode, body)
 	}
 	if len(body) == 0 {
-		return fmt.Errorf("%s: empty mutation response", opName)
+		return newAPIError(opName, statusCode, "empty mutation response", body, nil)
 	}
 
 	var envelope struct {
@@ -38,10 +33,10 @@ func decodeMutationBody(opName string, statusCode int, body []byte, out any) err
 		Messages []any  `json:"messages"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return fmt.Errorf("%s: decoding mutation response: %w", opName, err)
+		return newAPIError(opName, statusCode, "decoding mutation response: "+err.Error(), body, err)
 	}
 	if envelope.Success == nil {
-		return fmt.Errorf("%s: mutation response is missing boolean success", opName)
+		return newAPIError(opName, statusCode, "mutation response is missing boolean success", body, nil)
 	}
 	if !*envelope.Success {
 		message := envelope.Message
@@ -64,11 +59,11 @@ func decodeMutationBody(opName string, statusCode int, body []byte, out any) err
 		if message == "" {
 			message = "API returned success=false"
 		}
-		return fmt.Errorf("%s: %s", opName, message)
+		return newAPIError(opName, statusCode, message, body, nil)
 	}
 	if out != nil {
 		if err := json.Unmarshal(body, out); err != nil {
-			return fmt.Errorf("%s: decoding response: %w", opName, err)
+			return newAPIError(opName, statusCode, "decoding response: "+err.Error(), body, err)
 		}
 	}
 	return nil
