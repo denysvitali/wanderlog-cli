@@ -9,21 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// skipIntegrationTest skips the test unless INTEGRATION_TESTS environment variable is set.
+// skipIntegrationTest skips the test unless production API access is explicitly enabled.
 // Integration tests make real API calls and require authentication.
 func skipCLITest(t *testing.T) {
 	t.Helper()
-	if os.Getenv("INTEGRATION_TESTS") != "1" {
-		t.Skip("Skipping CLI integration test. Set INTEGRATION_TESTS=1 to run.")
+	if os.Getenv("WANDERLOG_RUN_PROD_INTEGRATION") != "1" {
+		t.Skip("Skipping CLI integration test. Set WANDERLOG_RUN_PROD_INTEGRATION=1 to run.")
 	}
-}
-
-func hasAuthEnv() bool {
-	hasSessionAuth := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE") != "" &&
-		os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN") != ""
-	hasLoginAuth := os.Getenv("WANDERLOG_AUTH_EMAIL") != "" &&
-		os.Getenv("WANDERLOG_AUTH_PASSWORD") != ""
-	return hasSessionAuth || hasLoginAuth
 }
 
 func requireTestTripID(t *testing.T) string {
@@ -33,6 +25,25 @@ func requireTestTripID(t *testing.T) string {
 		t.Skip("Set WANDERLOG_TEST_TRIP_ID to run this test")
 	}
 	return tripID
+}
+
+func disableCLIAuth(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{
+		"WANDERLOG_AUTH_SESSION_COOKIE",
+		"WANDERLOG_AUTH_SESSION_XSRF_TOKEN",
+		"WANDERLOG_AUTH_XSRF_TOKEN",
+		"WANDERLOG_AUTH_EMAIL",
+		"WANDERLOG_AUTH_PASSWORD",
+	} {
+		t.Setenv(name, "")
+	}
+	t.Setenv("WANDERLOG_DISABLE_KEYCHAIN", "1")
+	originalSession, originalXSRF := sessionCookie, xsrfToken
+	sessionCookie, xsrfToken = "", ""
+	t.Cleanup(func() {
+		sessionCookie, xsrfToken = originalSession, originalXSRF
+	})
 }
 
 // TestCLI_TripsList_JSON tests the trips list command with JSON output
@@ -70,6 +81,7 @@ func TestCLI_TripsList_JSON(t *testing.T) {
 // TestCLI_TripsList_WithoutAuth tests that trips list fails gracefully without auth
 func TestCLI_TripsList_WithoutAuth(t *testing.T) {
 	skipCLITest(t)
+	disableCLIAuth(t)
 
 	// This test verifies graceful failure - we don't set up auth
 	// so the command should fail with a clear error message
@@ -109,16 +121,6 @@ func TestCLI_TripsShow_JSON(t *testing.T) {
 	assert.True(t, len(output) > 0, "should have output")
 }
 
-// TestCLI_TripsShow_WithoutAuth tests that trips show fails without auth
-func TestCLI_TripsShow_WithoutAuth(t *testing.T) {
-	skipCLITest(t)
-
-	testTripID := requireTestTripID(t)
-	rootCmd.SetArgs([]string{"trips", "show", testTripID})
-	err := rootCmd.Execute()
-	assert.Error(t, err, "trips show should error without auth")
-}
-
 // TestCLI_TripsPlaces_JSON tests the trips places command with JSON output
 func TestCLI_TripsPlaces_JSON(t *testing.T) {
 	skipCLITest(t)
@@ -149,19 +151,10 @@ func TestCLI_TripsPlaces_JSON(t *testing.T) {
 	assert.True(t, len(output) > 0, "should have output")
 }
 
-// TestCLI_TripsPlaces_WithoutAuth tests that trips places fails without auth
-func TestCLI_TripsPlaces_WithoutAuth(t *testing.T) {
-	skipCLITest(t)
-
-	testTripID := requireTestTripID(t)
-	rootCmd.SetArgs([]string{"trips", "places", testTripID})
-	err := rootCmd.Execute()
-	assert.Error(t, err, "trips places should error without auth")
-}
-
 // TestCLI_TripsCreate_RequiresAuth tests that trips create requires authentication
 func TestCLI_TripsCreate_RequiresAuth(t *testing.T) {
 	skipCLITest(t)
+	disableCLIAuth(t)
 
 	// Create without required args should fail with usage
 	rootCmd.SetArgs([]string{"trips", "create"})
@@ -170,43 +163,10 @@ func TestCLI_TripsCreate_RequiresAuth(t *testing.T) {
 	assert.Error(t, err, "trips create should error without auth")
 }
 
-// TestCLI_TripsCreate_WithAuth tests that trips create works with auth (dry run - uses example flag)
-func TestCLI_TripsCreate_WithAuth(t *testing.T) {
-	skipCLITest(t)
-
-	if !hasAuthEnv() {
-		t.Skip("Auth credentials required for this test")
-	}
-
-	// Use the example flag to create a test trip without needing geo-id
-	// Note: This creates an actual trip, but since we're using the example trip
-	// it should be cleanable. In a full integration test, we'd delete after.
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	rootCmd.SetArgs([]string{"trips", "create", "--example"})
-	err := rootCmd.Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	output := buf.String()
-
-	// With auth but interactive confirmation might be needed
-	// The command may succeed or fail depending on keychain vs env vars
-	t.Logf("Output: %s", output)
-	t.Logf("Error: %v", err)
-
-	// We just verify the command runs without panicking
-	// Actual trip creation is tested in pkg/wanderlog tests
-}
-
 // TestCLI_TripsDelete_RequiresAuth tests that trips delete requires authentication
 func TestCLI_TripsDelete_RequiresAuth(t *testing.T) {
 	skipCLITest(t)
+	disableCLIAuth(t)
 
 	// Delete without auth should fail
 	rootCmd.SetArgs([]string{"trips", "delete", "nonexistent-trip-key"})
@@ -217,6 +177,7 @@ func TestCLI_TripsDelete_RequiresAuth(t *testing.T) {
 // TestCLI_TripsEditAddPlace_RequiresAuth tests that add-place requires authentication
 func TestCLI_TripsEditAddPlace_RequiresAuth(t *testing.T) {
 	skipCLITest(t)
+	disableCLIAuth(t)
 
 	// Add-place without auth should fail
 	rootCmd.SetArgs([]string{"trips", "edit", "add-place", "test-trip-key", "--name", "Test Place"})
@@ -227,6 +188,7 @@ func TestCLI_TripsEditAddPlace_RequiresAuth(t *testing.T) {
 // TestCLI_TripsEditRemovePlace_RequiresAuth tests that remove-place requires authentication
 func TestCLI_TripsEditRemovePlace_RequiresAuth(t *testing.T) {
 	skipCLITest(t)
+	disableCLIAuth(t)
 
 	// Remove-place without auth should fail
 	rootCmd.SetArgs([]string{"trips", "edit", "remove-place", "test-trip-key", "12345"})

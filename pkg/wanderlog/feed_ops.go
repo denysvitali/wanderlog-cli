@@ -191,12 +191,12 @@ func (c *Client) SearchGeos() (*GeoSearchResult, error) {
 	citiesBody := citiesResp.Body
 
 	var parsedCountries geoListResponse
-	if err := json.Unmarshal(countriesBody, &parsedCountries); err != nil {
-		return nil, fmt.Errorf("SearchGeos: parsing countries: %w", err)
+	if err := decodeAPIBody("SearchGeos (countries)", countriesResp.StatusCode, countriesBody, &parsedCountries); err != nil {
+		return nil, err
 	}
 	var parsedCities geoListResponse
-	if err := json.Unmarshal(citiesBody, &parsedCities); err != nil {
-		return nil, fmt.Errorf("SearchGeos: parsing cities: %w", err)
+	if err := decodeAPIBody("SearchGeos (cities)", citiesResp.StatusCode, citiesBody, &parsedCities); err != nil {
+		return nil, err
 	}
 
 	return &GeoSearchResult{Countries: parsedCountries.Data, Cities: parsedCities.Data}, nil

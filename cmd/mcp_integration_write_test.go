@@ -193,13 +193,13 @@ func getDatedItinerarySectionID(t *testing.T, tripID string) int {
 	return 0
 }
 
-// skipIntegrationTest skips the test unless INTEGRATION_TESTS environment variable is set.
+// skipIntegrationTest skips the test unless production API access is explicitly enabled.
 // Integration tests make real API calls and require authentication.
-// To run integration tests: INTEGRATION_TESTS=1 go test ./cmd -v
+// To run integration tests: WANDERLOG_RUN_PROD_INTEGRATION=1 go test ./cmd -v
 func skipIntegrationTest(t *testing.T) {
 	t.Helper()
-	if os.Getenv("INTEGRATION_TESTS") != "1" {
-		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
+	if os.Getenv("WANDERLOG_RUN_PROD_INTEGRATION") != "1" {
+		t.Skip("Skipping integration test. Set WANDERLOG_RUN_PROD_INTEGRATION=1 to run.")
 	}
 	if os.Getenv("CI") == "true" && !hasIntegrationAuthEnv() {
 		t.Skip("Skipping authenticated integration test. Configure Wanderlog auth secrets to run in CI.")
@@ -211,8 +211,8 @@ func skipIntegrationTest(t *testing.T) {
 
 func skipAuthenticatedIntegrationTest(t *testing.T) {
 	t.Helper()
-	if os.Getenv("INTEGRATION_TESTS") != "1" {
-		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
+	if os.Getenv("WANDERLOG_RUN_PROD_INTEGRATION") != "1" {
+		t.Skip("Skipping integration test. Set WANDERLOG_RUN_PROD_INTEGRATION=1 to run.")
 	}
 	if os.Getenv("CI") == "true" && !hasIntegrationAuthEnv() {
 		t.Skip("Skipping authenticated integration test. Configure Wanderlog auth secrets to run in CI.")

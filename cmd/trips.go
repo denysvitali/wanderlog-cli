@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -28,29 +27,29 @@ Requires authentication via 'wanderlog login'.
 Examples:
   wanderlog trips list
   wanderlog trips list --output json`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		trips, err := client.GetUserTrips()
+		trips, err := client.GetUserTripsContext(cmd.Context())
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch trips")
-			os.Exit(1)
+			return fmt.Errorf("fetch trips: %w", err)
 		}
 
 		switch outputFormat {
 		case "json":
-			ui.PrintJSON(trips)
+			return ui.PrintJSON(trips)
 		case "markdown", "md":
 			tripsListMarkdown(trips)
 		default:
 			tripsListPretty(trips)
 		}
+		return nil
 	},
 }
 
@@ -76,36 +75,35 @@ Examples:
 		}
 		return nil
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var trip *wanderlog.TripResponse
 		var err error
 
 		if fromFile != "" {
 			trip, err = wanderlog.LoadTripFromFile(fromFile)
 			if err != nil {
-				logger.WithError(err).Error("Failed to load trip from file")
-				os.Exit(1)
+				return fmt.Errorf("load trip from file: %w", err)
 			}
 		} else {
 			tripID := args[0]
 			client := wanderlog.NewClient()
 			client.SetLogger(logger)
 
-			trip, err = client.GetTrip(tripID)
+			trip, err = client.GetTripContext(cmd.Context(), tripID)
 			if err != nil {
-				logger.WithError(err).Error("Failed to fetch trip")
-				os.Exit(1)
+				return fmt.Errorf("fetch trip: %w", err)
 			}
 		}
 
 		switch outputFormat {
 		case "json":
-			ui.PrintJSON(trip)
+			return ui.PrintJSON(trip)
 		case "markdown", "md":
 			ui.PrintTripMarkdown(trip, showDetails)
 		default:
 			ui.PrintTrip(trip, showDetails)
 		}
+		return nil
 	},
 }
 
@@ -139,8 +137,8 @@ func tripsListPretty(trips *wanderlog.UserTripsResponse) {
 			privacy = "⭐"
 		}
 
-		fmt.Printf("%s %s\n", privacy, ui.PlaceStyle.Render(trip.Title))
-		fmt.Println(ui.IdStyle.Render(fmt.Sprintf("   Key: %s", trip.Key)))
+		fmt.Printf("%s %s\n", privacy, ui.PlaceStyle.Render(ui.SafeText(trip.Title)))
+		fmt.Println(ui.IdStyle.Render(fmt.Sprintf("   Key: %s", ui.SafeText(trip.Key))))
 
 		if trip.StartDate != "" && trip.EndDate != "" {
 			startDate, _ := time.Parse("2006-01-02", trip.StartDate)
@@ -178,10 +176,10 @@ func tripsListMarkdown(trips *wanderlog.UserTripsResponse) {
 	fmt.Printf("Total trips: %d\n\n", len(trips.Data))
 
 	for _, trip := range trips.Data {
-		fmt.Printf("## %s\n\n", trip.Title)
+		fmt.Printf("## %s\n\n", ui.MarkdownInline(trip.Title))
 
-		fmt.Printf("- **Trip Key:** %s\n", trip.Key)
-		fmt.Printf("- **Type:** %s\n", trip.Type)
+		fmt.Printf("- **Trip Key:** %s\n", ui.MarkdownInline(trip.Key))
+		fmt.Printf("- **Type:** %s\n", ui.MarkdownInline(trip.Type))
 
 		if trip.StartDate != "" && trip.EndDate != "" {
 			startDate, _ := time.Parse("2006-01-02", trip.StartDate)

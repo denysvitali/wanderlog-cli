@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -29,36 +28,35 @@ Examples:
 		}
 		return nil
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var trip *wanderlog.TripResponse
 		var err error
 
 		if fromFile != "" {
 			trip, err = wanderlog.LoadTripFromFile(fromFile)
 			if err != nil {
-				logger.WithError(err).Error("Failed to load trip from file")
-				os.Exit(1)
+				return fmt.Errorf("load trip from file: %w", err)
 			}
 		} else {
 			tripID := args[0]
 			client := wanderlog.NewClient()
 			client.SetLogger(logger)
 
-			trip, err = client.GetTrip(tripID)
+			trip, err = client.GetTripContext(cmd.Context(), tripID)
 			if err != nil {
-				logger.WithError(err).Error("Failed to fetch trip")
-				os.Exit(1)
+				return fmt.Errorf("fetch trip: %w", err)
 			}
 		}
 
 		switch outputFormat {
 		case "json":
-			ui.PrintJSON(trip.Resources.PlaceMetadata)
+			return ui.PrintJSON(trip.Resources.PlaceMetadata)
 		case "markdown", "md":
 			ui.PrintPlacesMarkdown(trip.Resources.PlaceMetadata)
 		default:
 			ui.PrintPlaces(trip.Resources.PlaceMetadata)
 		}
+		return nil
 	},
 }
 
@@ -71,7 +69,7 @@ Examples:
   wanderlog trips images abc123xyz
   wanderlog trips images abc123xyz --output json`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripID := args[0]
 
 		client := wanderlog.NewClient()
@@ -79,18 +77,18 @@ Examples:
 
 		images, err := client.GetTripImages(tripID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch trip images")
-			os.Exit(1)
+			return fmt.Errorf("fetch trip images: %w", err)
 		}
 
 		switch outputFormat {
 		case "json":
-			ui.PrintJSON(images)
+			return ui.PrintJSON(images)
 		case "markdown", "md":
 			tripsImagesMarkdown(images, tripID)
 		default:
 			tripsImagesPretty(images, tripID)
 		}
+		return nil
 	},
 }
 
@@ -102,24 +100,25 @@ var tripsExpensesCmd = &cobra.Command{
 Examples:
   wanderlog trips expenses abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		csv, err := client.GetTripExpensesCSV(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch expenses CSV")
-			os.Exit(1)
+			return fmt.Errorf("fetch expenses CSV: %w", err)
 		}
-		_, _ = os.Stdout.Write(csv)
+		if _, err := cmd.OutOrStdout().Write(csv); err != nil {
+			return fmt.Errorf("write expenses CSV: %w", err)
+		}
 		if len(csv) > 0 && csv[len(csv)-1] != '\n' {
-			fmt.Println()
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
 		}
+		return nil
 	},
 }
 
@@ -133,14 +132,13 @@ func init() {
 	tripsImagesCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	tripsImagesCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 
-	tripsExpensesCmd.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format")
 	tripsExpensesCmd.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 	tripsExpensesCmd.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 }
 
 func tripsImagesPretty(images *wanderlog.TripImagesResponse, tripID string) {
 	if len(images.Images) == 0 {
-		fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("📷 No images found for trip %s", tripID)))
+		fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("📷 No images found for trip %s", ui.SafeText(tripID))))
 		return
 	}
 
@@ -148,17 +146,17 @@ func tripsImagesPretty(images *wanderlog.TripImagesResponse, tripID string) {
 	fmt.Println()
 
 	for i, img := range images.Images {
-		fmt.Printf("%d. %s\n", i+1, ui.PlaceStyle.Render(img.Key))
+		fmt.Printf("%d. %s\n", i+1, ui.PlaceStyle.Render(ui.SafeText(img.Key)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Size: %dx%d", img.Width, img.Height)))
 		if img.Caption != "" {
-			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Caption: %s", img.Caption)))
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Caption: %s", ui.SafeText(img.Caption))))
 		}
 		if img.PlaceID != "" {
-			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Place ID: %s", img.PlaceID)))
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Place ID: %s", ui.SafeText(img.PlaceID))))
 		}
-		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("   URL: %s", img.URL)))
+		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("   URL: %s", ui.SafeText(img.URL))))
 		if img.ThumbnailURL != "" {
-			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Thumbnail: %s", img.ThumbnailURL)))
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("   Thumbnail: %s", ui.SafeText(img.ThumbnailURL))))
 		}
 		fmt.Println()
 	}
@@ -166,22 +164,22 @@ func tripsImagesPretty(images *wanderlog.TripImagesResponse, tripID string) {
 
 func tripsImagesMarkdown(images *wanderlog.TripImagesResponse, tripID string) {
 	fmt.Printf("# Trip Images\n\n")
-	fmt.Printf("Trip ID: %s\n", tripID)
+	fmt.Printf("Trip ID: %s\n", ui.MarkdownInline(tripID))
 	fmt.Printf("Total images: %d\n\n", len(images.Images))
 
 	for i, img := range images.Images {
 		fmt.Printf("## Image %d\n\n", i+1)
-		fmt.Printf("- **Key:** %s\n", img.Key)
+		fmt.Printf("- **Key:** %s\n", ui.MarkdownInline(img.Key))
 		fmt.Printf("- **Size:** %dx%d\n", img.Width, img.Height)
 		if img.Caption != "" {
-			fmt.Printf("- **Caption:** %s\n", img.Caption)
+			fmt.Printf("- **Caption:** %s\n", ui.MarkdownInline(img.Caption))
 		}
 		if img.PlaceID != "" {
-			fmt.Printf("- **Place ID:** %s\n", img.PlaceID)
+			fmt.Printf("- **Place ID:** %s\n", ui.MarkdownInline(img.PlaceID))
 		}
-		fmt.Printf("- **URL:** %s\n", img.URL)
+		fmt.Printf("- **URL:** %s\n", ui.MarkdownInline(img.URL))
 		if img.ThumbnailURL != "" {
-			fmt.Printf("- **Thumbnail:** %s\n", img.ThumbnailURL)
+			fmt.Printf("- **Thumbnail:** %s\n", ui.MarkdownInline(img.ThumbnailURL))
 		}
 		fmt.Println()
 	}

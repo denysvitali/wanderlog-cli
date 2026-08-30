@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,7 +23,7 @@ var searchGoogleCmd = &cobra.Command{
 	Long:   `Deprecated alias. Search is always handled by Wanderlog's autocomplete API.`,
 	Hidden: true,
 	Args:   cobra.ExactArgs(1),
-	Run:    runSearchPlaces,
+	RunE:   runSearchPlaces,
 }
 
 var searchWanderlogCmd = &cobra.Command{
@@ -37,7 +36,7 @@ Examples:
   wanderlog search places "Eiffel Tower"
   wanderlog search places "Tokyo Station" --lat 35.6812 --lng 139.7671`,
 	Args: cobra.ExactArgs(1),
-	Run:  runSearchPlaces,
+	RunE: runSearchPlaces,
 }
 
 var searchPlaceDetailsCmd = &cobra.Command{
@@ -48,7 +47,7 @@ var searchPlaceDetailsCmd = &cobra.Command{
 Examples:
   wanderlog search place-details ChIJLU7jZClu5kcR4PcOOO6p3I0`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		placeID := args[0]
 
 		client := wanderlog.NewClient()
@@ -60,17 +59,15 @@ Examples:
 
 		details, err := client.GetPlaceDetails(placeID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting place details: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("get place details: %w", err)
 		}
 
 		switch outputFormat {
 		case "json":
-			encoder := json.NewEncoder(os.Stdout)
+			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", "  ")
 			if err := encoder.Encode(details); err != nil {
-				fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("encode JSON: %w", err)
 			}
 		default:
 			fmt.Println(ui.TitleStyle.Render(fmt.Sprintf("📍 %s", details.Data.Details.Name)))
@@ -120,6 +117,7 @@ Examples:
 			fmt.Println()
 			fmt.Println(ui.DimStyle.Render(fmt.Sprintf("📍 Coordinates: %.6f, %.6f", coords.Lat, coords.Lng)))
 		}
+		return nil
 	},
 }
 
@@ -136,10 +134,10 @@ Examples:
   wanderlog search geos Japan
   wanderlog search geos Tokyo --limit 5`,
 	Args: cobra.ExactArgs(1),
-	Run:  runSearchGeos,
+	RunE: runSearchGeos,
 }
 
-func runSearchGeos(cmd *cobra.Command, args []string) {
+func runSearchGeos(cmd *cobra.Command, args []string) error {
 	query := args[0]
 
 	limit, _ := cmd.Flags().GetInt("limit")
@@ -153,8 +151,7 @@ func runSearchGeos(cmd *cobra.Command, args []string) {
 
 	result, err := client.SearchGeos()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error searching geos: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("search geos: %w", err)
 	}
 
 	if limit <= 0 {
@@ -183,7 +180,7 @@ func runSearchGeos(cmd *cobra.Command, args []string) {
 
 	switch outputFormat {
 	case "json":
-		encoder := json.NewEncoder(os.Stdout)
+		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(map[string]any{
 			"success": true,
@@ -191,13 +188,12 @@ func runSearchGeos(cmd *cobra.Command, args []string) {
 			"count":   len(matches),
 			"geos":    matches,
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("encode JSON: %w", err)
 		}
 	default:
 		if len(matches) == 0 {
 			fmt.Printf("No geos found matching: %s\n", query)
-			return
+			return nil
 		}
 
 		fmt.Printf("Found %d geo(s) matching %q:\n\n", len(matches), query)
@@ -207,6 +203,7 @@ func runSearchGeos(cmd *cobra.Command, args []string) {
 		fmt.Println()
 		fmt.Println("Use geo_id with: wanderlog create trip --geo-id <id> ...")
 	}
+	return nil
 }
 
 type geoIDNameMatch struct {

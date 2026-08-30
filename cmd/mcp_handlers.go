@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -2116,7 +2117,9 @@ func cloneMap(value map[string]any) (map[string]any, error) {
 		return nil, err
 	}
 	var cloned map[string]any
-	if err := json.Unmarshal(data, &cloned); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&cloned); err != nil {
 		return nil, err
 	}
 	return cloned, nil

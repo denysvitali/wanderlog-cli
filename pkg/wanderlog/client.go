@@ -9,14 +9,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	ClientVersion    = "2"
-	DefaultUserAgent = "wanderlog-cli/1.0"
+	ClientVersion           = "2"
+	DefaultUserAgent        = "wanderlog-cli/1.0"
+	MaxAPIResponseBodyBytes = 10 << 20
 )
 
 var (
@@ -33,11 +35,65 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:       30 * time.Second,
+			CheckRedirect: sameOriginRedirectPolicy,
 		},
 		logger:    logrus.New(),
 		userAgent: DefaultUserAgent,
 	}
+}
+
+func sameOriginRedirectPolicy(req *http.Request, via []*http.Request) error {
+	if len(via) == 0 || sameOriginURL(via[0].URL, req.URL) {
+		return nil
+	}
+	for _, previous := range via {
+		if requestHasSensitiveHeaders(previous) {
+			return fmt.Errorf("refusing cross-origin redirect from %s to %s", urlOrigin(via[0].URL), urlOrigin(req.URL))
+		}
+	}
+	return nil
+}
+
+func urlOrigin(value *url.URL) string {
+	if value == nil {
+		return "<invalid>"
+	}
+	return (&url.URL{Scheme: value.Scheme, Host: value.Host}).String()
+}
+
+func requestHasSensitiveHeaders(req *http.Request) bool {
+	return req != nil && (req.Header.Get("Authorization") != "" || req.Header.Get("Cookie") != "" || req.Header.Get("X-XSRF-TOKEN") != "")
+}
+
+func sameOriginURL(a, b *url.URL) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
+}
+
+func readAPIResponseBody(body io.Reader) ([]byte, error) {
+	limited := io.LimitReader(body, MaxAPIResponseBodyBytes+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > MaxAPIResponseBodyBytes {
+		return data[:MaxAPIResponseBodyBytes], fmt.Errorf("response body exceeds %d bytes", MaxAPIResponseBodyBytes)
+	}
+	return data, nil
+}
+
+func ensureAuthOrigin(req *http.Request) error {
+	base, err := url.Parse(BaseURL)
+	if err != nil {
+		return fmt.Errorf("parsing Wanderlog API origin: %w", err)
+	}
+	if !sameOriginURL(base, req.URL) {
+		return fmt.Errorf("refusing to send authentication to non-Wanderlog origin %q", urlOrigin(req.URL))
+	}
+	return nil
 }
 
 func (c *Client) SetLogger(logger *logrus.Logger) {
@@ -65,6 +121,17 @@ func truncateForLog(s string, max int) string {
 // the CLI for endpoints discovered in the web/Android bundle before they have a
 // typed Go wrapper.
 func (c *Client) DoAPI(method, path string, body []byte, headers map[string]string, authenticated bool) (int, []byte, error) {
+	return c.DoAPIContext(context.Background(), method, path, body, headers, authenticated)
+}
+
+// DoAPIContext performs a raw Wanderlog API request using ctx. Canceling ctx
+// cancels the in-flight HTTP request. DoAPI remains available for callers that
+// do not need cancellation.
+func (c *Client) DoAPIContext(ctx context.Context, method, path string, body []byte, headers map[string]string, authenticated bool) (int, []byte, error) {
+	if ctx == nil {
+		return 0, nil, fmt.Errorf("creating request: nil context")
+	}
+
 	apiURL := path
 	if !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
 		trimmed := strings.TrimPrefix(path, "/")
@@ -77,7 +144,7 @@ func (c *Client) DoAPI(method, path string, body []byte, headers map[string]stri
 		reader = bytes.NewReader(body)
 	}
 
-	req, err := http.NewRequest(method, apiURL, reader)
+	req, err := http.NewRequestWithContext(ctx, method, apiURL, reader)
 	if err != nil {
 		return 0, nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -91,12 +158,11 @@ func (c *Client) DoAPI(method, path string, body []byte, headers map[string]stri
 	}
 
 	if authenticated {
+		if err := ensureAuthOrigin(req); err != nil {
+			return 0, nil, err
+		}
 		if err := c.addAuthHeaders(req); err != nil {
 			return 0, nil, fmt.Errorf("adding auth headers: %w", err)
-		}
-	} else if c.auth != nil {
-		if err := c.addAuthHeaders(req); err != nil {
-			return 0, nil, fmt.Errorf("adding optional auth headers: %w", err)
 		}
 	}
 
@@ -106,24 +172,30 @@ func (c *Client) DoAPI(method, path string, body []byte, headers map[string]stri
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readAPIResponseBody(resp.Body)
 	if err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("reading response body: %w", err)
+		return resp.StatusCode, respBody, fmt.Errorf("reading response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp.StatusCode, respBody, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, string(respBody))
+		return resp.StatusCode, respBody, fmt.Errorf("API returned status %d: %s - %s", resp.StatusCode, resp.Status, truncateForLog(string(respBody), 500))
 	}
 
 	return resp.StatusCode, respBody, nil
 }
 
 func (c *Client) GetTrip(key string) (*TripResponse, error) {
+	return c.GetTripContext(context.Background(), key)
+}
+
+// GetTripContext retrieves a trip using ctx. Canceling ctx cancels the
+// in-flight HTTP request.
+func (c *Client) GetTripContext(ctx context.Context, key string) (*TripResponse, error) {
 	c.logger.WithFields(logrus.Fields{
 		"tripKey": key,
 	}).Debug("GetTrip request details")
 
-	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(key), apiQuery(map[string]string{
+	resp, err := c.apiRequest(ctx, http.MethodGet, "tripPlans/"+url.PathEscape(key), apiQuery(map[string]string{
 		"clientSchemaVersion": ClientVersion,
 	}), nil, false)
 	if err != nil {
@@ -164,7 +236,7 @@ func (c *Client) GetTripRaw(key string) (map[string]any, error) {
 	}
 
 	var trip map[string]any
-	if err := decodeAPIBody("GetTrip", resp.StatusCode, resp.Body, &trip); err != nil {
+	if err := decodeAPIBodyPreserveNumbers("GetTrip", resp.StatusCode, resp.Body, &trip); err != nil {
 		return nil, err
 	}
 	if msg, ok := trip["error"].(string); ok && msg != "" {
@@ -175,11 +247,16 @@ func (c *Client) GetTripRaw(key string) (map[string]any, error) {
 
 // GetTripSections retrieves only the sections of a trip without the full trip data
 func (c *Client) GetTripSections(key string) ([]ItSections, error) {
+	return c.GetTripSectionsContext(context.Background(), key)
+}
+
+// GetTripSectionsContext retrieves a trip's sections using ctx.
+func (c *Client) GetTripSectionsContext(ctx context.Context, key string) ([]ItSections, error) {
 	c.logger.WithFields(logrus.Fields{
 		"tripKey": key,
 	}).Debug("GetTripSections request details")
 
-	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans/"+url.PathEscape(key)+"/sections", nil, nil, false)
+	resp, err := c.apiRequest(ctx, http.MethodGet, "tripPlans/"+url.PathEscape(key)+"/sections", nil, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
@@ -292,58 +369,73 @@ func (c *Client) searchWanderlogPlaces(query string, latitude, longitude *float6
 
 // SearchPlacesInTrips searches for places within the user's trips by query
 func (c *Client) SearchPlacesInTrips(query string) (*PlaceSearchResponse, error) {
-	c.logger.WithField("query", query).Debug("Searching places in user trips")
+	return c.SearchPlacesInTripsContext(context.Background(), query)
+}
 
-	// First get user trips
-	trips, err := c.GetUserTrips()
+// SearchPlacesInTripsContext searches trips with bounded concurrency. Failed
+// trips are reported as warnings instead of being silently omitted.
+func (c *Client) SearchPlacesInTripsContext(ctx context.Context, query string) (*PlaceSearchResponse, error) {
+	c.logger.WithField("query", query).Debug("Searching places in user trips")
+	trips, err := c.GetUserTripsContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user trips: %w", err)
 	}
 
-	var results []SearchResult
+	perTrip := make([][]SearchResult, len(trips.Data))
+	tripErrors := make([]error, len(trips.Data))
+	jobs := make(chan int, len(trips.Data))
+	for index := range trips.Data {
+		jobs <- index
+	}
+	close(jobs)
 
-	// Search through each trip's places
-	for _, tripData := range trips.Data {
-		trip, err := c.GetTrip(tripData.Key)
-		if err != nil {
-			c.logger.WithField("tripKey", tripData.Key).Debug("Failed to get trip details")
-			continue
-		}
-
-		// Search through place metadata
-		for _, place := range trip.Resources.PlaceMetadata {
-			if c.matchesQuery(place, query) {
-				result := SearchResult{
-					ID:         fmt.Sprintf("%d", place.ID),
-					Name:       place.Name,
-					Address:    place.Address,
-					PlaceID:    place.PlaceID,
-					Rating:     place.Rating,
-					Categories: place.Categories,
-					Website:    place.Website,
+	workerCount := min(len(trips.Data), 6)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				tripData := trips.Data[index]
+				trip, tripErr := c.GetTripContext(ctx, tripData.Key)
+				if tripErr != nil {
+					tripErrors[index] = tripErr
+					continue
 				}
-
-				// Set description from generated or regular description
-				if place.GeneratedDescription != nil && *place.GeneratedDescription != "" {
-					result.Description = *place.GeneratedDescription
-				} else if place.Description != nil && *place.Description != "" {
-					result.Description = *place.Description
+				for _, place := range trip.Resources.PlaceMetadata {
+					if !c.matchesQuery(place, query) {
+						continue
+					}
+					result := SearchResult{
+						ID: fmt.Sprintf("%d", place.ID), Name: place.Name, Address: place.Address,
+						PlaceID: place.PlaceID, Rating: place.Rating, Categories: place.Categories, Website: place.Website,
+					}
+					if place.GeneratedDescription != nil && *place.GeneratedDescription != "" {
+						result.Description = *place.GeneratedDescription
+					} else if place.Description != nil && *place.Description != "" {
+						result.Description = *place.Description
+					}
+					perTrip[index] = append(perTrip[index], result)
 				}
-
-				results = append(results, result)
 			}
-		}
+		}()
+	}
+	workers.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("searching places in trips: %w", err)
 	}
 
-	c.logger.WithFields(logrus.Fields{
-		"query":       query,
-		"resultCount": len(results),
-	}).Info("Successfully searched places in trips")
-
-	return &PlaceSearchResponse{
-		Success: true,
-		Places:  results,
-	}, nil
+	var results []SearchResult
+	var warnings []string
+	for index, tripResults := range perTrip {
+		results = append(results, tripResults...)
+		if tripErrors[index] != nil {
+			warnings = append(warnings, fmt.Sprintf("trip %s could not be searched: %v", trips.Data[index].Key, tripErrors[index]))
+			c.logger.WithError(tripErrors[index]).WithField("tripKey", trips.Data[index].Key).Warn("Trip could not be searched")
+		}
+	}
+	c.logger.WithFields(logrus.Fields{"query": query, "resultCount": len(results), "warningCount": len(warnings)}).Info("Searched places in trips")
+	return &PlaceSearchResponse{Success: true, Places: results, Warnings: warnings}, nil
 }
 
 // matchesQuery checks if a place matches the search query

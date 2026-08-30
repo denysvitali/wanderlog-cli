@@ -42,7 +42,7 @@ func TestNukeTripPlaces(t *testing.T) {
 			tripStatus:       http.StatusOK,
 			nukeStatus:       http.StatusOK,
 			expectError:      false,
-			expectedOpsCount: 3, // 2 sections + 1 metadata clear
+			expectedOpsCount: 0,
 		},
 		{
 			name:    "trip with no sections",
@@ -90,7 +90,7 @@ func TestNukeTripPlaces(t *testing.T) {
 			tripStatus:       http.StatusOK,
 			nukeStatus:       http.StatusOK,
 			expectError:      false,
-			expectedOpsCount: 6, // 5 sections + 1 metadata
+			expectedOpsCount: 0,
 		},
 	}
 
@@ -168,6 +168,61 @@ func TestNukeTripPlaces(t *testing.T) {
 	}
 }
 
+func TestNukeTripPlacesPreservesMixedBlocksAndExactOldValues(t *testing.T) {
+	tripResponse := `{
+		"tripPlan":{"id":1,"key":"mixed","itinerary":{"sections":[
+			{"id":10,"serverSectionField":"keep","blocks":[
+				{"id":1,"type":"place","place":{"name":"Cafe"},"serverOnly":{"keep":true}},
+				{"id":2,"type":"note","text":"keep this note"},
+				{"id":3,"type":"flight","flight":{"number":"WL123"}}
+			]},
+			{"id":20,"blocks":[{"id":4,"type":"lodging","lodging":{"name":"Hotel"}}]}
+		]}},
+		"resources":{"placeMetadata":{"1":{"color":"red","serverOnly":true}}}
+	}`
+	var gotOps []Operation
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(tripResponse))
+			return
+		}
+		var req OperationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode operations: %v", err)
+		}
+		gotOps = req.Ops
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	defer server.Close()
+
+	oldBaseURL := BaseURL
+	BaseURL = server.URL
+	defer func() { BaseURL = oldBaseURL }()
+	client := NewClient()
+	client.auth = &AuthCredentials{SessionCookie: "session", XSRFToken: "token"}
+	if err := client.NukeTripPlaces("mixed"); err != nil {
+		t.Fatalf("NukeTripPlaces: %v", err)
+	}
+	if len(gotOps) != 2 {
+		t.Fatalf("operations = %d, want one block replacement and one metadata replacement: %#v", len(gotOps), gotOps)
+	}
+	oldBlocks := gotOps[0].OD.([]any)
+	newBlocks := gotOps[0].OI.([]any)
+	if len(oldBlocks) != 3 || oldBlocks[0].(map[string]any)["serverOnly"] == nil {
+		t.Fatalf("old blocks are not the exact raw snapshot: %#v", oldBlocks)
+	}
+	if len(newBlocks) != 2 || newBlocks[0].(map[string]any)["type"] != "note" || newBlocks[1].(map[string]any)["type"] != "flight" {
+		t.Fatalf("non-place blocks were not preserved: %#v", newBlocks)
+	}
+	oldMetadata, ok := gotOps[1].OD.(map[string]any)
+	if !ok || oldMetadata["1"].(map[string]any)["serverOnly"] != true {
+		t.Fatalf("metadata old value is not exact: %#v", gotOps[1].OD)
+	}
+	if newMetadata, ok := gotOps[1].OI.(map[string]any); !ok || len(newMetadata) != 0 {
+		t.Fatalf("metadata was not replaced with an empty object: %#v", gotOps[1].OI)
+	}
+}
+
 func TestClearSectionBlocks(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -204,7 +259,7 @@ func TestClearSectionBlocks(t *testing.T) {
 							"itinerary": {
 								"sections": [
 									{"id": 99, "heading": "Other", "blocks": []},
-									{"id": 1, "heading": "Day 1", "blocks": [{"id": 10, "type": "place", "text": {"ops": [{"insert": "\n"}]}}]}
+									{"id": 1, "heading": "Day 1", "blocks": [{"id": 10, "type": "place", "text": {"ops": [{"insert": "\n"}]}, "serverOnly": {"keep": true}}]}
 								]
 							}
 						},
@@ -244,6 +299,10 @@ func TestClearSectionBlocks(t *testing.T) {
 					expectedPath := []interface{}{"itinerary", "sections", 1, "blocks"}
 					if len(op.P) != len(expectedPath) {
 						t.Errorf("Expected path length %d, got %d", len(expectedPath), len(op.P))
+					}
+					oldBlocks, ok := op.OD.([]any)
+					if !ok || len(oldBlocks) != 1 || oldBlocks[0].(map[string]any)["serverOnly"] == nil {
+						t.Errorf("old blocks did not preserve raw server fields: %#v", op.OD)
 					}
 				}
 
@@ -291,7 +350,7 @@ func TestDeleteSection(t *testing.T) {
 					"itinerary": {
 						"sections": [
 							{"id": 99, "heading": "Other", "blocks": []},
-							{"id": 2, "heading": "Day 2", "blocks": []}
+							{"id": 2, "heading": "Day 2", "blocks": [], "serverOnly": {"keep": true}}
 						]
 					}
 				},
@@ -323,6 +382,10 @@ func TestDeleteSection(t *testing.T) {
 			expectedPath := []interface{}{"itinerary", "sections", 1}
 			if len(op.P) != len(expectedPath) {
 				t.Errorf("Expected path length %d, got %d", len(expectedPath), len(op.P))
+			}
+			oldSection, ok := op.LD.(map[string]any)
+			if !ok || oldSection["serverOnly"] == nil {
+				t.Errorf("deleted section did not preserve raw server fields: %#v", op.LD)
 			}
 		}
 

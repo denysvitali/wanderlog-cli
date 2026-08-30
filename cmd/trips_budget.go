@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"os"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -19,21 +19,21 @@ var tripsBudgetSetCmd = &cobra.Command{
 	Use:   "set [trip-key]",
 	Short: "Set a trip's total budget",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if tripsBudgetAmount < 0 {
-			logger.Error("Amount must be greater than or equal to 0")
-			os.Exit(1)
+			return fmt.Errorf("amount must be greater than or equal to 0")
 		}
 		if tripsBudgetCurrency == "" {
-			logger.Error("Currency is required (--currency)")
-			os.Exit(1)
+			return fmt.Errorf("currency is required (--currency)")
 		}
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		if err := client.SetTripBudget(args[0], tripsBudgetAmount, tripsBudgetCurrency); err != nil {
-			logger.WithError(err).Error("Failed to set budget")
-			os.Exit(1)
+			return fmt.Errorf("set budget: %w", err)
 		}
-		printSuccess(outputFormat, "Set trip budget", map[string]interface{}{
+		return printSuccess(outputFormat, "Set trip budget", map[string]interface{}{
 			"tripKey":  args[0],
 			"amount":   tripsBudgetAmount,
 			"currency": strings.ToUpper(tripsBudgetCurrency),
@@ -45,18 +45,19 @@ var tripsExpensesAddCmd = &cobra.Command{
 	Use:   "add [trip-key]",
 	Short: "Add an expense to a trip budget",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(tripsExpenseDescription) == "" {
-			logger.Error("Description is required (--description)")
-			os.Exit(1)
+			return fmt.Errorf("description is required (--description)")
 		}
 		if tripsExpenseAmount <= 0 {
-			logger.Error("Amount must be greater than 0")
-			os.Exit(1)
+			return fmt.Errorf("amount must be greater than 0")
 		}
 		if strings.TrimSpace(tripsExpenseCurrency) == "" {
-			logger.Error("Currency is required (--currency)")
-			os.Exit(1)
+			return fmt.Errorf("currency is required (--currency)")
+		}
+		splitWith, err := parseOptionalIntCSVE(tripsExpenseSplitWith)
+		if err != nil {
+			return err
 		}
 		req := wanderlog.AddExpenseRequest{
 			Description:      tripsExpenseDescription,
@@ -65,20 +66,22 @@ var tripsExpensesAddCmd = &cobra.Command{
 			CurrencyCode:     tripsExpenseCurrency,
 			Date:             tripsExpenseDate,
 			PaidByUserID:     tripsExpensePaidBy,
-			SplitWithUserIDs: parseOptionalIntCSV(tripsExpenseSplitWith),
+			SplitWithUserIDs: splitWith,
 			AssociatedDate:   tripsExpenseAssociatedDate,
 		}
 		if cmd.Flags().Changed("block-id") {
 			req.BlockID = &tripsExpenseBlockID
 		}
 
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		expense, err := client.AddTripExpense(args[0], req)
 		if err != nil {
-			logger.WithError(err).Error("Failed to add expense")
-			os.Exit(1)
+			return fmt.Errorf("add expense: %w", err)
 		}
-		printSuccess(outputFormat, "Added expense", expense)
+		return printSuccess(outputFormat, "Added expense", expense)
 	},
 }
 
@@ -86,8 +89,11 @@ var tripsExpensesUpdateCmd = &cobra.Command{
 	Use:   "update [trip-key] [expense-id]",
 	Short: "Update a trip budget expense",
 	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		expenseID := parseRequiredInt(args[1], "expense ID")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		expenseID, err := parseRequiredIntE(args[1], "expense ID")
+		if err != nil {
+			return err
+		}
 		req := wanderlog.UpdateExpenseRequest{}
 		if cmd.Flags().Changed("description") {
 			req.Description = &tripsExpenseDescription
@@ -116,20 +122,25 @@ var tripsExpensesUpdateCmd = &cobra.Command{
 		}
 		if cmd.Flags().Changed("split-with") {
 			req.SetSplitWith = true
-			req.SplitWithUserIDs = parseOptionalIntCSV(tripsExpenseSplitWith)
+			req.SplitWithUserIDs, err = parseOptionalIntCSVE(tripsExpenseSplitWith)
+			if err != nil {
+				return err
+			}
 		}
 		if cmd.Flags().Changed("associated-date") {
 			req.AssociatedDate = &tripsExpenseAssociatedDate
 		}
 		req.ClearAssociatedDate = tripsExpenseClearAssociatedDate
 
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		expense, err := client.UpdateTripExpense(args[0], expenseID, req)
 		if err != nil {
-			logger.WithError(err).Error("Failed to update expense")
-			os.Exit(1)
+			return fmt.Errorf("update expense: %w", err)
 		}
-		printSuccess(outputFormat, "Updated expense", expense)
+		return printSuccess(outputFormat, "Updated expense", expense)
 	},
 }
 
@@ -137,14 +148,19 @@ var tripsExpensesDeleteCmd = &cobra.Command{
 	Use:   "delete [trip-key] [expense-id]",
 	Short: "Delete a trip budget expense",
 	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		expenseID := parseRequiredInt(args[1], "expense ID")
-		client := newClient(true)
-		if err := client.DeleteTripExpense(args[0], expenseID); err != nil {
-			logger.WithError(err).Error("Failed to delete expense")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		expenseID, err := parseRequiredIntE(args[1], "expense ID")
+		if err != nil {
+			return err
 		}
-		printSuccess(outputFormat, "Deleted expense", map[string]interface{}{"tripKey": args[0], "expenseId": expenseID})
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
+		if err := client.DeleteTripExpense(args[0], expenseID); err != nil {
+			return fmt.Errorf("delete expense: %w", err)
+		}
+		return printSuccess(outputFormat, "Deleted expense", map[string]interface{}{"tripKey": args[0], "expenseId": expenseID})
 	},
 }
 
@@ -202,9 +218,9 @@ func addExpenseFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&tripsExpenseSplitWith, "split-with", "", "Comma-separated user IDs to split with")
 }
 
-func parseOptionalIntCSV(value string) []int {
+func parseOptionalIntCSVE(value string) ([]int, error) {
 	if strings.TrimSpace(value) == "" {
-		return nil
+		return nil, nil
 	}
 	parts := strings.Split(value, ",")
 	result := make([]int, 0, len(parts))
@@ -215,10 +231,12 @@ func parseOptionalIntCSV(value string) []int {
 		}
 		id, err := strconv.Atoi(part)
 		if err != nil {
-			logger.WithError(err).Error("Invalid user ID in comma-separated list")
-			os.Exit(1)
+			return nil, fmt.Errorf("invalid user ID %q in comma-separated list: %w", part, err)
+		}
+		if id <= 0 {
+			return nil, fmt.Errorf("invalid user ID %q in comma-separated list: must be greater than zero", part)
 		}
 		result = append(result, id)
 	}
-	return result
+	return result, nil
 }

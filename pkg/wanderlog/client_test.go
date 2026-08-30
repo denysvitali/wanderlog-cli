@@ -60,6 +60,13 @@ func TestGetTrip(t *testing.T) {
 			serverStatus:   http.StatusOK,
 			expectError:    true,
 		},
+		{
+			name:           "HTTP 200 API failure",
+			tripKey:        "denied",
+			serverResponse: `{"success":false,"message":"access denied"}`,
+			serverStatus:   http.StatusOK,
+			expectError:    true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -301,6 +308,87 @@ func TestDoAPI(t *testing.T) {
 			t.Fatal("expected error for non-200")
 		}
 	})
+}
+
+func TestDoAPICredentialBoundaries(t *testing.T) {
+	creds := &AuthCredentials{SessionCookie: "secret-session", XSRFToken: "secret-xsrf"}
+
+	t.Run("does not attach optional credentials", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if got := r.Header.Get("X-XSRF-TOKEN"); got != "" {
+				t.Errorf("unexpected XSRF header: %q", got)
+			}
+			if got := r.Header.Get("Cookie"); got != "" {
+				t.Errorf("unexpected Cookie header: %q", got)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}))
+		defer server.Close()
+
+		client := NewClient()
+		client.SetAuth(creds)
+		if _, _, err := client.DoAPI(http.MethodGet, server.URL, nil, nil, false); err != nil {
+			t.Fatalf("DoAPI: %v", err)
+		}
+	})
+
+	t.Run("rejects authenticated external URL", func(t *testing.T) {
+		external := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("external server must not be contacted")
+		}))
+		defer external.Close()
+		base := httptest.NewServer(http.NotFoundHandler())
+		defer base.Close()
+		oldBaseURL := BaseURL
+		BaseURL = base.URL
+		defer func() { BaseURL = oldBaseURL }()
+
+		client := NewClient()
+		client.SetAuth(creds)
+		_, _, err := client.DoAPI(http.MethodGet, external.URL, nil, nil, true)
+		if err == nil || !strings.Contains(err.Error(), "refusing to send authentication") {
+			t.Fatalf("expected origin rejection, got %v", err)
+		}
+	})
+
+	t.Run("rejects cross-origin redirect", func(t *testing.T) {
+		targetCalled := false
+		target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			targetCalled = true
+			if r.Header.Get("X-XSRF-TOKEN") != "" || r.Header.Get("Cookie") != "" {
+				t.Error("redirect leaked credentials")
+			}
+		}))
+		defer target.Close()
+		source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, target.URL, http.StatusFound)
+		}))
+		defer source.Close()
+		oldBaseURL := BaseURL
+		BaseURL = source.URL
+		defer func() { BaseURL = oldBaseURL }()
+
+		client := NewClient()
+		client.SetAuth(creds)
+		_, _, err := client.DoAPI(http.MethodGet, "/redirect", nil, nil, true)
+		if err == nil || !strings.Contains(err.Error(), "cross-origin redirect") {
+			t.Fatalf("expected redirect rejection, got %v", err)
+		}
+		if targetCalled {
+			t.Fatal("redirect target was contacted")
+		}
+	})
+}
+
+func TestReadAPIResponseBodyLimit(t *testing.T) {
+	body := strings.NewReader(strings.Repeat("x", MaxAPIResponseBodyBytes+1))
+	data, err := readAPIResponseBody(body)
+	if err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("expected size-limit error, got %v", err)
+	}
+	if len(data) != MaxAPIResponseBodyBytes {
+		t.Fatalf("expected bounded data length %d, got %d", MaxAPIResponseBodyBytes, len(data))
+	}
 }
 
 func TestSetLogger(t *testing.T) {

@@ -9,63 +9,148 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint:
-    name: Lint
+  quality:
+    name: Formatting, modules, vet, and lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: true
+      - name: Check formatting
+        run: make fmt-check
+      - name: Check toolchain alignment
+        run: make toolchain-check
+      - name: Verify module files
+        run: |
+          go mod verify
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Vet
+        run: go vet ./...
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
 
   test:
-    name: Test
+    name: Unit tests and coverage
     runs-on: ubuntu-latest
+    env:
+      WANDERLOG_RUN_PROD_INTEGRATION: "0"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - run: go test -coverprofile=coverage.out ./...
-        env:
-          INTEGRATION_TESTS: "0"
+          cache: true
+      - name: Run unit tests
+        run: go test -shuffle=on -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Enforce coverage floor
+        run: ./scripts/check_coverage.sh coverage.out 35.0
       - uses: actions/upload-artifact@v7
-        if: success()
-        continue-on-error: true
         with:
           name: coverage
           path: coverage.out
-          retention-days: 3
+          retention-days: 7
+
+  race:
+    name: Race detector
+    runs-on: ubuntu-latest
+    env:
+      WANDERLOG_RUN_PROD_INTEGRATION: "0"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -race ./...
+
+  vulnerability-scan:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+      - run: govulncheck ./...
+
+  integration-compile:
+    name: Compile integration suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile every integration-tagged package
+        run: go test -tags=integration -run '^$' ./...
 
   build:
-    name: Build
+    name: Build and version smoke test
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [quality, test]
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - run: go build -ldflags "-s -w" -o wanderlog .
+          cache: true
+      - run: make build VERSION=ci COMMIT=${{ github.sha }} BUILD_DATE=ci
+      - name: Verify injected build metadata
+        run: ./wanderlog version | grep -F 'wanderlog ci'
 
-  integration-test:
-    name: Integration Test
+  container:
+    name: Container smoke test
     runs-on: ubuntu-latest
-    # Only run on master/main branch pushes, not pull requests
-    # because secrets are not available to PRs from forks
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    needs: [quality, test]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          push: false
+          tags: wanderlog-cli:ci
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=ci
+      - name: Verify image and non-root runtime
+        run: |
+          test "$(docker run --rm --entrypoint id wanderlog-cli:ci -u)" != "0"
+          docker run --rm wanderlog-cli:ci version | grep -F 'wanderlog ci'
+
+  production-integration:
+    name: Production API integration tests
+    if: github.event_name == 'push' && vars.WANDERLOG_RUN_PROD_INTEGRATION == '1'
+    runs-on: ubuntu-latest
+    env:
+      WANDERLOG_RUN_PROD_INTEGRATION: "1"
+      WANDERLOG_TEST_TRIP_ID: ${{ secrets.WANDERLOG_TEST_TRIP_ID }}
+      WANDERLOG_AUTH_SESSION_COOKIE: ${{ secrets.WANDERLOG_AUTH_SESSION_COOKIE }}
+      WANDERLOG_AUTH_SESSION_XSRF_TOKEN: ${{ secrets.WANDERLOG_AUTH_SESSION_XSRF_TOKEN }}
+      WANDERLOG_AUTH_EMAIL: ${{ secrets.WANDERLOG_AUTH_EMAIL }}
+      WANDERLOG_AUTH_PASSWORD: ${{ secrets.WANDERLOG_AUTH_PASSWORD }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - name: Run integration tests
-        env:
-          INTEGRATION_TESTS: "1"
-          WANDERLOG_AUTH_EMAIL: ${{ secrets.WANDERLOG_AUTH_EMAIL }}
-          WANDERLOG_AUTH_PASSWORD: ${{ secrets.WANDERLOG_AUTH_PASSWORD }}
-        run: go test -v ./cmd/... -run "Integration"
+          cache: true
+      - run: ./test_integration.sh

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -21,98 +21,112 @@ var feedCmd = &cobra.Command{
 var feedHomeCmd = &cobra.Command{
 	Use:   "home",
 	Short: "Show the authenticated user's home feed",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetFeedHome()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch home feed")
-			os.Exit(1)
+			return fmt.Errorf("fetch home feed: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var feedRecentCmd = &cobra.Command{
 	Use:   "recent",
 	Short: "Show the most recently edited trip",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetFeedMostRecent()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch most recent feed")
-			os.Exit(1)
+			return fmt.Errorf("fetch most recent feed: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var feedFriendsCmd = &cobra.Command{
 	Use:   "friends",
 	Short: "Show trip plans from friends",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetFriendsPlans()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch friends plans")
-			os.Exit(1)
+			return fmt.Errorf("fetch friends plans: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var feedHistoryCmd = &cobra.Command{
 	Use:   "history",
 	Short: "Show trip edit history",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetTripHistory(feedHistoryOffset)
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch trip history")
-			os.Exit(1)
+			return fmt.Errorf("fetch trip history: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var feedLegacyCmd = &cobra.Command{
 	Use:   "legacy",
 	Short: "Show the legacy /tripPlans/feed response",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetFeed()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch feed")
-			os.Exit(1)
+			return fmt.Errorf("fetch feed: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var feedV2Cmd = &cobra.Command{
 	Use:   "v2",
 	Short: "Show the v2 trip feed",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetFeedV2()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch feed v2")
-			os.Exit(1)
+			return fmt.Errorf("fetch feed v2: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var feedGuidesCmd = &cobra.Command{
 	Use:   "guides",
 	Short: "Browse curated Wanderlog guides",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(false)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(false)
+		if err != nil {
+			return err
+		}
 		resp, err := client.BrowseGuides(feedGuidesGeoID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch guides")
-			os.Exit(1)
+			return fmt.Errorf("fetch guides: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 

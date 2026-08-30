@@ -1,7 +1,10 @@
 package wanderlog
 
 import (
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -58,15 +61,27 @@ func (c *Client) SetTripBudget(tripKey string, amount float64, currencyCode stri
 		return fmt.Errorf("currency code is required")
 	}
 
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
-
-	newAmount := CurrencyAmount{Amount: amount, CurrencyCode: currencyCode}
+	budget, err := rawTripBudget(trip)
+	if err != nil {
+		return err
+	}
+	oldAmount, ok := budget["amount"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("trip budget amount has unexpected type %T", budget["amount"])
+	}
+	newAmount, err := cloneRawMap(oldAmount)
+	if err != nil {
+		return fmt.Errorf("copying trip budget amount: %w", err)
+	}
+	newAmount["amount"] = amount
+	newAmount["currencyCode"] = currencyCode
 	op := ReplaceInObject(
 		[]any{"itinerary", "budget", "amount"},
-		trip.TripPlan.Itinerary.Budget.Amount,
+		oldAmount,
 		newAmount,
 	)
 	if err := c.ApplyOperations(tripKey, []Operation{op}); err != nil {
@@ -102,17 +117,25 @@ func (c *Client) AddTripExpense(tripKey string, req AddExpenseRequest) (*BudgetE
 		}
 	}
 
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return nil, fmt.Errorf("getting current trip: %w", err)
+	}
+	_, expenses, err := rawBudgetExpenses(trip)
+	if err != nil {
+		return nil, err
 	}
 	userID, err := c.defaultBudgetUserID(req.PaidByUserID)
 	if err != nil {
 		return nil, err
 	}
 
+	expenseID, err := makeBudgetNumericID()
+	if err != nil {
+		return nil, fmt.Errorf("generating expense ID: %w", err)
+	}
 	expense := BudgetExpense{
-		ID:           makeBudgetNumericID(),
+		ID:           expenseID,
 		Amount:       CurrencyAmount{Amount: req.Amount, CurrencyCode: currencyCode},
 		Category:     category,
 		Description:  strings.TrimSpace(req.Description),
@@ -126,7 +149,6 @@ func (c *Client) AddTripExpense(tripKey string, req AddExpenseRequest) (*BudgetE
 		expense.AssociatedDate = &req.AssociatedDate
 	}
 
-	expenses := trip.TripPlan.Itinerary.Budget.Expenses
 	op := InsertInList([]any{"itinerary", "budget", "expenses"}, len(expenses), expense)
 	if err := c.ApplyOperations(tripKey, []Operation{op}); err != nil {
 		return nil, fmt.Errorf("adding trip expense: %w", err)
@@ -135,75 +157,91 @@ func (c *Client) AddTripExpense(tripKey string, req AddExpenseRequest) (*BudgetE
 }
 
 func (c *Client) UpdateTripExpense(tripKey string, expenseID int, req UpdateExpenseRequest) (*BudgetExpense, error) {
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return nil, fmt.Errorf("getting current trip: %w", err)
 	}
-	expenses := trip.TripPlan.Itinerary.Budget.Expenses
-	index := FindBudgetExpenseIndex(expenses, expenseID)
+	_, expenses, err := rawBudgetExpenses(trip)
+	if err != nil {
+		return nil, err
+	}
+	index := findRawBudgetExpenseIndex(expenses, expenseID)
 	if index < 0 {
 		return nil, fmt.Errorf("expense %d not found", expenseID)
 	}
-
-	oldExpense := expenses[index]
-	newExpense := oldExpense
+	oldExpense, ok := expenses[index].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("expense %d has unexpected type %T", expenseID, expenses[index])
+	}
+	newExpense, err := cloneRawMap(oldExpense)
+	if err != nil {
+		return nil, fmt.Errorf("copying expense %d: %w", expenseID, err)
+	}
 	if req.Description != nil {
 		if strings.TrimSpace(*req.Description) == "" {
 			return nil, fmt.Errorf("expense description cannot be empty")
 		}
-		newExpense.Description = strings.TrimSpace(*req.Description)
+		newExpense["description"] = strings.TrimSpace(*req.Description)
 	}
 	if req.Category != nil {
 		category := normalizeExpenseCategory(*req.Category)
 		if !validExpenseCategories[category] {
 			return nil, fmt.Errorf("invalid expense category %q", *req.Category)
 		}
-		newExpense.Category = category
+		newExpense["category"] = category
 	}
 	if req.Amount != nil {
 		if *req.Amount <= 0 {
 			return nil, fmt.Errorf("expense amount must be greater than 0")
 		}
-		newExpense.Amount.Amount = *req.Amount
+		amountValue, ok := newExpense["amount"].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("expense %d amount has unexpected type %T", expenseID, newExpense["amount"])
+		}
+		amountValue["amount"] = *req.Amount
 	}
 	if req.CurrencyCode != nil {
 		currencyCode := normalizeCurrencyCode(*req.CurrencyCode)
 		if currencyCode == "" {
 			return nil, fmt.Errorf("currency code cannot be empty")
 		}
-		newExpense.Amount.CurrencyCode = currencyCode
+		amountValue, ok := newExpense["amount"].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("expense %d amount has unexpected type %T", expenseID, newExpense["amount"])
+		}
+		amountValue["currencyCode"] = currencyCode
 	}
 	if req.Date != nil {
 		if err := validateBudgetDate("date", *req.Date); err != nil {
 			return nil, err
 		}
-		newExpense.Date = *req.Date
+		newExpense["date"] = *req.Date
 	}
 	if req.ClearBlockID {
-		newExpense.BlockID = nil
+		delete(newExpense, "blockId")
 	} else if req.BlockID != nil {
-		newExpense.BlockID = req.BlockID
+		newExpense["blockId"] = *req.BlockID
 	}
 	if req.PaidByUserID != nil {
 		if *req.PaidByUserID <= 0 {
 			return nil, fmt.Errorf("paid by user ID must be greater than 0")
 		}
-		newExpense.PaidByUserID = *req.PaidByUserID
-		newExpense.PaidByUser = BudgetUser{Type: "registered", ID: *req.PaidByUserID}
+		newExpense["paidByUserId"] = *req.PaidByUserID
+		newExpense["paidByUser"] = map[string]any{"type": "registered", "id": *req.PaidByUserID}
 	}
 	if req.SetSplitWith {
-		newExpense.SplitWith = budgetSplitWith(req.SplitWithUserIDs)
+		newExpense["splitWith"] = budgetSplitWith(req.SplitWithUserIDs)
 	}
 	if req.ClearAssociatedDate {
-		newExpense.AssociatedDate = nil
+		delete(newExpense, "associatedDate")
 	} else if req.AssociatedDate != nil {
 		if *req.AssociatedDate == "" {
-			newExpense.AssociatedDate = nil
+			delete(newExpense, "associatedDate")
 		} else {
 			if err := validateBudgetDate("associated date", *req.AssociatedDate); err != nil {
 				return nil, err
 			}
-			newExpense.AssociatedDate = req.AssociatedDate
+			newExpense["associatedDate"] = *req.AssociatedDate
 		}
 	}
 
@@ -211,16 +249,23 @@ func (c *Client) UpdateTripExpense(tripKey string, expenseID int, req UpdateExpe
 	if err := c.ApplyOperations(tripKey, []Operation{op}); err != nil {
 		return nil, fmt.Errorf("updating trip expense: %w", err)
 	}
-	return &newExpense, nil
+	result, err := budgetExpenseFromRaw(newExpense)
+	if err != nil {
+		return nil, fmt.Errorf("decoding updated expense %d: %w", expenseID, err)
+	}
+	return result, nil
 }
 
 func (c *Client) DeleteTripExpense(tripKey string, expenseID int) error {
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
-	expenses := trip.TripPlan.Itinerary.Budget.Expenses
-	index := FindBudgetExpenseIndex(expenses, expenseID)
+	_, expenses, err := rawBudgetExpenses(trip)
+	if err != nil {
+		return err
+	}
+	index := findRawBudgetExpenseIndex(expenses, expenseID)
 	if index < 0 {
 		return fmt.Errorf("expense %d not found", expenseID)
 	}
@@ -230,6 +275,60 @@ func (c *Client) DeleteTripExpense(tripKey string, expenseID int) error {
 		return fmt.Errorf("deleting trip expense: %w", err)
 	}
 	return nil
+}
+
+func rawTripBudget(trip map[string]any) (map[string]any, error) {
+	tripPlan, ok := trip["tripPlan"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("trip response is missing tripPlan")
+	}
+	itinerary, ok := tripPlan["itinerary"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("trip response is missing tripPlan.itinerary")
+	}
+	budget, ok := itinerary["budget"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("trip response is missing tripPlan.itinerary.budget")
+	}
+	return budget, nil
+}
+
+func rawBudgetExpenses(trip map[string]any) (map[string]any, []any, error) {
+	budget, err := rawTripBudget(trip)
+	if err != nil {
+		return nil, nil, err
+	}
+	expensesValue, exists := budget["expenses"]
+	if !exists || expensesValue == nil {
+		return budget, []any{}, nil
+	}
+	expenses, ok := expensesValue.([]any)
+	if !ok {
+		return nil, nil, fmt.Errorf("trip budget expenses has unexpected type %T", expensesValue)
+	}
+	return budget, expenses, nil
+}
+
+func findRawBudgetExpenseIndex(expenses []any, expenseID int) int {
+	for i, value := range expenses {
+		expense, ok := value.(map[string]any)
+		if ok && rawInt(expense["id"]) == expenseID {
+			return i
+		}
+	}
+	return -1
+}
+
+func budgetExpenseFromRaw(value map[string]any) (*BudgetExpense, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	var expense BudgetExpense
+	if err := json.Unmarshal(data, &expense); err != nil {
+		return nil, err
+	}
+	return &expense, nil
 }
 
 func FindBudgetExpenseIndex(expenses []BudgetExpense, expenseID int) int {
@@ -271,9 +370,14 @@ func budgetSplitWith(userIDs []int) BudgetSplitWith {
 	return BudgetSplitWith{Type: "individuals", Users: users}
 }
 
-func makeBudgetNumericID() int {
-	now := time.Now()
-	return int(now.UnixMilli()*1000 + int64(now.Nanosecond()%1000))
+func makeBudgetNumericID() (int, error) {
+	// Keep IDs within JavaScript's exactly representable integer range while
+	// avoiding timestamp collisions across concurrent CLI processes.
+	value, err := rand.Int(rand.Reader, big.NewInt(1<<52-1))
+	if err != nil {
+		return 0, err
+	}
+	return int(value.Int64() + 1), nil
 }
 
 func normalizeCurrencyCode(value string) string {

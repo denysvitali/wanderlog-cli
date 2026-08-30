@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/ui"
@@ -16,22 +19,28 @@ Examples:
   wanderlog trips autofill abc123xyz 123 --query "restaurants"
   wanderlog trips autofill abc123xyz 123 --query "museums"`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sectionID, err := parseRequiredIntE(args[1], "section ID")
+		if err != nil {
+			return err
+		}
+		query := strings.TrimSpace(tripsAutofillQuery)
+		if query == "" {
+			return fmt.Errorf("--query is required")
+		}
+
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		sectionID := parseRequiredInt(args[1], "section ID")
-		resp, err := client.AutofillDay(args[0], sectionID, tripsAutofillQuery)
+		resp, err := client.AutofillDay(args[0], sectionID, query)
 		if err != nil {
-			logger.WithError(err).Error("Failed to autofill day")
-			return
+			return fmt.Errorf("autofill day: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 

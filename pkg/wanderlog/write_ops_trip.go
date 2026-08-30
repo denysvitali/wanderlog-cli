@@ -60,6 +60,9 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 	if req.InitialMapsPlaceIDs == nil {
 		req.InitialMapsPlaceIDs = []int{}
 	}
+	if err := validateProspectiveDates(req.StartDate, req.EndDate); err != nil {
+		return nil, err
+	}
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -81,27 +84,21 @@ func (c *Client) CreateTrip(req CreateTripRequest) (*CreateTripResponse, error) 
 		"body":   string(resp.Body),
 	}).Debug("CreateTrip API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("CreateTrip: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var createResp struct {
 		Success  bool                   `json:"success"`
 		TripPlan models.TripPlanSummary `json:"tripPlan"`
 		Data     models.TripPlanSummary `json:"data"`
 	}
-	if err := json.Unmarshal(resp.Body, &createResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	if !createResp.Success {
-		c.logger.WithField("response", string(resp.Body)).Error("Trip creation failed")
-		return nil, fmt.Errorf("failed to create trip - response: %s", string(resp.Body))
+	if err := decodeMutationBody("CreateTrip", resp.StatusCode, resp.Body, &createResp); err != nil {
+		return nil, err
 	}
 
 	tripPlan := createResp.TripPlan
 	if tripPlan.Key == "" {
 		tripPlan = createResp.Data
+	}
+	if tripPlan.Key == "" {
+		return nil, fmt.Errorf("CreateTrip: successful response is missing trip key")
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -134,19 +131,17 @@ func (c *Client) CreateExampleTrip() (*CreateTripResponse, error) {
 		"body":   string(resp.Body),
 	}).Debug("CreateExampleTrip API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("CreateExampleTrip: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	// The createExampleTripPlan response uses "data" with viewKey (like CopyTripResponse)
 	var exampleResp models.CopyTripResponse
-	if err := json.Unmarshal(resp.Body, &exampleResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := decodeMutationBody("CreateExampleTrip", resp.StatusCode, resp.Body, &exampleResp); err != nil {
+		return nil, err
 	}
-
-	if !exampleResp.Success {
-		c.logger.WithField("response", string(resp.Body)).Error("Example trip creation failed")
-		return nil, fmt.Errorf("failed to create example trip - response: %s", string(resp.Body))
+	key := exampleResp.Data.Key
+	if key == "" {
+		key = exampleResp.Data.ViewKey
+	}
+	if key == "" {
+		return nil, fmt.Errorf("CreateExampleTrip: successful response is missing trip key")
 	}
 
 	// Convert to CreateTripResponse format
@@ -154,7 +149,7 @@ func (c *Client) CreateExampleTrip() (*CreateTripResponse, error) {
 		Success: exampleResp.Success,
 		TripPlan: models.TripPlanSummary{
 			ID:    exampleResp.Data.ID,
-			Key:   exampleResp.Data.Key,
+			Key:   key,
 			Title: exampleResp.Data.Title,
 		},
 	}
@@ -181,7 +176,7 @@ func (c *Client) DeleteTrip(tripKey string) error {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeAPIBody("DeleteTrip", resp.StatusCode, resp.Body, nil); err != nil {
+	if err := decodeOptionalMutationBody("DeleteTrip", resp.StatusCode, resp.Body); err != nil {
 		return err
 	}
 
@@ -199,6 +194,19 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 	trip, err := c.GetTrip(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
+	}
+	nextStartDate := trip.TripPlan.StartDate
+	if req.StartDate != "" {
+		nextStartDate = req.StartDate
+	}
+	nextEndDate := trip.TripPlan.EndDate
+	if req.EndDate != "" {
+		nextEndDate = req.EndDate
+	}
+	if req.StartDate != "" || req.EndDate != "" {
+		if err := validateProspectiveDates(nextStartDate, nextEndDate); err != nil {
+			return err
+		}
 	}
 
 	// Build operations to replace fields
@@ -227,16 +235,12 @@ func (c *Client) UpdateTrip(tripKey string, req UpdateTripRequest) error {
 			req.EndDate,
 		))
 	}
-	nextStartDate := trip.TripPlan.StartDate
-	if req.StartDate != "" {
-		nextStartDate = req.StartDate
-	}
-	nextEndDate := trip.TripPlan.EndDate
-	if req.EndDate != "" {
-		nextEndDate = req.EndDate
-	}
 	if nextStartDate != "" && nextEndDate != "" {
-		if days, err := tripDays(nextStartDate, nextEndDate); err == nil && days != trip.TripPlan.Days {
+		days, err := tripDays(nextStartDate, nextEndDate)
+		if err != nil {
+			return err
+		}
+		if days != trip.TripPlan.Days {
 			ops = append(ops, models.ReplaceInObject(
 				[]interface{}{"days"},
 				trip.TripPlan.Days,
@@ -291,6 +295,25 @@ func tripDays(startDate, endDate string) (int, error) {
 		return 0, fmt.Errorf("end date must be on or after start date")
 	}
 	return days, nil
+}
+
+func validateProspectiveDates(startDate, endDate string) error {
+	if startDate != "" {
+		if _, err := time.Parse(apiDateFormat, startDate); err != nil {
+			return fmt.Errorf("invalid start date %q: expected YYYY-MM-DD", startDate)
+		}
+	}
+	if endDate != "" {
+		if _, err := time.Parse(apiDateFormat, endDate); err != nil {
+			return fmt.Errorf("invalid end date %q: expected YYYY-MM-DD", endDate)
+		}
+	}
+	if startDate != "" && endDate != "" {
+		if _, err := tripDays(startDate, endDate); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ValidateAddPlaceRequest validates the AddPlaceRequest structure
@@ -449,32 +472,8 @@ func (c *Client) AddPlace(tripKey string, sectionID int, req AddPlaceRequest) er
 		"responseBody": string(respBody),
 	}).Debug("AddPlace API response")
 
-	if statusCode != http.StatusOK {
-		bodyText := string(respBody)
-		if msg, ok := knownWanderlogServerError("AddPlace", bodyText); ok {
-			return fmt.Errorf("AddPlace: HTTP %d: %s", statusCode, msg)
-		}
-		return fmt.Errorf("AddPlace: HTTP %d: %s", statusCode, truncateForLog(bodyText, 500))
-	}
-
-	// Try to parse the response to check for API-level errors
-	var apiResp map[string]interface{}
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		c.logger.WithField("responseBody", string(respBody)).Warn("Could not parse API response as JSON")
-	} else {
-		// Check if the response indicates success
-		if success, ok := apiResp["success"]; ok {
-			if successBool, ok := success.(bool); ok && !successBool {
-				// API returned success: false
-				errorMsg := "unknown error"
-				if msg, ok := apiResp["error"]; ok {
-					if msgStr, ok := msg.(string); ok {
-						errorMsg = msgStr
-					}
-				}
-				return fmt.Errorf("API request failed: %s", errorMsg)
-			}
-		}
+	if err := decodeMutationBody("AddPlace", statusCode, respBody, nil); err != nil {
+		return err
 	}
 
 	c.logger.WithFields(map[string]interface{}{

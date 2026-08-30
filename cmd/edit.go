@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -41,21 +39,16 @@ Examples:
   wanderlog edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --section 123
   wanderlog edit add-place abc123xyz --name "Custom Place" --text "Great restaurant!" --start-time 19:00`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 
 		if placeName == "" {
-			logger.Error("Place name is required")
-			os.Exit(1)
+			return fmt.Errorf("place name is required")
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		// Ensure authentication (from flags, env vars, or keychain)
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		// Build the place info with proper geometry structure
@@ -81,16 +74,16 @@ Examples:
 			EndTime:   endTimeFlag,
 		}
 
-		err := client.AddPlace(tripKey, sectionIDFlag, req)
+		err = client.AddPlace(tripKey, sectionIDFlag, req)
 		if err != nil {
-			logger.WithError(err).Error("Failed to add place")
-			os.Exit(1)
+			return fmt.Errorf("add place: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("📍 Successfully added place '%s' to trip %s", placeName, tripKey)))
 		if sectionIDFlag > 0 {
 			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Section ID: %d", sectionIDFlag)))
 		}
+		return nil
 	},
 }
 
@@ -103,35 +96,30 @@ Examples:
   wanderlog edit remove-place abc123xyz 12345
   wanderlog edit remove-place abc123xyz 12345 --section 123`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 		placeIDStr := args[1]
 
-		placeIDInt, err := strconv.Atoi(placeIDStr)
+		placeIDInt, err := parseRequiredIntE(placeIDStr, "place ID")
 		if err != nil {
-			logger.WithError(err).Error("Invalid place ID - must be a number")
-			os.Exit(1)
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		// Ensure authentication (from flags, env vars, or keychain)
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		err = client.RemovePlace(tripKey, sectionIDFlag, placeIDInt)
 		if err != nil {
-			logger.WithError(err).Error("Failed to remove place")
-			os.Exit(1)
+			return fmt.Errorf("remove place: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🗑️  Successfully removed place %d from trip %s", placeIDInt, tripKey)))
 		if sectionIDFlag > 0 {
 			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Section ID: %d", sectionIDFlag)))
 		}
+		return nil
 	},
 }
 
@@ -143,32 +131,27 @@ var clearSectionCmd = &cobra.Command{
 Examples:
   wanderlog edit clear-section abc123xyz 6310036`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 		sectionIDStr := args[1]
 
-		sectionID, err := strconv.Atoi(sectionIDStr)
+		sectionID, err := parseRequiredIntE(sectionIDStr, "section ID")
 		if err != nil {
-			logger.WithError(err).Error("Invalid section ID")
-			os.Exit(1)
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		// Ensure authentication (from flags, env vars, or keychain)
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		err = client.ClearSectionBlocks(tripKey, sectionID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to clear section")
-			os.Exit(1)
+			return fmt.Errorf("clear section: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🧹 Successfully cleared all blocks from section %d in trip %s", sectionID, tripKey)))
+		return nil
 	},
 }
 
@@ -180,32 +163,27 @@ var deleteSectionCmd = &cobra.Command{
 Examples:
   wanderlog edit delete-section abc123xyz 6310036`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 		sectionIDStr := args[1]
 
-		sectionID, err := strconv.Atoi(sectionIDStr)
+		sectionID, err := parseRequiredIntE(sectionIDStr, "section ID")
 		if err != nil {
-			logger.WithError(err).Error("Invalid section ID")
-			os.Exit(1)
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		// Ensure authentication (from flags, env vars, or keychain)
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		err = client.DeleteSection(tripKey, sectionID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to delete section")
-			os.Exit(1)
+			return fmt.Errorf("delete section: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🗑️ Successfully deleted section %d from trip %s", sectionID, tripKey)))
+		return nil
 	},
 }
 
@@ -220,37 +198,33 @@ WARNING: This will remove ALL places from ALL sections of your trip!
 Examples:
   wanderlog edit nuke-places abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 
-		fmt.Print(ui.WarningStyle.Render("⚠️  WARNING: This will remove ALL places from ALL sections of your trip!\n"))
-		fmt.Print("Are you sure you want to continue? (y/N): ")
+		_, _ = fmt.Fprint(cmd.ErrOrStderr(), ui.WarningStyle.Render("⚠️  WARNING: This will remove ALL places from ALL sections of your trip!\n"))
+		_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Are you sure you want to continue? (y/N): ")
 
 		var response string
-		_, _ = fmt.Scanln(&response)
+		_, _ = fmt.Fscanln(cmd.InOrStdin(), &response)
 
 		if response != "y" && response != "Y" && response != "yes" {
-			fmt.Println(ui.InfoStyle.Render("Operation canceled."))
-			return
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), ui.InfoStyle.Render("Operation canceled."))
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		// Ensure authentication (from flags, env vars, or keychain)
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
-		}
-
-		err := client.NukeTripPlaces(tripKey)
+		client, err := newClientE(true)
 		if err != nil {
-			logger.WithError(err).Error("Failed to nuke trip places")
-			os.Exit(1)
+			return err
+		}
+
+		err = client.NukeTripPlaces(tripKey)
+		if err != nil {
+			return fmt.Errorf("nuke trip places: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("💥 Successfully nuked all place data from trip %s", tripKey)))
 		fmt.Println(ui.InfoStyle.Render("🔄 Try accessing your trip now - the location error should be fixed."))
+		return nil
 	},
 }
 

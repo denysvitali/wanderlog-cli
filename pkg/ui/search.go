@@ -20,7 +20,7 @@ func PrintSearchResults(results []wanderlog.SearchResult) {
 
 	for i, place := range results {
 		// Place name with rating
-		name := place.Name
+		name := SafeText(place.Name)
 		if place.Rating > 0 {
 			stars := strings.Repeat("⭐", int(place.Rating))
 			if len(stars) > 5 {
@@ -33,23 +33,23 @@ func PrintSearchResults(results []wanderlog.SearchResult) {
 
 		// Address
 		if place.Address != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏠 %s", place.Address)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏠 %s", SafeText(place.Address))))
 		}
 
 		// Categories
 		if len(place.Categories) > 0 {
-			categories := strings.Join(place.Categories, ", ")
+			categories := SafeText(strings.Join(place.Categories, ", "))
 			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏷️  %s", categories)))
 		}
 
 		// Description
 		if place.Description != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📝 %s", place.Description)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📝 %s", SafeText(place.Description))))
 		}
 
 		// Website
 		if place.Website != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🌐 %s", place.Website)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🌐 %s", SafeText(place.Website))))
 		}
 
 		// Coordinates
@@ -59,7 +59,7 @@ func PrintSearchResults(results []wanderlog.SearchResult) {
 
 		// Place ID
 		if place.PlaceID != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🆔 %s", place.PlaceID)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🆔 %s", SafeText(place.PlaceID))))
 		}
 
 		// Spacer between places
@@ -79,26 +79,26 @@ func PrintSearchResultsMarkdown(results []wanderlog.SearchResult) {
 	fmt.Printf("# Search Results\n\nFound %d place(s):\n\n", len(results))
 
 	for i, place := range results {
-		fmt.Printf("## %d. %s\n\n", i+1, place.Name)
+		fmt.Printf("## %d. %s\n\n", i+1, MarkdownInline(place.Name))
 
 		if place.Rating > 0 {
 			fmt.Printf("**Rating:** %.1f/5 ⭐\n\n", place.Rating)
 		}
 
 		if place.Address != "" {
-			fmt.Printf("**Address:** %s\n\n", place.Address)
+			fmt.Printf("**Address:** %s\n\n", MarkdownInline(place.Address))
 		}
 
 		if len(place.Categories) > 0 {
-			fmt.Printf("**Categories:** %s\n\n", strings.Join(place.Categories, ", "))
+			fmt.Printf("**Categories:** %s\n\n", MarkdownInline(strings.Join(place.Categories, ", ")))
 		}
 
 		if place.Description != "" {
-			fmt.Printf("**Description:** %s\n\n", place.Description)
+			fmt.Printf("**Description:** %s\n\n", MarkdownInline(place.Description))
 		}
 
 		if place.Website != "" {
-			fmt.Printf("**Website:** %s\n\n", place.Website)
+			fmt.Printf("**Website:** %s\n\n", MarkdownInline(place.Website))
 		}
 
 		if place.Latitude != 0 && place.Longitude != 0 {
@@ -106,7 +106,7 @@ func PrintSearchResultsMarkdown(results []wanderlog.SearchResult) {
 		}
 
 		if place.PlaceID != "" {
-			fmt.Printf("**Place ID:** %s\n\n", place.PlaceID)
+			fmt.Printf("**Place ID:** %s\n\n", MarkdownInline(place.PlaceID))
 		}
 
 		fmt.Println("---")

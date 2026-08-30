@@ -26,22 +26,34 @@ func testSections(t *testing.T) []ItSections {
 }
 
 func TestMovePlaceOperationsAdjustsSameSectionForwardMove(t *testing.T) {
-	ops, err := movePlaceOperations(testSections(t), 1, 10, 10, 3)
+	var trip map[string]any
+	if err := json.Unmarshal([]byte(`{"tripPlan":{"itinerary":{"sections":[{"id":10,"blocks":[{"id":1,"type":"place","place":{"name":"one"},"serverOnly":true},{"id":2,"type":"note"},{"id":3,"type":"place","place":{"name":"three"}}]}]}}}`), &trip); err != nil {
+		t.Fatal(err)
+	}
+	ops, err := movePlaceRawOperations(trip, 1, 10, 10, 1)
 	if err != nil {
-		t.Fatalf("movePlaceOperations: %v", err)
+		t.Fatalf("movePlaceRawOperations: %v", err)
 	}
 	if got, want := ops[0].P[4], 0; got != want {
 		t.Fatalf("delete index = %v, want %v", got, want)
 	}
-	if got, want := ops[1].P[4], 2; got != want {
+	if got, want := ops[1].P[4], 1; got != want {
 		t.Fatalf("insert index = %v, want %v", got, want)
+	}
+	deleted := ops[0].LD.(map[string]any)
+	if deleted["serverOnly"] != true {
+		t.Fatalf("exact raw block was not preserved: %#v", deleted)
 	}
 }
 
 func TestReorderPlacesOperationsPreservesUnlistedBlocks(t *testing.T) {
-	ops, err := reorderPlacesOperations(testSections(t), 10, []int{3, 1})
+	var trip map[string]any
+	if err := json.Unmarshal([]byte(`{"tripPlan":{"itinerary":{"sections":[{"id":10,"blocks":[{"id":1,"type":"place","place":{"name":"one"},"unknown":{"keep":true}},{"id":2,"type":"note","unknown":"note"},{"id":3,"type":"place","place":{"name":"three"}}]}]}}}`), &trip); err != nil {
+		t.Fatal(err)
+	}
+	ops, err := reorderPlacesRawOperations(trip, 10, []int{3, 1})
 	if err != nil {
-		t.Fatalf("reorderPlacesOperations: %v", err)
+		t.Fatalf("reorderPlacesRawOperations: %v", err)
 	}
 	newBlocks, ok := ops[0].OI.([]any)
 	if !ok {
@@ -52,14 +64,19 @@ func TestReorderPlacesOperationsPreservesUnlistedBlocks(t *testing.T) {
 	}
 	ids := make([]int, 0, len(newBlocks))
 	for _, raw := range newBlocks {
-		id := reflect.ValueOf(raw).FieldByName("ID").Int()
-		ids = append(ids, int(id))
+		ids = append(ids, rawInt(raw.(map[string]any)["id"]))
 	}
 	want := []int{3, 2, 1}
 	for i := range want {
 		if ids[i] != want[i] {
 			t.Fatalf("ids = %v, want %v", ids, want)
 		}
+	}
+	if got := newBlocks[1].(map[string]any)["unknown"]; got != "note" {
+		t.Fatalf("unlisted note block was not preserved: %#v", newBlocks[1])
+	}
+	if got := newBlocks[2].(map[string]any)["unknown"]; !reflect.DeepEqual(got, map[string]any{"keep": true}) {
+		t.Fatalf("unknown place fields were not preserved: %#v", newBlocks[2])
 	}
 }
 

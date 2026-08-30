@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -20,33 +19,32 @@ Examples:
   wanderlog trips update abc123xyz --start 2024-06-01 --end 2024-06-15
   wanderlog trips update abc123xyz --privacy public`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		validateDateFlag(updateStartDate, "start")
-		validateDateFlag(updateEndDate, "end")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateDateFlagE(updateStartDate, "start"); err != nil {
+			return err
+		}
+		if err := validateDateFlagE(updateEndDate, "end"); err != nil {
+			return err
+		}
 		if tripsUpdateTitle == "" && updateStartDate == "" && updateEndDate == "" && updatePrivacy == "" {
-			logger.Error("At least one of --title, --start, --end, or --privacy is required")
-			os.Exit(1)
+			return fmt.Errorf("at least one of --title, --start, --end, or --privacy is required")
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
-		err := client.UpdateTrip(args[0], wanderlog.UpdateTripRequest{
+		err = client.UpdateTrip(args[0], wanderlog.UpdateTripRequest{
 			Title:     tripsUpdateTitle,
 			StartDate: updateStartDate,
 			EndDate:   updateEndDate,
 			Privacy:   updatePrivacy,
 		})
 		if err != nil {
-			logger.WithError(err).Error("Failed to update trip")
-			os.Exit(1)
+			return fmt.Errorf("update trip: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Updated trip %s", args[0]), map[string]string{"tripKey": args[0]})
+		return printSuccess(outputFormat, fmt.Sprintf("Updated trip %s", args[0]), map[string]string{"tripKey": args[0]})
 	},
 }
 
@@ -58,16 +56,15 @@ var tripsSectionsCmd = &cobra.Command{
 Examples:
   wanderlog trips sections abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
-		sections, err := client.GetTripSections(args[0])
+		sections, err := client.GetTripSectionsContext(cmd.Context(), args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch sections")
-			os.Exit(1)
+			return fmt.Errorf("fetch sections: %w", err)
 		}
-		ui.PrintJSON(sections)
+		return ui.PrintJSON(sections)
 	},
 }
 
@@ -79,21 +76,17 @@ var tripsFlightsCmd = &cobra.Command{
 Examples:
   wanderlog trips flights abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		flights, err := client.GetTripFlights(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch trip flights")
-			os.Exit(1)
+			return fmt.Errorf("fetch trip flights: %w", err)
 		}
-		ui.PrintJSON(flights)
+		return ui.PrintJSON(flights)
 	},
 }
 
@@ -105,21 +98,17 @@ var tripsExportCmd = &cobra.Command{
 Examples:
   wanderlog trips export abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		resp, err := client.ExportTrip(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to export trip")
-			os.Exit(1)
+			return fmt.Errorf("export trip: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 

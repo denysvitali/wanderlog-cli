@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/ui"
@@ -16,16 +19,15 @@ var travelAirlinesCmd = &cobra.Command{
 	Use:   "airlines",
 	Short: "List all airlines",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		resp, err := client.GetAllAirlines()
 		if err != nil {
-			logger.WithError(err).Error("Failed to list airlines")
-			return
+			return fmt.Errorf("list airlines: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -33,7 +35,10 @@ var travelAirportsCmd = &cobra.Command{
 	Use:   "airports [query]",
 	Short: "Search airports",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if (travelLat == 0) != (travelLng == 0) {
+			return fmt.Errorf("--lat and --lng must be provided together")
+		}
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
@@ -45,10 +50,9 @@ var travelAirportsCmd = &cobra.Command{
 			resp, err = client.AutocompleteAirport(args[0])
 		}
 		if err != nil {
-			logger.WithError(err).Error("Failed to search airports")
-			return
+			return fmt.Errorf("search airports: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -56,18 +60,19 @@ var travelFlightStopsCmd = &cobra.Command{
 	Use:   "flight-stops [flight-number]",
 	Short: "Show stops for a flight number",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		flightNum := args[0]
 		airline := flightStopsAirline
 		date := flightStopsDate
 
 		if airline == "" {
-			logger.Error("--airline is required (e.g., UA, BA, LH)")
-			return
+			return fmt.Errorf("--airline is required (for example, UA, BA, or LH)")
 		}
 		if date == "" {
-			logger.Error("--date is required (YYYY-MM-DD)")
-			return
+			return fmt.Errorf("--date is required (YYYY-MM-DD)")
+		}
+		if err := validateDateFlagE(date, "departure"); err != nil {
+			return err
 		}
 
 		client := wanderlog.NewClient()
@@ -75,10 +80,9 @@ var travelFlightStopsCmd = &cobra.Command{
 
 		resp, err := client.GetFlightStops(flightNum, airline, date)
 		if err != nil {
-			logger.WithError(err).Error("Failed to get flight stops")
-			return
+			return fmt.Errorf("get flight stops: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -86,19 +90,32 @@ var travelHotelsCmd = &cobra.Command{
 	Use:   "hotels [query]",
 	Short: "Search hotels/lodging",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		validateDateFlag(travelHotelCheckIn, "check-in")
-		validateDateFlag(travelHotelCheckOut, "check-out")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateDateFlagE(travelHotelCheckIn, "check-in"); err != nil {
+			return err
+		}
+		if err := validateDateFlagE(travelHotelCheckOut, "check-out"); err != nil {
+			return err
+		}
+		if travelHotelGuests < 1 {
+			return fmt.Errorf("--guests must be at least 1")
+		}
+		if travelHotelCheckIn != "" && travelHotelCheckOut != "" {
+			checkIn, _ := time.Parse("2006-01-02", travelHotelCheckIn)
+			checkOut, _ := time.Parse("2006-01-02", travelHotelCheckOut)
+			if !checkOut.After(checkIn) {
+				return fmt.Errorf("--check-out must be after --check-in")
+			}
+		}
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		resp, err := client.SearchLodgings(args[0], travelHotelCheckIn, travelHotelCheckOut, travelHotelGuests)
 		if err != nil {
-			logger.WithError(err).Error("Failed to search hotels")
-			return
+			return fmt.Errorf("search hotels: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -106,16 +123,15 @@ var travelHotelRatesCmd = &cobra.Command{
 	Use:   "hotel-rates [property-id]",
 	Short: "Get Google lodging price rates",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		resp, err := client.GetGooglePriceRates(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to get hotel rates")
-			return
+			return fmt.Errorf("get hotel rates: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 

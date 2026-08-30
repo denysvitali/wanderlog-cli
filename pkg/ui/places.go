@@ -18,7 +18,7 @@ func PrintPlaces(places []wanderlog.Metadata) {
 
 	for i, place := range places {
 		// Place name with rating
-		name := place.Name
+		name := SafeText(place.Name)
 		if place.Rating > 0 {
 			stars := strings.Repeat("⭐", int(place.Rating))
 			if len(stars) > 5 {
@@ -31,28 +31,28 @@ func PrintPlaces(places []wanderlog.Metadata) {
 
 		// Address
 		if place.Address != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📍 %s", place.Address)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📍 %s", SafeText(place.Address))))
 		}
 
 		// Categories
 		if len(place.Categories) > 0 {
-			categories := strings.Join(place.Categories, ", ")
+			categories := SafeText(strings.Join(place.Categories, ", "))
 			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🏷️  %s", categories)))
 		}
 
 		// Website
 		if place.Website != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🌐 %s", place.Website)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   🌐 %s", SafeText(place.Website))))
 		}
 
 		// Phone
 		if place.InternationalPhoneNumber != "" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📞 %s", place.InternationalPhoneNumber)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   📞 %s", SafeText(place.InternationalPhoneNumber))))
 		}
 
 		// Business status
 		if place.BusinessStatus != "" && place.BusinessStatus != "OPERATIONAL" {
-			fmt.Println(InfoStyle.Render(fmt.Sprintf("   ⚠️  Status: %s", place.BusinessStatus)))
+			fmt.Println(InfoStyle.Render(fmt.Sprintf("   ⚠️  Status: %s", SafeText(place.BusinessStatus))))
 		}
 
 		// Permanently closed warning
@@ -62,7 +62,7 @@ func PrintPlaces(places []wanderlog.Metadata) {
 
 		// Description
 		if place.Description != nil && *place.Description != "" {
-			desc := *place.Description
+			desc := SafeText(*place.Description)
 			if len(desc) > 100 {
 				desc = desc[:97] + "..."
 			}

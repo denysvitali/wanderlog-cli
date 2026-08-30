@@ -28,8 +28,8 @@ type (
 )
 
 func (c *Client) requireAuth(opName string) error {
-	if c.auth == nil {
-		return fmt.Errorf("%s: authentication required", opName)
+	if err := c.auth.Validate(); err != nil {
+		return fmt.Errorf("%s: authentication required: %w", opName, err)
 	}
 	return nil
 }

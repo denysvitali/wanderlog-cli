@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"net/mail"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -22,25 +24,31 @@ var tripsInviteSendCmd = &cobra.Command{
 Examples:
   wanderlog trips invite send abc123xyz --email alice@example.com --email bob@example.com`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(tripsInviteEmails) == 0 {
-			logger.Error("At least one --email is required")
-			return
+			return fmt.Errorf("at least one --email is required")
+		}
+		emails := make([]string, 0, len(tripsInviteEmails))
+		for _, value := range tripsInviteEmails {
+			email := strings.TrimSpace(value)
+			address, err := mail.ParseAddress(email)
+			if err != nil || address.Address != email {
+				return fmt.Errorf("invalid invitee email %q", value)
+			}
+			emails = append(emails, email)
 		}
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		if err := client.SendTripInvites(args[0], wanderlog.SendInvitesRequest{Invitees: tripsInviteEmails}); err != nil {
-			logger.WithError(err).Error("Failed to send invites")
-			return
+		if err := client.SendTripInvites(args[0], wanderlog.SendInvitesRequest{Invitees: emails}); err != nil {
+			return fmt.Errorf("send invites: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Sent %d invite(s)", len(tripsInviteEmails)), map[string]interface{}{"tripKey": args[0], "invitees": tripsInviteEmails})
+		return printSuccess(outputFormat, fmt.Sprintf("Sent %d invite(s)", len(emails)), map[string]interface{}{"tripKey": args[0], "invitees": emails})
 	},
 }
 
@@ -52,21 +60,19 @@ var tripsInviteListCmd = &cobra.Command{
 Examples:
   wanderlog trips invite list abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		invites, err := client.ListTripInvites(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to list invites")
-			return
+			return fmt.Errorf("list invites: %w", err)
 		}
-		ui.PrintJSON(invites)
+		return ui.PrintJSON(invites)
 	},
 }
 

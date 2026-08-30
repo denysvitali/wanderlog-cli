@@ -95,9 +95,15 @@ type TripStatsResponse struct {
 
 // GetUserTrips retrieves all trips for the authenticated user
 func (c *Client) GetUserTrips() (*UserTripsResponse, error) {
+	return c.GetUserTripsContext(context.Background())
+}
+
+// GetUserTripsContext retrieves all trips using ctx. Canceling ctx cancels the
+// in-flight HTTP request.
+func (c *Client) GetUserTripsContext(ctx context.Context) (*UserTripsResponse, error) {
 	c.logger.Debug("Fetching user trips")
 
-	resp, err := c.apiRequest(context.Background(), http.MethodGet, "tripPlans", nil, nil, false)
+	resp, err := c.apiRequest(ctx, http.MethodGet, "tripPlans", nil, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}

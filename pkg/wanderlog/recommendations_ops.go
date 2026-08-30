@@ -17,6 +17,10 @@ type (
 // GetRecommendedPlaces returns place recommendations for a trip + geo, using
 // the v2 recommendations endpoint.
 func (c *Client) GetRecommendedPlaces(req RecommendedPlacesRequest) (*RecommendedPlacesResponse, error) {
+	return c.GetRecommendedPlacesContext(context.Background(), req)
+}
+
+func (c *Client) GetRecommendedPlacesContext(ctx context.Context, req RecommendedPlacesRequest) (*RecommendedPlacesResponse, error) {
 	if req.TripPlanID == 0 {
 		return nil, fmt.Errorf("GetRecommendedPlaces: tripPlanId is required")
 	}
@@ -26,7 +30,7 @@ func (c *Client) GetRecommendedPlaces(req RecommendedPlacesRequest) (*Recommende
 	if err := c.requireAuth("GetRecommendedPlaces"); err != nil {
 		return nil, err
 	}
-	resp, err := c.apiJSON(context.Background(), http.MethodPost, "recommendations/v2", nil, req, true)
+	resp, err := c.apiJSON(ctx, http.MethodPost, "recommendations/v2", nil, req, true)
 	if err != nil {
 		return nil, err
 	}

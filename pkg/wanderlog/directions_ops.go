@@ -54,10 +54,14 @@ func (c *Client) GetDistancesForMode(payload any) (*DirectionsResponse, error) {
 
 // OptimizeRoute returns an optimized ordering for a list of places.
 func (c *Client) OptimizeRoute(payload any) (*DirectionsResponse, error) {
+	return c.OptimizeRouteContext(context.Background(), payload)
+}
+
+func (c *Client) OptimizeRouteContext(ctx context.Context, payload any) (*DirectionsResponse, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("OptimizeRoute: payload is required")
 	}
-	resp, err := c.apiJSON(context.Background(), http.MethodPost, "directions/optimizeRoute", nil, payload, false)
+	resp, err := c.apiJSON(ctx, http.MethodPost, "directions/optimizeRoute", nil, payload, false)
 	if err != nil {
 		return nil, err
 	}

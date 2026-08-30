@@ -7,10 +7,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// skipIntegrationTest skips the test if INTEGRATION_TESTS env var is not set
+// skipIntegrationTest requires an explicit opt-in because these tests contact
+// wanderlog.com and may mutate account data.
 func skipIntegrationTest(t *testing.T) {
-	if os.Getenv("INTEGRATION_TESTS") != "1" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS env var not set")
+	if os.Getenv("WANDERLOG_RUN_PROD_INTEGRATION") != "1" {
+		t.Skip("Skipping production integration test. Set WANDERLOG_RUN_PROD_INTEGRATION=1 to run.")
 	}
 }
 
@@ -19,7 +20,7 @@ func TestIntegration_EnsureAuthenticated(t *testing.T) {
 
 	t.Run("full fallback chain with explicit credentials", func(t *testing.T) {
 		sessionCookie := os.Getenv("WANDERLOG_AUTH_SESSION_COOKIE")
-		xsrfToken := os.Getenv("WANDERLOG_AUTH_XSRF_TOKEN")
+		xsrfToken := os.Getenv("WANDERLOG_AUTH_SESSION_XSRF_TOKEN")
 		email := os.Getenv("WANDERLOG_AUTH_EMAIL")
 		password := os.Getenv("WANDERLOG_AUTH_PASSWORD")
 
@@ -70,6 +71,22 @@ func TestIntegration_EnsureAuthenticated(t *testing.T) {
 
 func TestIntegration_KeychainCredentialOperations(t *testing.T) {
 	skipIntegrationTest(t)
+	if os.Getenv("WANDERLOG_RUN_KEYCHAIN_INTEGRATION") != "1" {
+		t.Skip("keychain mutation requires WANDERLOG_RUN_KEYCHAIN_INTEGRATION=1")
+	}
+
+	original, err := LoadCredentials()
+	if err != nil {
+		t.Skipf("system keychain is unavailable: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = DeleteCredentials()
+		if original != nil {
+			if restoreErr := SaveCredentials(original); restoreErr != nil {
+				t.Errorf("restoring original keychain credentials: %v", restoreErr)
+			}
+		}
+	})
 
 	t.Run("save and load credentials", func(t *testing.T) {
 		testCreds := &AuthCredentials{
@@ -217,8 +234,7 @@ func TestIntegration_TokenRefreshReLogin(t *testing.T) {
 			t.Error("UserID is empty after login")
 		}
 
-		t.Logf("Login successful: userID=%s, sessionCookie=%s, xsrfToken=%s",
-			creds.UserID, creds.SessionCookie[:min(20, len(creds.SessionCookie))]+"...", creds.XSRFToken)
+		t.Logf("Login successful: userID=%s, sessionCookie=[REDACTED], xsrfToken=[REDACTED]", creds.UserID)
 	})
 
 	t.Run("set auth and verify headers", func(t *testing.T) {

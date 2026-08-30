@@ -15,8 +15,8 @@ const (
 
 // SaveCredentials securely stores authentication credentials in the system keychain
 func SaveCredentials(creds *AuthCredentials) error {
-	if creds == nil {
-		return fmt.Errorf("credentials cannot be nil")
+	if err := creds.Validate(); err != nil {
+		return fmt.Errorf("invalid credentials: %w", err)
 	}
 
 	// Marshal credentials to JSON for storage
@@ -50,6 +50,9 @@ func LoadCredentials() (*AuthCredentials, error) {
 	if err := json.Unmarshal([]byte(credsJSON), &creds); err != nil {
 		return nil, fmt.Errorf("unmarshaling credentials: %w", err)
 	}
+	if err := creds.Validate(); err != nil {
+		return nil, fmt.Errorf("stored credentials are invalid: %w", err)
+	}
 
 	return &creds, nil
 }
@@ -65,6 +68,6 @@ func DeleteCredentials() error {
 
 // HasStoredCredentials checks if credentials are stored in the keychain
 func HasStoredCredentials() bool {
-	_, err := keyring.Get(serviceName, userKey)
-	return err == nil
+	creds, err := LoadCredentials()
+	return err == nil && creds != nil
 }

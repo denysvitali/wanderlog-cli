@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -13,15 +14,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newClient(requireAuth bool) *wanderlog.Client {
+func newClientE(requireAuth bool) (*wanderlog.Client, error) {
 	client := wanderlog.NewClient()
 	client.SetLogger(logger)
 	if requireAuth {
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return nil, fmt.Errorf("authentication required: %w", err)
 		}
-		return client
+		return client, nil
 	}
 
 	switch {
@@ -38,33 +38,38 @@ func newClient(requireAuth bool) *wanderlog.Client {
 			client.SetAuth(creds)
 		}
 	}
-	return client
+	return client, nil
 }
 
-func parseRequiredInt(value, name string) int {
+func parseRequiredIntE(value, name string) (int, error) {
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
-		logger.WithError(err).Errorf("Invalid %s - must be a number", name)
-		os.Exit(1)
+		return 0, fmt.Errorf("invalid %s %q: must be a number", name, value)
 	}
-	return parsed
+	if parsed <= 0 {
+		return 0, fmt.Errorf("invalid %s %q: must be greater than zero", name, value)
+	}
+	return parsed, nil
 }
 
-func parseIntCSV(value, name string) []int {
+func parseIntCSVE(value, name string) ([]int, error) {
 	if strings.TrimSpace(value) == "" {
-		logger.Errorf("%s is required", name)
-		os.Exit(1)
+		return nil, fmt.Errorf("%s is required", name)
 	}
 
 	parts := strings.Split(value, ",")
 	result := make([]int, 0, len(parts))
 	for _, part := range parts {
-		result = append(result, parseRequiredInt(strings.TrimSpace(part), name))
+		parsed, err := parseRequiredIntE(strings.TrimSpace(part), name)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, parsed)
 	}
-	return result
+	return result, nil
 }
 
-func parseChecklistItems(values []string) []wanderlog.ChecklistItem {
+func parseChecklistItemsE(values []string) ([]wanderlog.ChecklistItem, error) {
 	items := make([]wanderlog.ChecklistItem, 0, len(values))
 	for _, value := range values {
 		text := strings.TrimSpace(value)
@@ -74,39 +79,60 @@ func parseChecklistItems(values []string) []wanderlog.ChecklistItem {
 		items = append(items, wanderlog.ChecklistItem{Text: text})
 	}
 	if len(items) == 0 {
-		logger.Error("At least one --item value is required")
-		os.Exit(1)
+		return nil, fmt.Errorf("at least one non-empty --item value is required")
 	}
-	return items
+	return items, nil
 }
 
-func validateDateFlag(value, name string) {
+func validateDateFlagE(value, name string) error {
 	if value == "" {
-		return
+		return nil
 	}
 	if _, err := time.Parse("2006-01-02", value); err != nil {
-		logger.WithError(err).Errorf("Invalid %s date format. Use YYYY-MM-DD", name)
-		os.Exit(1)
+		return fmt.Errorf("invalid %s date %q: use YYYY-MM-DD", name, value)
 	}
+	return nil
 }
 
-func mustJSON(data string) []byte {
+func parseJSONBody(data string) ([]byte, error) {
 	if strings.TrimSpace(data) == "" {
-		return nil
+		return nil, nil
 	}
 
 	var raw json.RawMessage
 	if err := json.Unmarshal([]byte(data), &raw); err != nil {
-		logger.WithError(err).Error("Invalid JSON body")
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid JSON body: %w", err)
 	}
-	return []byte(data)
+	return []byte(data), nil
 }
 
-func printSuccess(format string, message string, data interface{}) {
+func printSuccess(format string, message string, data interface{}) error {
 	if format == "json" {
-		ui.PrintJSON(data)
-		return
+		return ui.PrintJSON(data)
 	}
-	fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✓ %s", message)))
+	_, err := fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✓ %s", message)))
+	return err
+}
+
+// confirmAction keeps prompts off stdout (which may be consumed as JSON) and
+// accepts --yes for scripts. EOF is treated as a canceled operation.
+func confirmAction(cmd interface {
+	InOrStdin() io.Reader
+	ErrOrStderr() io.Writer
+}, prompt string, assumeYes bool) (bool, error) {
+	if assumeYes {
+		return true, nil
+	}
+	if outputFormat == "json" {
+		return false, fmt.Errorf("--yes is required with --output json")
+	}
+
+	if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "%s Type 'yes' to confirm: ", prompt); err != nil {
+		return false, err
+	}
+	response, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
+	if err != nil && err != io.EOF {
+		return false, fmt.Errorf("read confirmation: %w", err)
+	}
+	return strings.EqualFold(strings.TrimSpace(response), "yes"), nil
 }

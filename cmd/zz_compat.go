@@ -1,173 +1,80 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 )
 
-// Backward compatibility aliases for old command paths.
-// These allow existing scripts using old commands to continue working.
+// compatibilityCommand exposes a canonical command at its former root path.
+// Sharing the canonical flag set keeps validation, defaults, arguments, and
+// behavior in sync instead of maintaining a second command implementation.
+func compatibilityCommand(name string, target *cobra.Command) *cobra.Command {
+	use := name
+	if _, suffix, ok := strings.Cut(target.Use, " "); ok {
+		use += " " + suffix
+	}
 
-var compatListCmd = &cobra.Command{
-	Use:                "list",
-	Short:              "List your trips (deprecated: use 'wanderlog trips list')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsListCmd.Run(tripsListCmd, args)
-	},
-}
+	path := target.CommandPath()
+	path = strings.TrimPrefix(path, "wanderlog ")
+	compat := &cobra.Command{
+		Use:                use,
+		Short:              target.Short + " (deprecated: use 'wanderlog " + path + "')",
+		Long:               target.Long,
+		Args:               target.Args,
+		ArgAliases:         target.ArgAliases,
+		ValidArgs:          target.ValidArgs,
+		ValidArgsFunction:  target.ValidArgsFunction,
+		Hidden:             true,
+		DisableSuggestions: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if target.PreRunE != nil {
+				if err := target.PreRunE(cmd, args); err != nil {
+					return err
+				}
+			} else if target.PreRun != nil {
+				target.PreRun(cmd, args)
+			}
 
-var compatTripCmd = &cobra.Command{
-	Use:                "trip",
-	Short:              "Get trip information (deprecated: use 'wanderlog trips show')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsShowCmd.Run(tripsShowCmd, args)
-	},
-}
-
-var compatCreateCmd = &cobra.Command{
-	Use:                "create",
-	Short:              "Create a new trip (deprecated: use 'wanderlog trips create')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsCreateCmd.Run(tripsCreateCmd, args)
-	},
-}
-
-var compatDeleteCmd = &cobra.Command{
-	Use:                "delete",
-	Short:              "Delete a trip (deprecated: use 'wanderlog trips delete')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsDeleteCmd.Run(tripsDeleteCmd, args)
-	},
-}
-
-var compatCopyCmd = &cobra.Command{
-	Use:                "copy",
-	Short:              "Copy an existing trip (deprecated: use 'wanderlog trips copy')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsCopyCmd.Run(tripsCopyCmd, args)
-	},
-}
-
-var compatRestoreCmd = &cobra.Command{
-	Use:                "restore",
-	Short:              "Restore a deleted trip (deprecated: use 'wanderlog trips restore')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsRestoreCmd.Run(tripsRestoreCmd, args)
-	},
-}
-
-var compatPlacesCmd = &cobra.Command{
-	Use:                "places",
-	Short:              "Show places from a trip (deprecated: use 'wanderlog trips places')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsPlacesCmd.Run(tripsPlacesCmd, args)
-	},
-}
-
-var compatImagesCmd = &cobra.Command{
-	Use:                "images",
-	Short:              "Show trip images (deprecated: use 'wanderlog trips images')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsImagesCmd.Run(tripsImagesCmd, args)
-	},
-}
-
-var compatExpensesCmd = &cobra.Command{
-	Use:                "expenses",
-	Short:              "Download trip expenses as CSV (deprecated: use 'wanderlog trips expenses')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsExpensesCmd.Run(tripsExpensesCmd, args)
-	},
-}
-
-var compatSectionsCmd = &cobra.Command{
-	Use:                "sections",
-	Short:              "List trip sections (deprecated: use 'wanderlog trips sections')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsSectionsCmd.Run(tripsSectionsCmd, args)
-	},
-}
-
-var compatLikeCmd = &cobra.Command{
-	Use:                "like",
-	Short:              "Like or unlike a trip (deprecated: use 'wanderlog trips like')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsLikeCmd.Run(tripsLikeCmd, args)
-	},
-}
-
-var compatLikeCountCmd = &cobra.Command{
-	Use:                "like-count",
-	Short:              "Get trip like count (deprecated: use 'wanderlog trips like-count')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		tripsLikeCountCmd.Run(tripsLikeCountCmd, args)
-	},
-}
-
-var compatSearchCmd = &cobra.Command{
-	Use:                "search",
-	Short:              "Search for places (deprecated: use 'wanderlog search places')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		searchWanderlogCmd.Run(searchWanderlogCmd, args)
-	},
-}
-
-var compatSearchPlacesCmd = &cobra.Command{
-	Use:                "search-places",
-	Short:              "Search places using Wanderlog autocomplete (deprecated: use 'wanderlog search places')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		searchWanderlogCmd.Run(searchWanderlogCmd, args)
-	},
-}
-
-var compatPlaceDetailsCmd = &cobra.Command{
-	Use:                "place-details",
-	Short:              "Get place details (deprecated: use 'wanderlog search place-details')",
-	Hidden:             true,
-	DisableSuggestions: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		searchPlaceDetailsCmd.Run(searchPlaceDetailsCmd, args)
-	},
+			if target.RunE != nil {
+				return target.RunE(cmd, args)
+			}
+			target.Run(cmd, args)
+			return nil
+		},
+	}
+	compat.Flags().AddFlagSet(target.Flags())
+	return compat
 }
 
 func init() {
-	// Auth commands - no aliases needed, these are unchanged
-	// login, logout, status stay at root
-
-	// Trip aliases
 	rootCmd.AddCommand(
-		compatListCmd, compatTripCmd, compatCreateCmd, compatDeleteCmd,
-		compatCopyCmd, compatRestoreCmd, compatPlacesCmd, compatImagesCmd,
-		compatExpensesCmd, compatSectionsCmd, compatLikeCmd, compatLikeCountCmd,
+		compatibilityCommand("list", tripsListCmd),
+		compatibilityCommand("trip", tripsShowCmd),
+		compatibilityCommand("create", tripsCreateCmd),
+		compatibilityCommand("delete", tripsDeleteCmd),
+		compatibilityCommand("copy", tripsCopyCmd),
+		compatibilityCommand("restore", tripsRestoreCmd),
+		compatibilityCommand("places", tripsPlacesCmd),
+		compatibilityCommand("images", tripsImagesCmd),
+		compatibilityCommand("expenses", tripsExpensesCmd),
+		compatibilityCommand("sections", tripsSectionsCmd),
+		compatibilityCommand("like", tripsLikeCmd),
+		compatibilityCommand("like-count", tripsLikeCountCmd),
+		compatibilityCommand("search-places", searchWanderlogCmd),
+		compatibilityCommand("place-details", searchPlaceDetailsCmd),
 	)
 
-	// Search aliases
-	rootCmd.AddCommand(compatSearchCmd, compatSearchPlacesCmd, compatPlaceDetailsCmd)
+	// `search` is now a command group, but it can still accept the former
+	// positional query form without shadowing its modern subcommands.
+	searchParentCmd.Use = "search [query]"
+	searchParentCmd.Args = searchWanderlogCmd.Args
+	searchParentCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if searchWanderlogCmd.RunE != nil {
+			return searchWanderlogCmd.RunE(cmd, args)
+		}
+		searchWanderlogCmd.Run(cmd, args)
+		return nil
+	}
+	searchParentCmd.Flags().AddFlagSet(searchWanderlogCmd.Flags())
 }

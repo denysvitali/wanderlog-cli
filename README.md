@@ -44,28 +44,28 @@ go build -o wanderlog
 
 ```bash
 # Get trip overview from API
-wanderlog trip abc123xyz
+wanderlog trips show abc123xyz
 
 # Get detailed itinerary with flights and destinations
-wanderlog trip abc123xyz --details
+wanderlog trips show abc123xyz --details
 
 # Load trip from local JSON file
-wanderlog trip --file trips/trip1.json
+wanderlog trips show --file trips/trip1.json
 
 # Show places with details, ratings, and addresses
-wanderlog places abc123xyz
-wanderlog places --file trips/trip1.json
+wanderlog trips places abc123xyz
+wanderlog trips places --file trips/trip1.json
 
 # View trip images
-wanderlog images abc123xyz
+wanderlog trips images abc123xyz
 
 # Output as JSON for scripting
-wanderlog trip abc123xyz --format json
-wanderlog places abc123xyz --format json
+wanderlog trips show abc123xyz --output json
+wanderlog trips places abc123xyz --output json
 
 # Output as Markdown for LLMs and documentation
-wanderlog trip abc123xyz --format markdown --details
-wanderlog places abc123xyz --format markdown
+wanderlog trips show abc123xyz --output markdown --details
+wanderlog trips places abc123xyz --output markdown
 ```
 
 ### Writing and Editing Trips
@@ -75,28 +75,47 @@ wanderlog places abc123xyz --format markdown
 wanderlog login
 
 # List your trips
-wanderlog list
+wanderlog trips list
 
 # Create a new trip
-wanderlog create --title "Trip to Japan" --start 2024-06-01 --end 2024-06-15
+wanderlog trips create --title "Trip to Japan" --geo-id 1 --start 2026-06-01 --end 2026-06-15
 
 # Copy an existing trip
-wanderlog copy abc123xyz
+wanderlog trips copy abc123xyz
 
 # Add a place to a trip
-wanderlog edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
+wanderlog trips edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
 
 # Add a place with coordinates
 wanderlog trips edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --start-time 09:30
 
 # Remove a place from a trip  
-wanderlog edit remove-place abc123xyz 12345
+wanderlog trips edit remove-place abc123xyz 12345
 
 # Set or change a place visit time
 wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30 --end-time 11:00
 
+# Add, edit, or remove a flight reservation (block IDs are shown by `trips flights`)
+wanderlog trips flight add abc123xyz --flight-number MU244 --departure-date 2026-06-02 --departure-time 09:30
+wanderlog trips flight update abc123xyz 12345 --confirmation ABC123 --arrival-time 14:20
+wanderlog trips flight delete abc123xyz 12345
+
+# Add, edit, or remove a lodging reservation
+wanderlog trips lodging add abc123xyz --name "Hôtel du Louvre" --place-id ChIJ... --check-in 2026-06-03 --check-out 2026-06-06
+wanderlog trips lodging update abc123xyz 23456 --confirmation HOTEL123 --traveler Ada --traveler Grace
+wanderlog trips lodging delete abc123xyz 23456
+
+# Add rail/transit. A station Place ID can replace each name/coordinate group.
+wanderlog trips train add abc123xyz --carrier "SBB EC 317" --departure-date 2026-06-07 \
+  --departure-name "Zürich HB" --departure-lat 47.3782 --departure-lng 8.5402 \
+  --arrival-name "Milano Centrale" --arrival-lat 45.4863 --arrival-lng 9.2045
+wanderlog trips train delete abc123xyz 34567
+
 # Delete a trip (careful!)
-wanderlog delete abc123xyz
+wanderlog trips delete abc123xyz
+
+# Skip the confirmation only in an intentional script
+wanderlog trips delete abc123xyz --yes --output json
 ```
 
 ### Authentication
@@ -114,11 +133,11 @@ wanderlog status
 wanderlog logout
 
 # Or set credentials via environment variables (not recommended for security)
-export WANDERLOG_SESSION="your-session-cookie"
-export WANDERLOG_XSRF="your-xsrf-token"
+export WANDERLOG_AUTH_SESSION_COOKIE="your-session-cookie"
+export WANDERLOG_AUTH_SESSION_XSRF_TOKEN="your-xsrf-token"
 
 # Or pass as flags (not recommended for security)
-wanderlog create --title "New Trip" --session "cookie" --xsrf "token"
+wanderlog trips create --title "New Trip" --geo-id 1 --session "cookie" --xsrf "token"
 ```
 
 **Security Features:**
@@ -167,10 +186,10 @@ wanderlog feed guides --geo-id 1
 
 ```bash
 # Read a published journal by share key
-wanderlog journal <journal-key>
+wanderlog trips journal <journal-key>
 
 # Download expenses for a trip
-wanderlog expenses <trip-key> > expenses.csv
+wanderlog trips expenses <trip-key> > expenses.csv
 
 # Set a budget and add ticket/expense costs
 wanderlog trips budget set <trip-key> --amount 2500 --currency USD
@@ -179,15 +198,23 @@ wanderlog trips expenses update <trip-key> <expense-id> --amount 95
 wanderlog trips expenses delete <trip-key> <expense-id>
 
 # Register a view, check whether the client needs an upgrade
-wanderlog register-view <trip-key>
-wanderlog update-required <trip-key>
+wanderlog trips register-view <trip-key>
+wanderlog trips update-required <trip-key>
 
 # Get / set distinction (badges)
-wanderlog distinction <trip-key>
-wanderlog distinction <trip-key> --set community-pick
+wanderlog trips distinction <trip-key>
+wanderlog trips distinction <trip-key> --set community-pick
 
 # Promote a trip into a published guide
-wanderlog create-guide <trip-key>
+wanderlog trips create-guide <trip-key>
+
+# Analyze itinerary density, block mix, metadata consistency, and costs
+wanderlog trips analytics <trip-key>
+wanderlog trips analytics --file trip.json --output json
+
+# Optimize a route or request destination recommendations
+wanderlog trips optimize-route --body '{"mode":"driving","places":[{"id":123},{"id":456}]}'
+wanderlog trips recommendations <trip-key> --geo-id 1
 ```
 
 ### Server configuration
@@ -270,8 +297,12 @@ Wanderlog CLI includes a [Model Context Protocol (MCP)](https://modelcontextprot
 # Start MCP server on stdio (default, for LLM hosts like Claude Code)
 wanderlog mcp
 
-# Start MCP server on HTTP
-wanderlog mcp --http
+# Start authenticated HTTP MCP on localhost (endpoint: /mcp)
+export WANDERLOG_MCP_HTTP_TOKEN="replace-with-a-random-secret-of-at-least-16-characters"
+wanderlog mcp --http :8080
+
+# A non-loopback bind also requires TLS
+wanderlog mcp --http 0.0.0.0:8443 --tls-cert server.crt --tls-key server.key
 
 # Enable write operations (read-only by default)
 wanderlog mcp --enable-write
@@ -280,9 +311,15 @@ wanderlog mcp --enable-write
 wanderlog mcp --trip-id abc123xyz
 ```
 
+HTTP transport always requires `Authorization: Bearer $WANDERLOG_MCP_HTTP_TOKEN`.
+An address such as `:8080` is deliberately normalized to `127.0.0.1:8080`;
+non-loopback addresses are refused unless both a TLS certificate and key are
+configured. HTTP requests are origin-checked, size-limited, and served with
+bounded read/header/idle timeouts. Prefer stdio unless remote access is needed.
+
 **Available MCP tools include:**
 - **Read-only:** `list_trips`, `get_trip`, `get_trip_plan`, `get_itinerary`, `list_places`, `list_sections`, `get_flights`, `get_trip_sections`, `search_places`, `search_restaurants`, `search_places_wanderlog`, `search_hotels`, `get_place_details`, `get_flight_stops`, `get_like_count`, `list_trip_invites`, `get_me`, `get_user_profile`, `get_notifications`, `get_notification_settings`, `get_user_emails`, `get_user_kv`, `list_following`, `find_user_by_email`, `autocomplete_users`, `is_username_taken`, `get_feed_home`, `get_feed`, `get_feed_v2`, `get_feed_recent`, `get_feed_friends`, `get_trip_history`, `get_if_edited`, `browse_guides`, `search_geos`, `get_view_only_journal`, `get_journal_stop_polylines`, `get_trip_expenses_csv`, `get_trip_distinction`, `get_trip_update_required`, `get_trip_images`, `get_trip_places`, `search_places_in_trips`, `get_all_airlines`, `autocomplete_airports`, `get_hotel_rates`, `get_global_config`, `get_session_store`, `get_session_preferences`
-- **Write-gated (need `--enable-write`):** `add_place`, `remove_place`, `move_place`, `reorder_places`, `update_place_notes`, `update_place_visit_time`, `clear_section_blocks`, `delete_section`, `nuke_trip_places`, `add_flight`, `update_flight`, `delete_flight`, `add_lodging`, `update_lodging`, `delete_lodging`, `delete_itinerary_block`, `set_trip_budget`, `add_trip_expense`, `update_trip_expense`, `delete_trip_expense`, `create_trip`, `create_example_trip`, `delete_trip`, `delete_trips`, `restore_trip`, `copy_trip`, `update_trip`, `like_trip`, `send_trip_invites`, `mark_notifications_read`, `set_user_kv`, `update_me`, `update_notification_settings`, `set_utc_offset`, `block_user`, `server_logout`, `set_session_store_value`, `register_trip_view`, `create_guide_from_trip`, `export_trip`, `autofill_day`, `add_checklist_items`, `toggle_checklist_item`, `add_collaborator`, `remove_collaborator`, `get_or_create_share_key`, `set_trip_distinction`, `update_trip_plan_geo`
+- **Write-gated (need `--enable-write`):** `add_place`, `remove_place`, `move_place`, `reorder_places`, `update_place_notes`, `update_place_visit_time`, `clear_section_blocks`, `delete_section`, `nuke_trip_places`, `add_flight`, `update_flight`, `delete_flight`, `add_lodging`, `update_lodging`, `delete_lodging`, `add_train`, `delete_itinerary_block`, `set_trip_budget`, `add_trip_expense`, `update_trip_expense`, `delete_trip_expense`, `create_trip`, `create_example_trip`, `delete_trip`, `delete_trips`, `restore_trip`, `copy_trip`, `update_trip`, `like_trip`, `send_trip_invites`, `mark_notifications_read`, `set_user_kv`, `update_me`, `update_notification_settings`, `set_utc_offset`, `block_user`, `server_logout`, `set_session_store_value`, `register_trip_view`, `create_guide_from_trip`, `export_trip`, `autofill_day`, `add_checklist_items`, `toggle_checklist_item`, `add_collaborator`, `remove_collaborator`, `get_or_create_share_key`, `set_trip_distinction`, `update_trip_plan_geo`
 
 ### Using with Claude Code
 
@@ -309,13 +346,13 @@ wanderlog travel airlines
 wanderlog travel airports "New York"
 
 # Get flight stops for a specific flight
-wanderlog travel flight-stops --flight-number 244 --airline MU --date 2026-05-11
+wanderlog travel flight-stops 244 --airline MU --date 2026-05-11
 
 # Search hotels
-wanderlog travel hotels --location Tokyo --check-in 2026-06-01 --check-out 2026-06-07
+wanderlog travel hotels Tokyo --check-in 2026-06-01 --check-out 2026-06-07
 
 # Get hotel price rates
-wanderlog travel hotel-rates --property-id some-prop-id
+wanderlog travel hotel-rates some-prop-id
 ```
 
 ## Raw API Passthrough
@@ -334,26 +371,23 @@ wanderlog api /user/notifications/markRead -X POST \
 wanderlog api /user --auth
 
 # Raw output (no formatting)
-wanderlog api /config/globalConfig --format raw
+wanderlog api /config/globalConfig --output raw
 ```
 
 ## Configuration
 
 The CLI supports configuration via:
-- Config file: `~/.wanderlog.yaml`
+- Config file: `$XDG_CONFIG_HOME/wanderlog/config.yaml` (normally `~/.config/wanderlog/config.yaml`)
 - Environment variables (prefixed with `WANDERLOG_`)
 - Command-line flags
 
-Example config file:
-```yaml
-verbose: true
-format: pretty
-```
+Authentication secrets are stored in the system keychain rather than in this
+file. Use `--config /path/to/config.yaml` to select a different config file.
 
 ## Example Output
 
 ```bash
-$ wanderlog trip --file trips/trip1.json --details
+$ wanderlog trips show --file trips/trip1.json --details
 
 🌍 Trip to China
 
@@ -388,14 +422,14 @@ $ wanderlog trip --file trips/trip1.json --details
 
 ## LLM Integration
 
-The `--format markdown` option produces clean, structured Markdown perfect for feeding to Large Language Models:
+The `--output markdown` option produces clean, structured Markdown perfect for feeding to Large Language Models:
 
 ```bash
 # Generate trip analysis for an LLM
-wanderlog trip abc123xyz --format markdown --details > trip.md
+wanderlog trips show abc123xyz --output markdown --details > trip.md
 
 # Get places data for AI processing
-wanderlog places abc123xyz --format markdown > places.md
+wanderlog trips places abc123xyz --output markdown > places.md
 ```
 
 **Example Markdown output:**
@@ -460,7 +494,16 @@ The CLI implements secure credential storage using your system's native keychain
 - **Windows**: Windows Credential Manager  
 - **Linux**: Secret Service (GNOME Keyring, KDE Wallet, etc.)
 
-Your login credentials (email/password) are **never stored**. Only session tokens are securely stored for convenience. You can always run `wanderlog logout` to clear stored credentials.
+Your account password is **never stored**. New session tokens are stored only in
+the native keychain. On startup, the CLI removes plaintext passwords left in
+config files by older releases and repairs config permissions to `0600`.
+`wanderlog status` verifies stored credentials with the server without printing
+token fragments, and `wanderlog logout` invalidates the remote session before
+clearing local keychain and legacy config data.
+
+Raw `wanderlog api` requests never receive stored credentials unless `--auth` is
+explicitly set. Authenticated raw requests must use the configured Wanderlog API
+origin, and credential-bearing requests cannot follow cross-origin redirects.
 
 ## Development
 
@@ -475,7 +518,7 @@ go test ./...
 go build -o wanderlog
 
 # Run locally
-./wanderlog trip abc123xyz
+./wanderlog trips show abc123xyz
 ```
 
 ## Project Structure

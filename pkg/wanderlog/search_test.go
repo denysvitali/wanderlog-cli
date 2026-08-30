@@ -1,6 +1,7 @@
 package wanderlog
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -88,6 +89,47 @@ func TestSearchPlacesInTrips(t *testing.T) {
 		_, err := client.SearchPlacesInTrips("test")
 		if err == nil {
 			t.Fatal("expected error when get user trips fails")
+		}
+	})
+
+	t.Run("returns matches and reports partial failures", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/tripPlans":
+				_, _ = w.Write([]byte(`{"success":true,"data":[{"key":"first"},{"key":"missing"},{"key":"second"}]}`))
+			case "/tripPlans/missing":
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			default:
+				_, _ = w.Write([]byte(`{"success":true,"resources":{"placeMetadata":[{"id":1,"name":"Coffee shop"}]}}`))
+			}
+		}))
+		defer server.Close()
+
+		resp, err := newTestClient(t, server).SearchPlacesInTrips("coffee")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(resp.Places) != 2 || len(resp.Warnings) != 1 {
+			t.Fatalf("unexpected partial result: %+v", resp)
+		}
+	})
+
+	t.Run("honors cancellation", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/tripPlans" {
+				_, _ = w.Write([]byte(`{"success":true,"data":[{"key":"slow"}]}`))
+				return
+			}
+			<-r.Context().Done()
+		}))
+		defer server.Close()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if _, err := newTestClient(t, server).SearchPlacesInTripsContext(ctx, "coffee"); err == nil {
+			t.Fatal("expected cancellation error")
 		}
 	})
 }

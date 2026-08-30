@@ -1,0 +1,10 @@
+.git
+.github
+.env
+*.env
+.credentials
+coverage.out
+coverage.html
+dist
+wanderlog
+wanderlog-cli

@@ -1,7 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "labels": [
+    "dependencies"
   ],
   "postUpdateOptions": [
     "gomodTidy",
@@ -9,31 +13,55 @@
   ],
   "packageRules": [
     {
-      "description": "Group Go module updates together",
+      "description": "Group compatible Go module updates",
       "matchManagers": [
         "gomod"
       ],
-      "groupName": "Go modules",
-      "groupSlug": "go-modules",
-      "separateMajorMinor": false
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "Go module non-major updates",
+      "groupSlug": "go-modules-non-major"
     },
     {
-      "description": "Group Docker image updates together",
+      "description": "Keep breaking Go module updates isolated",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": null
+    },
+    {
+      "description": "Group compatible Docker image updates",
       "matchManagers": [
         "dockerfile"
       ],
-      "groupName": "Docker images",
-      "groupSlug": "docker-images",
-      "separateMajorMinor": false
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "Docker image non-major updates",
+      "groupSlug": "docker-images-non-major"
     },
     {
-      "description": "Group GitHub Actions updates together",
+      "description": "Group compatible GitHub Actions updates",
       "matchManagers": [
         "github-actions"
       ],
-      "groupName": "GitHub Actions",
-      "groupSlug": "github-actions",
-      "separateMajorMinor": false
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "GitHub Actions non-major updates",
+      "groupSlug": "github-actions-non-major"
     }
   ]
 }

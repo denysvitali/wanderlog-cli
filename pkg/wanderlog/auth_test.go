@@ -1,12 +1,17 @@
 package wanderlog
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"github.com/zalando/go-keyring"
 )
 
 func TestAddAuthHeaders(t *testing.T) {
@@ -62,6 +67,249 @@ func TestAddAuthHeaders(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("rejects incomplete credentials", func(t *testing.T) {
+		client2 := NewClient()
+		client2.SetAuth(&AuthCredentials{SessionCookie: "session-only"})
+		req, _ := http.NewRequest("GET", "http://example.com/", nil)
+		err := client2.addAuthHeaders(req)
+		if err == nil || !strings.Contains(err.Error(), "XSRF token is missing") {
+			t.Fatalf("expected incomplete credential error, got %v", err)
+		}
+	})
+}
+
+func TestEnsureAuthenticatedRejectsPartialExplicitCredentials(t *testing.T) {
+	client := NewClient()
+	err := client.EnsureAuthenticated("session-only", "")
+	if err == nil || !strings.Contains(err.Error(), "XSRF token is missing") {
+		t.Fatalf("expected incomplete credential error, got %v", err)
+	}
+}
+
+func TestEnsureAuthenticatedValidatesSession(t *testing.T) {
+	clearAuthEnvironment(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/user" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			return
+		}
+		if r.Header.Get("X-XSRF-TOKEN") != "valid-xsrf" {
+			t.Error("validation request did not include the XSRF token")
+		}
+		if cookie, err := r.Cookie("connect.sid"); err != nil || cookie.Value != "valid-session" {
+			t.Errorf("validation request session cookie = %v, %v", cookie, err)
+		}
+		_, _ = w.Write([]byte(`{"id":42,"email":"user@example.com"}`))
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
+	client := NewClient()
+	if err := client.EnsureAuthenticated("valid-session", "valid-xsrf"); err != nil {
+		t.Fatalf("EnsureAuthenticated: %v", err)
+	}
+}
+
+func TestEnsureAuthenticatedRejectedSessionRefreshesFromEnvironment(t *testing.T) {
+	clearAuthEnvironment(t)
+	t.Setenv("WANDERLOG_AUTH_SESSION_COOKIE", "expired-session")
+	t.Setenv("WANDERLOG_AUTH_XSRF_TOKEN", "expired-xsrf")
+	t.Setenv("WANDERLOG_AUTH_EMAIL", "user@example.com")
+	t.Setenv("WANDERLOG_AUTH_PASSWORD", "environment-password")
+
+	validationCalls := 0
+	loginCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			validationCalls++
+			w.WriteHeader(http.StatusUnauthorized)
+		case r.Method == http.MethodPost && r.URL.Path == "/user/login":
+			loginCalls++
+			var request LoginRequest
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Errorf("decode login: %v", err)
+				return
+			}
+			if request.Email != "user@example.com" || request.Password != "environment-password" {
+				t.Errorf("unexpected login request: %+v", request)
+			}
+			w.Header().Add("Set-Cookie", "connect.sid=refreshed-session; Path=/; HttpOnly")
+			w.Header().Add("Set-Cookie", "XSRF-TOKEN=refreshed-xsrf; Path=/")
+			_, _ = w.Write([]byte(`{"success":true,"user":{"id":42,"email":"user@example.com"}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
+	client := NewClient()
+	if err := client.EnsureAuthenticatedContext(context.Background(), "", ""); err != nil {
+		t.Fatalf("EnsureAuthenticatedContext: %v", err)
+	}
+	if validationCalls != 1 || loginCalls != 1 {
+		t.Fatalf("validation calls = %d, login calls = %d", validationCalls, loginCalls)
+	}
+	if client.auth == nil || client.auth.SessionCookie != "refreshed-session" || client.auth.XSRFToken != "refreshed-xsrf" {
+		t.Fatalf("refreshed credentials not installed: %+v", client.auth)
+	}
+}
+
+func TestEnsureAuthenticatedRefreshesRejectedKeychainSession(t *testing.T) {
+	clearAuthEnvironment(t)
+	t.Setenv("WANDERLOG_DISABLE_KEYCHAIN", "")
+	t.Setenv("WANDERLOG_AUTH_EMAIL", "user@example.com")
+	t.Setenv("WANDERLOG_AUTH_PASSWORD", "environment-password")
+	keyring.MockInit()
+	if err := SaveCredentials(&AuthCredentials{SessionCookie: "expired-session", XSRFToken: "expired-xsrf"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = DeleteCredentials() })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			w.WriteHeader(http.StatusUnauthorized)
+		case r.Method == http.MethodPost && r.URL.Path == "/user/login":
+			w.Header().Add("Set-Cookie", "connect.sid=refreshed-keychain-session; Path=/; HttpOnly")
+			w.Header().Add("Set-Cookie", "XSRF-TOKEN=refreshed-keychain-xsrf; Path=/")
+			_, _ = w.Write([]byte(`{"success":true,"user":{"id":42}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
+	client := NewClient()
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		t.Fatalf("EnsureAuthenticated: %v", err)
+	}
+	stored, err := LoadCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored == nil || stored.SessionCookie != "refreshed-keychain-session" || stored.XSRFToken != "refreshed-keychain-xsrf" {
+		t.Fatalf("keychain was not refreshed: %+v", stored)
+	}
+}
+
+func TestEnsureAuthenticatedEnvironmentLoginWorksWithoutKeychain(t *testing.T) {
+	clearAuthEnvironment(t)
+	t.Setenv("WANDERLOG_AUTH_EMAIL", "user@example.com")
+	t.Setenv("WANDERLOG_AUTH_PASSWORD", "environment-password")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/user/login" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			return
+		}
+		w.Header().Add("Set-Cookie", "connect.sid=environment-session; Path=/; HttpOnly")
+		w.Header().Add("Set-Cookie", "XSRF-TOKEN=environment-xsrf; Path=/")
+		_, _ = w.Write([]byte(`{"success":true,"user":{"id":42}}`))
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
+	client := NewClient()
+	if err := client.EnsureAuthenticated("", ""); err != nil {
+		t.Fatalf("EnsureAuthenticated: %v", err)
+	}
+	if client.auth == nil || client.auth.SessionCookie != "environment-session" {
+		t.Fatalf("environment credentials not installed: %+v", client.auth)
+	}
+}
+
+func TestEnsureAuthenticatedDoesNotFallbackForServerFailure(t *testing.T) {
+	clearAuthEnvironment(t)
+	t.Setenv("WANDERLOG_AUTH_EMAIL", "user@example.com")
+	t.Setenv("WANDERLOG_AUTH_PASSWORD", "environment-password")
+	loginCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			loginCalls++
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
+	client := NewClient()
+	err := client.EnsureAuthenticated("session", "xsrf")
+	if err == nil || errors.Is(err, ErrSessionRejected) {
+		t.Fatalf("expected non-rejection validation failure, got %v", err)
+	}
+	if loginCalls != 0 {
+		t.Fatalf("login fallback attempted %d times", loginCalls)
+	}
+	if client.auth != nil {
+		t.Fatalf("rejected credentials remain installed: %+v", client.auth)
+	}
+}
+
+func TestEnsureAuthenticatedContextHonorsCancellation(t *testing.T) {
+	clearAuthEnvironment(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	client := NewClient()
+	err := client.EnsureAuthenticatedContext(ctx, "session", "xsrf")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if client.auth != nil {
+		t.Fatalf("credentials remain installed after canceled validation: %+v", client.auth)
+	}
+}
+
+func TestEnsureAuthenticatedNeverUsesConfigPassword(t *testing.T) {
+	clearAuthEnvironment(t)
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("auth.session.cookie", "expired-session")
+	viper.Set("auth.session.xsrf_token", "expired-xsrf")
+	viper.Set("auth.email", "config@example.com")
+	viper.Set("auth.password", "forbidden-config-password")
+	loginCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			loginCalls++
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+	withAuthTestBaseURL(t, server.URL)
+
+	client := NewClient()
+	err := client.EnsureAuthenticated("", "")
+	if !errors.Is(err, ErrSessionRejected) {
+		t.Fatalf("expected rejected config session, got %v", err)
+	}
+	if loginCalls != 0 {
+		t.Fatalf("config password triggered %d login attempts", loginCalls)
+	}
+}
+
+func clearAuthEnvironment(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"WANDERLOG_AUTH_SESSION_COOKIE",
+		"WANDERLOG_AUTH_XSRF_TOKEN",
+		"WANDERLOG_AUTH_SESSION_XSRF_TOKEN",
+		"WANDERLOG_AUTH_USER_ID",
+		"WANDERLOG_AUTH_EMAIL",
+		"WANDERLOG_AUTH_PASSWORD",
+	} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("WANDERLOG_DISABLE_KEYCHAIN", "1")
+}
+
+func withAuthTestBaseURL(t *testing.T, value string) {
+	t.Helper()
+	old := BaseURL
+	BaseURL = value
+	t.Cleanup(func() { BaseURL = old })
 }
 
 func TestLogin(t *testing.T) {
@@ -136,6 +384,26 @@ func TestLogin(t *testing.T) {
 		_, err := client.Login("a@b.com", "pass123")
 		if err == nil || !strings.Contains(err.Error(), "session cookie not found") {
 			t.Fatalf("expected session cookie error, got: %v", err)
+		}
+	})
+
+	t.Run("missing xsrf token", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Set-Cookie", "connect.sid=session; Path=/; HttpOnly")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":true,"user":{"id":42}}`))
+		}))
+		defer server.Close()
+
+		old := BaseURL
+		BaseURL = server.URL
+		defer func() { BaseURL = old }()
+
+		client := NewClient()
+		client.SetLogger(newTestLogger(t))
+		_, err := client.Login("a@b.com", "pass123")
+		if err == nil || !strings.Contains(err.Error(), "XSRF token not found") {
+			t.Fatalf("expected XSRF token error, got: %v", err)
 		}
 	})
 }

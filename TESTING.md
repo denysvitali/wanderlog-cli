@@ -1,154 +1,114 @@
 # Testing Guide
 
-## Integration Tests
+The default test suite is hermetic: it must not contact wanderlog.com or depend
+on credentials. Production integration tests have a separate build/run path and
+require an explicit opt-in.
 
-This project includes comprehensive integration tests that interact with the real Wanderlog API.
-
-### Prerequisites
-
-1. **Authentication Required**: Run `./wanderlog auth login` before running integration tests
-2. **Network Access**: Tests make real API calls to wanderlog.com
-3. **Rate Limiting**: Some tests add delays to respect API rate limits
-
-### Running Tests
+## Local quality checks
 
 ```bash
-# Run all integration tests
-go test -v -tags=integration -timeout 30m ./pkg/wanderlog
-
-# Run specific test
-go test -v -tags=integration -run TestSnapshotTrip -timeout 10m ./pkg/wanderlog
-go test -v -tags=integration -run TestBeijingTripCreation -timeout 30m ./pkg/wanderlog
-
-# Run with snapshot saving enabled
-SAVE_SNAPSHOTS=1 go test -v -tags=integration -run TestSnapshotTrip ./pkg/wanderlog
+make fmt-check
+make vet
+make test
+make test-race
+make coverage-check
+make integration-compile
+make build
 ```
 
-### Available Integration Tests
-
-#### `TestSnapshotTrip` - Trip Modification Snapshots
-Creates a Paris trip and captures server snapshots after each operation:
-1. Initial trip creation
-2. Add first place (Eiffel Tower)
-3. Add second place (Louvre Museum)
-4. Update trip title
-5. Remove first place
-
-Shows unified diffs between each step to demonstrate how the server state changes.
-
-**Usage:**
-```bash
-# Run with snapshot saving
-SAVE_SNAPSHOTS=1 go test -v -tags=integration -run TestSnapshotTrip ./pkg/wanderlog
-
-# Snapshots saved to /tmp/snapshot_*.json
-ls /tmp/snapshot_*.json
-```
-
-#### `TestBeijingTripCreation` - Real-World Trip Planning
-Creates a complete week-long Beijing itinerary using the search API:
-- Searches for 15+ attractions dynamically
-- Adds places across 7 days with detailed notes
-- Captures snapshots after each place addition
-- Shows diffs to track trip evolution
-
-**Usage:**
-```bash
-# Run with verbose output
-go test -v -tags=integration -run TestBeijingTripCreation -timeout 30m ./pkg/wanderlog
-
-# Save all snapshots for inspection
-SAVE_SNAPSHOTS=1 go test -v -tags=integration -run TestBeijingTripCreation -timeout 30m ./pkg/wanderlog
-
-# Snapshots saved to /tmp/beijing_snapshot_*.json
-```
-
-#### `TestIntegration_*` - Individual Operations
-Tests for specific operations:
-- `TestIntegration_CreateAndDeleteTrip`
-- `TestIntegration_CopyTrip`
-- `TestIntegration_LikeTrip`
-- `TestIntegration_GetLikeCount`
-
-### Snapshot Features
-
-The snapshot tests capture the raw, unprocessed JSON response from the server after each modification. This is useful for:
-
-1. **Debugging**: See exactly what the server returns
-2. **Verification**: Confirm operations work as expected
-3. **Documentation**: Understand the API response structure
-4. **Regression Testing**: Detect unexpected API changes
-
-**Unified Diffs**: Tests display unified diffs showing:
-- Lines added (prefixed with `+`)
-- Lines removed (prefixed with `-`)
-- Context lines (unchanged)
-
-### Unit Tests
-
-Run unit tests without the integration tag:
+`make coverage-check` writes `coverage.out` and `coverage.html`, then enforces
+the current project-wide statement coverage floor of 35%. Raise
+`COVERAGE_MIN` locally when validating a coverage improvement:
 
 ```bash
-# Run all unit tests
-go test -v ./pkg/wanderlog
-
-# Run specific unit test
-go test -v -run TestCreateTrip ./pkg/wanderlog
+make coverage-check COVERAGE_MIN=35
 ```
 
-### API Request Contract Tests
-
-`TestAPIRequestContracts` captures Go client requests with a local test server
-and compares them against `artifacts/api-contracts/go_request_contracts.json`.
-It also checks that every contract maps back to an endpoint listed in
-`artifacts/api-contracts/api_calls.json`.
+Run `make vulncheck` after installing the pinned scanner used by CI:
 
 ```bash
-go test -v -run TestAPIRequestContracts ./pkg/wanderlog
+go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+make vulncheck
 ```
 
-### Test Organization
+## Production integration tests
 
+These tests call the real Wanderlog service and some tests create, update, or
+delete data. Use a dedicated test account and a disposable trip. Never point
+`WANDERLOG_TEST_TRIP_ID` at data you care about.
+
+There is one opt-in switch for every production integration suite:
+
+```bash
+export WANDERLOG_RUN_PROD_INTEGRATION=1
+export WANDERLOG_TEST_TRIP_ID='your-disposable-trip-id'
 ```
-pkg/wanderlog/
-├── *_test.go              # Unit tests (no integration tag)
-├── *_integration_test.go  # Integration tests (require auth)
-├── snapshot_test.go       # Snapshot-based testing
-└── beijing_trip_test.go   # Real-world trip creation
+
+Provide exactly one complete authentication method.
+
+Session credentials:
+
+```bash
+export WANDERLOG_AUTH_SESSION_COOKIE='...'
+export WANDERLOG_AUTH_SESSION_XSRF_TOKEN='...'
 ```
 
-### Best Practices
+Or login credentials:
 
-1. **Clean Up**: Tests clean up created trips automatically
-2. **Rate Limits**: Tests include delays between API calls
-3. **Error Handling**: Tests continue on non-fatal errors (e.g., search failures)
-4. **Logging**: Use `-v` flag for detailed test output
-5. **Timeouts**: Long-running tests have explicit timeouts
-
-### Troubleshooting
-
-**Authentication Errors:**
+```bash
+export WANDERLOG_AUTH_EMAIL='test-account@example.com'
+export WANDERLOG_AUTH_PASSWORD='...'
 ```
-Failed to authenticate: authentication required
-```
-**Solution:** Run `./wanderlog auth login` first
 
-**Timeout Errors:**
-```
-panic: test timed out after 2m0s
-```
-**Solution:** Increase timeout with `-timeout 30m`
+Then run both the client and command integration suites:
 
-**Search Failures:**
+```bash
+./test_integration.sh
 ```
-⚠️  No results for 'Place Name'
+
+The runner fails before testing when the opt-in, trip ID, credential pair, or
+expected test names are missing. This prevents a green result caused by every
+test silently skipping.
+
+The production runner never mutates the desktop keychain. Keychain storage has
+a separate destructive opt-in (`WANDERLOG_RUN_KEYCHAIN_INTEGRATION=1`) and
+restores any credential it replaced; do not enable it on shared CI runners.
+
+To compile all files guarded by the `integration` build tag without contacting
+the service, run:
+
+```bash
+make integration-compile
 ```
-**Solution:** This is expected - tests skip places that can't be found
 
-### Environment Variables
+To run an individual tagged test after exporting the same opt-in and
+credentials:
 
-- `SAVE_SNAPSHOTS=1`: Save JSON snapshots to /tmp for inspection
-- `WANDERLOG_SESSION_COOKIE`: Override session cookie (not recommended)
-- `WANDERLOG_XSRF_TOKEN`: Override XSRF token (not recommended)
+```bash
+go test -count=1 -v -tags=integration -timeout 10m \
+  ./pkg/wanderlog -run '^TestIntegration_CreateAndDeleteTrip$'
+```
 
-Use the CLI's built-in authentication instead of environment variables.
+Snapshot tests are intentionally outside the default runner because they are
+long-running scenarios. Invoke them explicitly:
+
+```bash
+SAVE_SNAPSHOTS=1 go test -count=1 -v -tags=integration -timeout 30m \
+  ./pkg/wanderlog -run '^TestSnapshotTrip$'
+```
+
+## CI behavior
+
+Every push and pull request checks formatting, module tidiness, vet, lint, unit
+tests, race detection, coverage, known vulnerabilities, integration-suite
+compilation, a versioned binary, and the non-root container image.
+
+Live production tests run only on branch pushes when the repository variable
+`WANDERLOG_RUN_PROD_INTEGRATION` is set to `1`. The repository must also define
+`WANDERLOG_TEST_TRIP_ID` and one complete credential pair as Actions secrets.
+If live testing is enabled but its preconditions are incomplete, CI fails
+instead of reporting a false success.
+
+Tags beginning with `v` trigger GoReleaser. Releases contain checksummed
+Linux, macOS, and Windows archives, per-archive SPDX SBOMs, injected version
+metadata, and GitHub build-provenance attestations.

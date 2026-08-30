@@ -1,12 +1,24 @@
 package cmd
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCloneMapPreservesLargeJSONNumbers(t *testing.T) {
+	want := json.Number("9007199254740993")
+	cloned, err := cloneMap(map[string]any{
+		"serverOnly": map[string]any{"revision": want},
+	})
+	require.NoError(t, err)
+	serverOnly, ok := cloned["serverOnly"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, want, serverOnly["revision"])
+}
 
 func TestLodgingBlockShapeMatchesReactNativeBundle(t *testing.T) {
 	place := minimalPlaceForBlock("Hotel Test", "ChIJhotel", 48.8566, 2.3522)

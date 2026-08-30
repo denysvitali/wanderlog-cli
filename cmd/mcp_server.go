@@ -2,7 +2,14 @@ package cmd
 
 import (
 	"context"
+	"crypto/subtle"
+	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -52,21 +59,50 @@ Examples:
   wanderlog mcp --enable-write              # Start read-write MCP server on stdio
   wanderlog mcp --trip-id "abc123"          # Start with default trip ID (trip_id params become optional)
   wanderlog mcp --trip-id "abc123" --enable-write  # Start with default trip ID and write operations
-  wanderlog mcp --http :8080                # Start read-only HTTP MCP server on port 8080`,
-	Run: func(cmd *cobra.Command, args []string) {
-		enableWrite, _ := cmd.Flags().GetBool("enable-write")
-		tripID, _ := cmd.Flags().GetString("trip-id")
-		if httpAddr, _ := cmd.Flags().GetString("http"); httpAddr != "" {
-			runMCPHTTPServer(httpAddr, enableWrite, tripID)
-		} else {
-			runMCPStdioServer(enableWrite, tripID)
+  WANDERLOG_MCP_HTTP_TOKEN=<secret> wanderlog mcp --http :8080
+                                            # Start authenticated HTTP MCP on localhost`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		enableWrite, err := cmd.Flags().GetBool("enable-write")
+		if err != nil {
+			return err
 		}
+		tripID, err := cmd.Flags().GetString("trip-id")
+		if err != nil {
+			return err
+		}
+		httpAddr, err := cmd.Flags().GetString("http")
+		if err != nil {
+			return err
+		}
+		if httpAddr != "" {
+			httpToken, err := cmd.Flags().GetString("http-token")
+			if err != nil {
+				return err
+			}
+			if httpToken == "" {
+				httpToken = os.Getenv("WANDERLOG_MCP_HTTP_TOKEN")
+			}
+			tlsCert, err := cmd.Flags().GetString("tls-cert")
+			if err != nil {
+				return err
+			}
+			tlsKey, err := cmd.Flags().GetString("tls-key")
+			if err != nil {
+				return err
+			}
+			return runMCPHTTPServer(httpAddr, enableWrite, tripID, httpToken, tlsCert, tlsKey)
+		}
+		return runMCPStdioServer(enableWrite, tripID)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(mcpCmd)
-	mcpCmd.Flags().String("http", "", "HTTP address to serve MCP on (e.g., :8080)")
+	mcpCmd.Flags().String("http", "", "HTTP address to serve MCP on; :PORT binds to localhost")
+	mcpCmd.Flags().String("http-token", "", "Bearer token for HTTP MCP (prefer WANDERLOG_MCP_HTTP_TOKEN)")
+	mcpCmd.Flags().String("tls-cert", "", "TLS certificate for HTTP MCP (required for non-loopback binds)")
+	mcpCmd.Flags().String("tls-key", "", "TLS private key for HTTP MCP (required for non-loopback binds)")
 	mcpCmd.Flags().Bool("enable-write", false, "Enable write operations (add/remove places, etc.)")
 	mcpCmd.Flags().String("trip-id", "", "Default trip key to use for all operations (makes trip_id/trip_key parameters optional in tools)")
 }
@@ -933,7 +969,7 @@ func createMCPServer(readOnly bool) *server.MCPServer {
 	return s
 }
 
-func runMCPStdioServer(enableWrite bool, tripID string) {
+func runMCPStdioServer(enableWrite bool, tripID string) error {
 	readOnly := !enableWrite
 	s := createMCPServer(readOnly)
 
@@ -959,11 +995,19 @@ func runMCPStdioServer(enableWrite bool, tripID string) {
 	}
 
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to start MCP server")
+		return fmt.Errorf("serving MCP on stdio: %w", err)
 	}
+	return nil
 }
 
-func runMCPHTTPServer(addr string, enableWrite bool, tripID string) {
+const maxMCPHTTPRequestBytes = 1 << 20
+
+func runMCPHTTPServer(addr string, enableWrite bool, tripID, token, tlsCert, tlsKey string) error {
+	listenAddr, err := validateMCPHTTPConfig(addr, token, tlsCert, tlsKey)
+	if err != nil {
+		return fmt.Errorf("invalid HTTP MCP configuration: %w", err)
+	}
+
 	readOnly := !enableWrite
 	s := createMCPServer(readOnly)
 
@@ -972,23 +1016,105 @@ func runMCPHTTPServer(addr string, enableWrite bool, tripID string) {
 		mode = "read-write"
 	}
 
-	logFields := map[string]interface{}{"address": addr, "mode": mode}
+	logFields := map[string]interface{}{"address": listenAddr, "mode": mode, "authenticated": true, "tls": tlsCert != ""}
 	if tripID != "" {
 		logFields["default_trip_id"] = tripID
 	}
 	logger.WithFields(logFields).Info("Starting Wanderlog MCP server on HTTP")
 
-	var httpServer *server.StreamableHTTPServer
+	standardServer := &http.Server{
+		Addr:              listenAddr,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+	options := []server.StreamableHTTPOption{server.WithStreamableHTTPServer(standardServer)}
+	if tlsCert != "" {
+		options = append(options, server.WithTLSCert(tlsCert, tlsKey))
+	}
 	if tripID != "" {
 		// Use context function to inject trip ID from HTTP headers or use default
-		httpServer = server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(func(ctx context.Context, r *http.Request) context.Context {
+		options = append(options, server.WithHTTPContextFunc(func(ctx context.Context, r *http.Request) context.Context {
 			return withTripID(ctx, tripID)
 		}))
-	} else {
-		httpServer = server.NewStreamableHTTPServer(s)
 	}
+	httpServer := server.NewStreamableHTTPServer(s, options...)
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", mcpHTTPMiddleware(httpServer, token))
+	standardServer.Handler = mux
 
-	if err := httpServer.Start(addr); err != nil {
-		logger.WithError(err).Fatal("Failed to start HTTP MCP server")
+	if err := httpServer.Start(listenAddr); err != nil {
+		return fmt.Errorf("serving HTTP MCP: %w", err)
 	}
+	return nil
+}
+
+func validateMCPHTTPConfig(addr, token, tlsCert, tlsKey string) (string, error) {
+	listenAddr, loopback, err := normalizeMCPHTTPAddress(addr)
+	if err != nil {
+		return "", err
+	}
+	if len(token) < 16 {
+		return "", fmt.Errorf("a bearer token of at least 16 characters is required; set WANDERLOG_MCP_HTTP_TOKEN")
+	}
+	if (tlsCert == "") != (tlsKey == "") {
+		return "", fmt.Errorf("both a TLS certificate and key are required when TLS is enabled")
+	}
+	if !loopback && tlsCert == "" {
+		return "", fmt.Errorf("a non-loopback bind requires a TLS certificate and key")
+	}
+	return listenAddr, nil
+}
+
+func normalizeMCPHTTPAddress(addr string) (normalized string, loopback bool, err error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", false, fmt.Errorf("expected HOST:PORT: %w", err)
+	}
+	if port == "" {
+		return "", false, fmt.Errorf("port is required")
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	loopback = strings.EqualFold(host, "localhost")
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		loopback = ip.IsLoopback()
+	}
+	return net.JoinHostPort(host, port), loopback, nil
+}
+
+func mcpHTTPMiddleware(next http.Handler, token string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+
+		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if provided == r.Header.Get("Authorization") || subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="wanderlog-mcp"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" && !sameMCPHTTPOrigin(origin, r) {
+			http.Error(w, "forbidden origin", http.StatusForbidden)
+			return
+		}
+		if r.Method == http.MethodPost {
+			r.Body = http.MaxBytesReader(w, r.Body, maxMCPHTTPRequestBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func sameMCPHTTPOrigin(origin string, r *http.Request) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.User != nil || parsed.Host == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return strings.EqualFold(parsed.Scheme, scheme) && strings.EqualFold(parsed.Host, r.Host)
 }

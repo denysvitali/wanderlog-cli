@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
@@ -19,20 +21,21 @@ var tripsCollaboratorAddCmd = &cobra.Command{
 Examples:
   wanderlog trips collaborator add abc123xyz --user-id 12345`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if tripsCollaboratorID <= 0 {
+			return fmt.Errorf("--user-id must be greater than zero")
+		}
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		if err := client.AddCollaborator(args[0], tripsCollaboratorID); err != nil {
-			logger.WithError(err).Error("Failed to add collaborator")
-			return
+			return fmt.Errorf("add collaborator: %w", err)
 		}
-		printSuccess(outputFormat, "Added collaborator", map[string]interface{}{"tripKey": args[0], "userId": tripsCollaboratorID})
+		return printSuccess(outputFormat, "Added collaborator", map[string]interface{}{"tripKey": args[0], "userId": tripsCollaboratorID})
 	},
 }
 
@@ -44,20 +47,21 @@ var tripsCollaboratorRemoveCmd = &cobra.Command{
 Examples:
   wanderlog trips collaborator remove abc123xyz --user-id 12345`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if tripsCollaboratorID <= 0 {
+			return fmt.Errorf("--user-id must be greater than zero")
+		}
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		if err := client.RemoveCollaborator(args[0], tripsCollaboratorID); err != nil {
-			logger.WithError(err).Error("Failed to remove collaborator")
-			return
+			return fmt.Errorf("remove collaborator: %w", err)
 		}
-		printSuccess(outputFormat, "Removed collaborator", map[string]interface{}{"tripKey": args[0], "userId": tripsCollaboratorID})
+		return printSuccess(outputFormat, "Removed collaborator", map[string]interface{}{"tripKey": args[0], "userId": tripsCollaboratorID})
 	},
 }
 

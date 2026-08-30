@@ -1,6 +1,6 @@
 module github.com/denysvitali/wanderlog-cli
 
-go 1.24.5
+go 1.26.6
 
 require (
 	github.com/adrg/xdg v0.5.3

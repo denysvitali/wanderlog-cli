@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -11,7 +10,7 @@ import (
 	"github.com/denysvitali/wanderlog-cli/pkg/wanderlog"
 )
 
-func runSearchPlaces(cmd *cobra.Command, args []string) {
+func runSearchPlaces(cmd *cobra.Command, args []string) error {
 	query := args[0]
 
 	latFlag, _ := cmd.Flags().GetString("lat")
@@ -23,16 +22,14 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 	if latFlag != "" {
 		lat, err = strconv.ParseFloat(latFlag, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid latitude: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("invalid latitude %q: %w", latFlag, err)
 		}
 	}
 
 	if lngFlag != "" {
 		lng, err = strconv.ParseFloat(lngFlag, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid longitude: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("invalid longitude %q: %w", lngFlag, err)
 		}
 	}
 
@@ -45,22 +42,20 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 
 	results, err := client.SearchPlacesWithWanderlog(query, lat, lng)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error searching places: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("search places: %w", err)
 	}
 
 	switch outputFormat {
 	case "json":
-		encoder := json.NewEncoder(os.Stdout)
+		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(results); err != nil {
-			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("encode JSON: %w", err)
 		}
 	default:
 		if len(results.Data) == 0 {
 			fmt.Printf("No places found for query: %s\n", query)
-			return
+			return nil
 		}
 
 		fmt.Printf("Found %d places for query: %s\n\n", len(results.Data), query)
@@ -79,4 +74,5 @@ func runSearchPlaces(cmd *cobra.Command, args []string) {
 			fmt.Println()
 		}
 	}
+	return nil
 }

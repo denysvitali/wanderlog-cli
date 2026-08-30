@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  actions: read
+  attestations: write
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Validate source and integration builds
+        run: |
+          make fmt-check
+          make toolchain-check
+          go vet ./...
+          go test -race ./...
+          go test -tags=integration -run '^$' ./...
+      - name: Install Syft for release SBOMs
+        id: syft
+        uses: anchore/sbom-action/download-syft@v0
+      - name: Add Syft to PATH
+        run: echo "$(dirname '${{ steps.syft.outputs.cmd }}')" >> "$GITHUB_PATH"
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: v2.18.0
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest release provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.txt
+            dist/*.sbom.json

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -22,7 +23,7 @@ in the system keychain for future use.
 Examples:
   wanderlog login
   wanderlog login --email user@example.com`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		email, _ := cmd.Flags().GetString("email")
 
 		if email == "" {
@@ -33,71 +34,78 @@ Examples:
 		fmt.Print("Password: ")
 		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
-			logger.WithError(err).Error("Failed to read password")
-			os.Exit(1)
+			return fmt.Errorf("reading password: %w", err)
 		}
 		fmt.Println() // New line after password input
-
-		password := string(passwordBytes)
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
-		creds, err := client.Login(email, password)
+		creds, err := client.LoginContext(cmd.Context(), email, string(passwordBytes))
+		// Do not retain the password any longer than required for the login call.
+		for i := range passwordBytes {
+			passwordBytes[i] = 0
+		}
 		if err != nil {
-			logger.WithError(err).Error("Login failed")
-			os.Exit(1)
+			return fmt.Errorf("login failed: %w", err)
 		}
 
-		// Store credentials in both keychain and config file
-		keychainErr := wanderlog.SaveCredentials(creds)
-		configErr := wanderlog.SaveCredentialsToConfig(creds, email, password)
-
-		if keychainErr != nil && configErr != nil {
-			logger.WithError(keychainErr).Warn("Failed to save credentials to keychain")
-			logger.WithError(configErr).Warn("Failed to save credentials to config file")
-			fmt.Println(ui.WarningStyle.Render("⚠️ Credentials saved in memory only (this session)"))
-		} else {
-			if keychainErr == nil {
-				fmt.Println(ui.SuccessStyle.Render("🔐 Credentials saved to keychain"))
-			}
-			if configErr == nil {
-				fmt.Println(ui.SuccessStyle.Render("📝 Credentials saved to config file"))
-			}
+		// New logins are persisted only in the system keychain. Never fall back to
+		// writing bearer credentials or the account password to a plaintext file.
+		if err := wanderlog.SaveCredentials(creds); err != nil {
+			return fmt.Errorf("login succeeded, but securely storing credentials failed: %w", err)
+		}
+		if err := wanderlog.ClearCredentialsFromConfig(); err != nil {
+			logger.WithError(err).Warn("Logged in, but failed to remove legacy config credentials")
 		}
 
+		fmt.Println(ui.SuccessStyle.Render("🔐 Credentials saved to keychain"))
 		fmt.Println(ui.SuccessStyle.Render("✅ Successfully logged in!"))
-		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Session: %s...", creds.SessionCookie[:20])))
+		fmt.Println(ui.InfoStyle.Render("Session: [redacted]"))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %s", creds.UserID)))
+		return nil
 	},
 }
 
 var logoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Clear stored authentication credentials",
-	Long: `Remove stored authentication credentials from the system keychain.
+	Long: `Invalidate the current server session and remove stored authentication
+credentials from the system keychain and any legacy config-file fallback.
 
 This will require you to login again before performing write operations.
 
 Examples:
   wanderlog logout`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		creds, _, loadErr := loadAuthCredentials()
+		var serverErr error
+		if creds != nil {
+			client := wanderlog.NewClient()
+			client.SetLogger(logger)
+			client.SetAuth(creds)
+			serverErr = client.ServerLogout()
+		}
+
+		// Local deletion is attempted even when server invalidation or one storage
+		// backend fails; this minimizes the chance of leaving credentials behind.
 		keychainErr := wanderlog.DeleteCredentials()
 		configErr := wanderlog.ClearCredentialsFromConfig()
 
-		if keychainErr != nil && configErr != nil {
-			logger.WithError(keychainErr).Error("Failed to clear credentials from keychain")
-			logger.WithError(configErr).Error("Failed to clear credentials from config")
-			os.Exit(1)
+		if keychainErr != nil || configErr != nil {
+			return errors.Join(loadErr, serverErr, keychainErr, configErr)
 		}
 
-		fmt.Println(ui.SuccessStyle.Render("✅ Successfully logged out"))
-		if keychainErr == nil {
-			fmt.Println(ui.InfoStyle.Render("🗑️ Credentials cleared from keychain"))
+		if serverErr != nil {
+			fmt.Println(ui.SuccessStyle.Render("🗑️ Local credentials cleared"))
+			logger.WithError(serverErr).Warn("Local credentials cleared, but the remote session could not be invalidated")
+		} else {
+			fmt.Println(ui.SuccessStyle.Render("✅ Successfully logged out"))
 		}
-		if configErr == nil {
-			fmt.Println(ui.InfoStyle.Render("🗑️ Credentials cleared from config file"))
+		if loadErr != nil {
+			logger.WithError(loadErr).Warn("Credentials could not be loaded before local deletion")
 		}
+		return nil
 	},
 }
 
@@ -108,45 +116,52 @@ var statusCmd = &cobra.Command{
 
 Examples:
   wanderlog status`,
-	Run: func(cmd *cobra.Command, args []string) {
-		var creds *wanderlog.AuthCredentials
-		var source string
-
-		if wanderlog.HasStoredCredentials() {
-			c, err := wanderlog.LoadCredentials()
-			if err != nil {
-				logger.WithError(err).Error("Failed to load credentials from keychain")
-			} else {
-				creds = c
-				source = "keychain"
-			}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		creds, source, err := loadAuthCredentials()
+		if err != nil {
+			return err
 		}
-
-		if creds == nil && wanderlog.HasConfigCredentials() {
-			c, err := wanderlog.LoadCredentialsFromConfig()
-			if err != nil {
-				logger.WithError(err).Error("Failed to load credentials from config file")
-			} else {
-				creds = c
-				source = "config file"
-			}
-		}
-
-		if creds != nil {
-			fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✅ Authenticated (via %s)", source)))
-			sessionDisplay := creds.SessionCookie
-			if len(sessionDisplay) > 20 {
-				sessionDisplay = sessionDisplay[:20]
-			}
-			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Session: %s...", sessionDisplay)))
-			if creds.UserID != "" {
-				fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %s", creds.UserID)))
-			}
-		} else {
+		if creds == nil {
 			fmt.Println(ui.ErrorStyle.Render("❌ Not authenticated"))
 			fmt.Println(ui.InfoStyle.Render("Run 'wanderlog login' to authenticate"))
+			return fmt.Errorf("not authenticated")
 		}
+
+		client := wanderlog.NewClient()
+		client.SetLogger(logger)
+		client.SetAuth(creds)
+		profile, err := client.GetMe()
+		if err != nil {
+			return fmt.Errorf("stored credentials from %s could not be verified: %w", source, err)
+		}
+
+		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✅ Authenticated (verified via %s)", source)))
+		fmt.Println(ui.InfoStyle.Render("Session: [redacted]"))
+		if profile.ID != 0 {
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %d", profile.ID)))
+		} else if creds.UserID != "" {
+			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %s", creds.UserID)))
+		}
+		return nil
 	},
+}
+
+func loadAuthCredentials() (*wanderlog.AuthCredentials, string, error) {
+	creds, keychainErr := wanderlog.LoadCredentials()
+	if creds != nil {
+		return creds, "keychain", nil
+	}
+	if wanderlog.HasConfigCredentials() {
+		creds, err := wanderlog.LoadCredentialsFromConfig()
+		if err != nil {
+			return nil, "", fmt.Errorf("loading credentials from config file: %w", err)
+		}
+		return creds, "legacy config file", nil
+	}
+	if keychainErr != nil {
+		return nil, "", fmt.Errorf("loading credentials from keychain: %w", keychainErr)
+	}
+	return nil, "", nil
 }
 
 func init() {

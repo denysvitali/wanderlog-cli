@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -29,20 +27,16 @@ Examples:
   wanderlog trips edit add-place abc123xyz --name "Eiffel Tower" --place-id "ChIJLU7jZClu5kcR4PcOOO6p3I0"
   wanderlog trips edit add-place abc123xyz --name "Tokyo Station" --lat 35.6812 --lng 139.7671 --section 123 --start-time 09:30`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 
 		if tripsEditPlaceName == "" {
-			logger.Error("Place name is required (--name)")
-			os.Exit(1)
+			return fmt.Errorf("place name is required (--name)")
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		placeInfo := wanderlog.AddPlaceInfo{
@@ -66,16 +60,16 @@ Examples:
 			EndTime:   tripsEditEndTime,
 		}
 
-		err := client.AddPlace(tripKey, tripsEditSectionID, req)
+		err = client.AddPlace(tripKey, tripsEditSectionID, req)
 		if err != nil {
-			logger.WithError(err).Error("Failed to add place")
-			os.Exit(1)
+			return fmt.Errorf("add place: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("📍 Successfully added place '%s' to trip %s", tripsEditPlaceName, tripKey)))
 		if tripsEditSectionID > 0 {
 			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Section ID: %d", tripsEditSectionID)))
 		}
+		return nil
 	},
 }
 
@@ -88,34 +82,30 @@ Examples:
   wanderlog trips edit remove-place abc123xyz 12345
   wanderlog trips edit remove-place abc123xyz 12345 --section 123`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 		placeIDStr := args[1]
 
-		placeIDInt, err := strconv.Atoi(placeIDStr)
+		placeIDInt, err := parseRequiredIntE(placeIDStr, "place ID")
 		if err != nil {
-			logger.WithError(err).Error("Invalid place ID - must be a number")
-			os.Exit(1)
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		err = client.RemovePlace(tripKey, tripsEditSectionID, placeIDInt)
 		if err != nil {
-			logger.WithError(err).Error("Failed to remove place")
-			os.Exit(1)
+			return fmt.Errorf("remove place: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🗑️  Successfully removed place %d from trip %s", placeIDInt, tripKey)))
 		if tripsEditSectionID > 0 {
 			fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Section ID: %d", tripsEditSectionID)))
 		}
+		return nil
 	},
 }
 
@@ -127,31 +117,27 @@ var tripsEditClearSectionCmd = &cobra.Command{
 Examples:
   wanderlog trips edit clear-section abc123xyz 6310036`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 		sectionIDStr := args[1]
 
-		sectionID, err := strconv.Atoi(sectionIDStr)
+		sectionID, err := parseRequiredIntE(sectionIDStr, "section ID")
 		if err != nil {
-			logger.WithError(err).Error("Invalid section ID")
-			os.Exit(1)
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		err = client.ClearSectionBlocks(tripKey, sectionID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to clear section")
-			os.Exit(1)
+			return fmt.Errorf("clear section: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🧹 Successfully cleared all blocks from section %d in trip %s", sectionID, tripKey)))
+		return nil
 	},
 }
 
@@ -163,31 +149,27 @@ var tripsEditDeleteSectionCmd = &cobra.Command{
 Examples:
   wanderlog trips edit delete-section abc123xyz 6310036`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 		sectionIDStr := args[1]
 
-		sectionID, err := strconv.Atoi(sectionIDStr)
+		sectionID, err := parseRequiredIntE(sectionIDStr, "section ID")
 		if err != nil {
-			logger.WithError(err).Error("Invalid section ID")
-			os.Exit(1)
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		err = client.DeleteSection(tripKey, sectionID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to delete section")
-			os.Exit(1)
+			return fmt.Errorf("delete section: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("🗑️ Successfully deleted section %d from trip %s", sectionID, tripKey)))
+		return nil
 	},
 }
 
@@ -202,36 +184,33 @@ WARNING: This will remove ALL places from ALL sections of your trip!
 Examples:
   wanderlog trips edit nuke-places abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 
-		fmt.Print(ui.WarningStyle.Render("⚠️  WARNING: This will remove ALL places from ALL sections of your trip!\n"))
-		fmt.Print("Are you sure you want to continue? (y/N): ")
+		_, _ = fmt.Fprint(cmd.ErrOrStderr(), ui.WarningStyle.Render("⚠️  WARNING: This will remove ALL places from ALL sections of your trip!\n"))
+		_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Are you sure you want to continue? (y/N): ")
 
 		var response string
-		_, _ = fmt.Scanln(&response)
+		_, _ = fmt.Fscanln(cmd.InOrStdin(), &response)
 
 		if response != "y" && response != "Y" && response != "yes" {
-			fmt.Println(ui.InfoStyle.Render("Operation canceled."))
-			return
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), ui.InfoStyle.Render("Operation canceled."))
+			return err
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
-		}
-
-		err := client.NukeTripPlaces(tripKey)
+		client, err := newClientE(true)
 		if err != nil {
-			logger.WithError(err).Error("Failed to nuke trip places")
-			os.Exit(1)
+			return err
+		}
+
+		err = client.NukeTripPlaces(tripKey)
+		if err != nil {
+			return fmt.Errorf("nuke trip places: %w", err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("💥 Successfully nuked all place data from trip %s", tripKey)))
 		fmt.Println(ui.InfoStyle.Render("🔄 Try accessing your trip now - the location error should be fixed."))
+		return nil
 	},
 }
 
@@ -243,21 +222,20 @@ var tripsEditMovePlaceCmd = &cobra.Command{
 Examples:
   wanderlog trips edit move-place abc123xyz 12345 --from-section 100 --to-section 200 --position 0`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
-		placeID := parseRequiredInt(args[1], "place ID")
+		placeID, err := parseRequiredIntE(args[1], "place ID")
+		if err != nil {
+			return err
+		}
 		if err := client.MovePlace(args[0], placeID, tripsEditMoveFromSection, tripsEditMoveToSection, tripsEditMovePosition); err != nil {
-			logger.WithError(err).Error("Failed to move place")
-			os.Exit(1)
+			return fmt.Errorf("move place: %w", err)
 		}
-		printSuccess(outputFormat, "Moved place", map[string]interface{}{"tripKey": args[0], "placeId": placeID})
+		return printSuccess(outputFormat, "Moved place", map[string]interface{}{"tripKey": args[0], "placeId": placeID})
 	},
 }
 
@@ -269,22 +247,24 @@ var tripsEditReorderPlacesCmd = &cobra.Command{
 Examples:
   wanderlog trips edit reorder-places abc123xyz 123 --place-ids "456,789,012"`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
-		sectionID := parseRequiredInt(args[1], "section ID")
-		placeIDs := parseIntCSV(tripsEditReorderPlaceIDs, "place IDs")
+		sectionID, err := parseRequiredIntE(args[1], "section ID")
+		if err != nil {
+			return err
+		}
+		placeIDs, err := parseIntCSVE(tripsEditReorderPlaceIDs, "place IDs")
+		if err != nil {
+			return err
+		}
 		if err := client.ReorderPlaces(args[0], sectionID, placeIDs); err != nil {
-			logger.WithError(err).Error("Failed to reorder places")
-			os.Exit(1)
+			return fmt.Errorf("reorder places: %w", err)
 		}
-		printSuccess(outputFormat, "Reordered places", map[string]interface{}{"tripKey": args[0], "sectionId": sectionID, "placeIds": placeIDs})
+		return printSuccess(outputFormat, "Reordered places", map[string]interface{}{"tripKey": args[0], "sectionId": sectionID, "placeIds": placeIDs})
 	},
 }
 
@@ -297,21 +277,20 @@ Examples:
   wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30
   wanderlog trips edit set-place-time abc123xyz 12345 --section 100 --start-time 09:30 --end-time 11:00`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
-		placeID := parseRequiredInt(args[1], "place ID")
+		placeID, err := parseRequiredIntE(args[1], "place ID")
+		if err != nil {
+			return err
+		}
 		if err := client.UpdatePlaceVisitTime(args[0], tripsEditSectionID, placeID, tripsEditStartTime, tripsEditEndTime); err != nil {
-			logger.WithError(err).Error("Failed to update place visit time")
-			os.Exit(1)
+			return fmt.Errorf("update place visit time: %w", err)
 		}
-		printSuccess(outputFormat, "Updated place visit time", map[string]interface{}{
+		return printSuccess(outputFormat, "Updated place visit time", map[string]interface{}{
 			"tripKey":   args[0],
 			"sectionId": tripsEditSectionID,
 			"placeId":   placeID,

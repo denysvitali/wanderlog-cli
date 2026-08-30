@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,6 +18,7 @@ var (
 	tripsCreatePrivacy string
 	tripsCreateGeoIDs  []int
 	tripsCreateExample bool
+	tripsDeleteYes     bool
 )
 
 var tripsCreateCmd = &cobra.Command{
@@ -32,35 +33,38 @@ Examples:
   wanderlog trips create --title "Europe 2024" --geo-id 7 --start 2024-06-01 --end 2024-06-15
   wanderlog trips create --title "Private Trip" --geo-id 1 --privacy private
   wanderlog trips create --example`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if tripsCreateTitle == "" && !tripsCreateExample {
-			logger.Error("Trip title is required")
-			os.Exit(1)
+			return fmt.Errorf("--title is required")
 		}
 		if len(tripsCreateGeoIDs) == 0 && !tripsCreateExample {
-			logger.Error("At least one --geo-id is required")
-			os.Exit(1)
+			return fmt.Errorf("at least one --geo-id is required")
 		}
 
-		if tripsCreateStart != "" {
-			if _, err := time.Parse("2006-01-02", tripsCreateStart); err != nil {
-				logger.WithError(err).Error("Invalid start date format. Use YYYY-MM-DD")
-				os.Exit(1)
+		if err := validateDateFlagE(tripsCreateStart, "start"); err != nil {
+			return err
+		}
+		if err := validateDateFlagE(tripsCreateEnd, "end"); err != nil {
+			return err
+		}
+		if tripsCreateStart != "" && tripsCreateEnd != "" {
+			start, _ := time.Parse("2006-01-02", tripsCreateStart)
+			end, _ := time.Parse("2006-01-02", tripsCreateEnd)
+			if end.Before(start) {
+				return fmt.Errorf("--end must not be before --start")
 			}
 		}
-		if tripsCreateEnd != "" {
-			if _, err := time.Parse("2006-01-02", tripsCreateEnd); err != nil {
-				logger.WithError(err).Error("Invalid end date format. Use YYYY-MM-DD")
-				os.Exit(1)
-			}
+		privacy := strings.ToLower(strings.TrimSpace(tripsCreatePrivacy))
+		if privacy != "private" && privacy != "public" && privacy != "friends" {
+			return fmt.Errorf("invalid privacy %q (valid values: private, public, friends)", tripsCreatePrivacy)
 		}
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		var resp *wanderlog.CreateTripResponse
@@ -75,23 +79,26 @@ Examples:
 				Type:                "plan",
 				StartDate:           tripsCreateStart,
 				EndDate:             tripsCreateEnd,
-				Privacy:             tripsCreatePrivacy,
+				Privacy:             privacy,
 				IsMapEmbed:          false,
 				Language:            "en",
 			}
 			resp, err = client.CreateTrip(req)
 		}
 		if err != nil {
-			logger.WithError(err).Error("Failed to create trip")
-			os.Exit(1)
+			return fmt.Errorf("create trip: %w", err)
 		}
 
+		if outputFormat == "json" {
+			return ui.PrintJSON(resp)
+		}
 		fmt.Println(ui.SuccessStyle.Render("🎉 Successfully created trip!"))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Title: %s", resp.TripPlan.Title)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Trip ID: %d", resp.TripPlan.ID)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Trip Key: %s", resp.TripPlan.Key)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Edit Key: %s", resp.TripPlan.EditKey)))
 		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("URL: https://wanderlog.com/view/%s/%s", resp.TripPlan.Key, resp.TripPlan.Title)))
+		return nil
 	},
 }
 
@@ -107,35 +114,31 @@ Examples:
 
 WARNING: This action cannot be undone!`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripKey := args[0]
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
-
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("⚠️  Are you sure you want to delete trip %s? This cannot be undone.", tripKey)))
-		fmt.Print("Type 'yes' to confirm: ")
-
-		var confirmation string
-		_, _ = fmt.Scanln(&confirmation)
-
-		if confirmation != "yes" {
-			fmt.Println(ui.InfoStyle.Render("Trip deletion canceled."))
-			return
-		}
-
-		err := client.DeleteTrip(tripKey)
+		confirmed, err := confirmAction(cmd,
+			ui.WarningStyle.Render(fmt.Sprintf("WARNING: deleting trip %s cannot be undone.", tripKey)),
+			tripsDeleteYes,
+		)
 		if err != nil {
-			logger.WithError(err).Error("Failed to delete trip")
-			os.Exit(1)
+			return err
+		}
+		if !confirmed {
+			fmt.Println(ui.InfoStyle.Render("Trip deletion canceled."))
+			return nil
 		}
 
-		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully deleted trip %s", tripKey)))
+		if err := client.DeleteTrip(tripKey); err != nil {
+			return fmt.Errorf("delete trip: %w", err)
+		}
+		return printSuccess(outputFormat, fmt.Sprintf("Deleted trip %s", tripKey), map[string]string{"tripKey": tripKey})
 	},
 }
 
@@ -147,29 +150,31 @@ var tripsCopyCmd = &cobra.Command{
 Examples:
   wanderlog trips copy abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceKey := args[0]
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		resp, err := client.CopyTrip(sourceKey)
 		if err != nil {
-			logger.WithError(err).Error("Failed to copy trip")
-			os.Exit(1)
+			return fmt.Errorf("copy trip: %w", err)
 		}
 
+		if outputFormat == "json" {
+			return ui.PrintJSON(resp)
+		}
 		fmt.Println(ui.SuccessStyle.Render("📋 Successfully copied trip!"))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Original: %s", sourceKey)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("New Title: %s", resp.TripPlan.Title)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("New Key: %s", resp.TripPlan.Key)))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Edit Key: %s", resp.TripPlan.EditKey)))
 		fmt.Println(ui.UrlStyle.Render(fmt.Sprintf("URL: https://wanderlog.com/view/%s/%s", resp.TripPlan.Key, resp.TripPlan.Title)))
+		return nil
 	},
 }
 
@@ -181,20 +186,18 @@ var tripsRestoreCmd = &cobra.Command{
 Examples:
   wanderlog trips restore abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
 		if err := client.RestoreTrip(args[0]); err != nil {
-			logger.WithError(err).Error("Failed to restore trip")
-			os.Exit(1)
+			return fmt.Errorf("restore trip: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Restored trip %s", args[0]), map[string]string{"tripKey": args[0]})
+		return printSuccess(outputFormat, fmt.Sprintf("Restored trip %s", args[0]), map[string]string{"tripKey": args[0]})
 	},
 }
 
@@ -208,9 +211,11 @@ func init() {
 	tripsCreateCmd.Flags().StringVar(&tripsCreatePrivacy, "privacy", "private", "Trip privacy (public, private, friends)")
 	tripsCreateCmd.Flags().IntSliceVar(&tripsCreateGeoIDs, "geo-id", nil, "Wanderlog destination geo ID (repeatable)")
 	tripsCreateCmd.Flags().BoolVar(&tripsCreateExample, "example", false, "Create Wanderlog's pre-filled example trip")
+	tripsDeleteCmd.Flags().BoolVarP(&tripsDeleteYes, "yes", "y", false, "Skip the destructive-operation confirmation")
 
 	// auth flags
 	for _, c := range []*cobra.Command{tripsCreateCmd, tripsDeleteCmd, tripsCopyCmd, tripsRestoreCmd} {
+		c.Flags().StringVarP(&outputFormat, "output", "o", "pretty", "Output format (pretty, json)")
 		c.Flags().StringVar(&sessionCookie, "session", "", "Session cookie for authentication")
 		c.Flags().StringVar(&xsrfToken, "xsrf", "", "XSRF token for authentication")
 	}

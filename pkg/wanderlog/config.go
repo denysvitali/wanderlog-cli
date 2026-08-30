@@ -32,35 +32,44 @@ func InitConfig() error {
 	if err := viper.ReadInConfig(); err != nil {
 		return fmt.Errorf("reading config file: %w", err)
 	}
+	if _, err := MigrateLegacyConfig(); err != nil {
+		return err
+	}
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("reloading migrated config file: %w", err)
+	}
 
 	return nil
 }
 
 // ConfigAuth represents the auth section of the config file
 type ConfigAuth struct {
-	Email    string        `yaml:"email,omitempty"`
-	Password string        `yaml:"password,omitempty"`
-	Session  ConfigSession `yaml:"session,omitempty"`
+	Email    string         `yaml:"email,omitempty"`
+	Password string         `yaml:"password,omitempty"`
+	Session  ConfigSession  `yaml:"session,omitempty"`
+	Extra    map[string]any `yaml:",inline"`
 }
 
 // ConfigSession represents session credentials in the config file
 type ConfigSession struct {
-	Cookie    string `yaml:"cookie,omitempty"`
-	XSRFToken string `yaml:"xsrf_token,omitempty"`
-	UserID    string `yaml:"user_id,omitempty"`
+	Cookie    string         `yaml:"cookie,omitempty"`
+	XSRFToken string         `yaml:"xsrf_token,omitempty"`
+	UserID    string         `yaml:"user_id,omitempty"`
+	Extra     map[string]any `yaml:",inline"`
 }
 
 // Config represents the entire config file structure
 type Config struct {
-	Auth ConfigAuth `yaml:"auth,omitempty"`
+	Auth  ConfigAuth     `yaml:"auth,omitempty"`
+	Extra map[string]any `yaml:",inline"`
 }
 
-// SaveCredentialsToConfig saves authentication credentials to the config file
-// If email/password are provided, it saves them along with the session tokens
-// This allows automatic re-login when session tokens expire
-func SaveCredentialsToConfig(creds *AuthCredentials, email, password string) error {
-	if creds == nil {
-		return fmt.Errorf("credentials cannot be nil")
+// SaveCredentialsToConfig saves a legacy config-file session fallback. The
+// password parameter remains for source compatibility but is deliberately
+// ignored: account passwords are never persisted.
+func SaveCredentialsToConfig(creds *AuthCredentials, email, _ string) error {
+	if err := creds.Validate(); err != nil {
+		return fmt.Errorf("invalid credentials: %w", err)
 	}
 
 	// Determine config file path
@@ -74,17 +83,9 @@ func SaveCredentialsToConfig(creds *AuthCredentials, email, password string) err
 		configPath = filepath.Join(configDir, "config.yaml")
 	}
 
-	// Read existing config or create new one
-	var config Config
-	if _, err := os.Stat(configPath); err == nil {
-		// Config file exists, read it
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("reading config file: %w", err)
-		}
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("parsing config file: %w", err)
-		}
+	config, err := readConfig(configPath)
+	if err != nil {
+		return err
 	}
 
 	// Update config with new credentials
@@ -92,13 +93,12 @@ func SaveCredentialsToConfig(creds *AuthCredentials, email, password string) err
 	config.Auth.Session.XSRFToken = creds.XSRFToken
 	config.Auth.Session.UserID = creds.UserID
 
-	// Save email/password if provided
+	// Email is not secret and is useful for identifying the account. Always
+	// remove any password written by older versions while updating the session.
 	if email != "" {
 		config.Auth.Email = email
 	}
-	if password != "" {
-		config.Auth.Password = password
-	}
+	config.Auth.Password = ""
 
 	// Marshal to YAML
 	data, err := yaml.Marshal(&config)
@@ -106,17 +106,12 @@ func SaveCredentialsToConfig(creds *AuthCredentials, email, password string) err
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	// Write to file with secure permissions
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
-		return fmt.Errorf("writing config file: %w", err)
-	}
-
-	return nil
+	return writeConfigAtomically(configPath, data)
 }
 
 // HasConfigCredentials checks if credentials are stored in the config file
 func HasConfigCredentials() bool {
-	return viper.GetString("auth.session.cookie") != ""
+	return viper.GetString("auth.session.cookie") != "" && viper.GetString("auth.session.xsrf_token") != ""
 }
 
 // LoadCredentialsFromConfig loads credentials from the config file
@@ -125,15 +120,15 @@ func LoadCredentialsFromConfig() (*AuthCredentials, error) {
 	xsrfToken := viper.GetString("auth.session.xsrf_token")
 	userID := viper.GetString("auth.session.user_id")
 
-	if sessionCookie == "" {
-		return nil, fmt.Errorf("no session cookie found in config file")
-	}
-
-	return &AuthCredentials{
+	creds := &AuthCredentials{
 		SessionCookie: sessionCookie,
 		XSRFToken:     xsrfToken,
 		UserID:        userID,
-	}, nil
+	}
+	if err := creds.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config credentials: %w", err)
+	}
+	return creds, nil
 }
 
 // ClearCredentialsFromConfig removes credentials from the config file
@@ -144,35 +139,115 @@ func ClearCredentialsFromConfig() error {
 		return nil
 	}
 
-	// Read existing config
-	var config Config
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Config file doesn't exist
 		return nil
 	}
 
-	data, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return fmt.Errorf("reading config file: %w", err)
-	}
-
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("parsing config file: %w", err)
+		return err
 	}
 
 	// Clear auth credentials
 	config.Auth = ConfigAuth{}
 
 	// Marshal to YAML
-	data, err = yaml.Marshal(&config)
+	data, err := yaml.Marshal(&config)
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	// Write to file
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
-		return fmt.Errorf("writing config file: %w", err)
-	}
+	return writeConfigAtomically(configPath, data)
+}
 
+// MigrateLegacyConfig removes plaintext passwords written by older releases
+// and repairs config-file permissions. It returns whether a password was
+// removed. Session tokens are retained as a compatibility fallback.
+func MigrateLegacyConfig() (bool, error) {
+	configPath := viper.ConfigFileUsed()
+	if configPath == "" {
+		return false, nil
+	}
+	info, err := os.Stat(configPath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("stating config file: %w", err)
+	}
+	config, err := readConfig(configPath)
+	if err != nil {
+		return false, err
+	}
+	removedPassword := config.Auth.Password != ""
+	config.Auth.Password = ""
+	if removedPassword {
+		data, marshalErr := yaml.Marshal(&config)
+		if marshalErr != nil {
+			return false, fmt.Errorf("marshaling config: %w", marshalErr)
+		}
+		if err := writeConfigAtomically(configPath, data); err != nil {
+			return false, err
+		}
+	} else if info.Mode().Perm() != 0600 {
+		if err := os.Chmod(configPath, 0600); err != nil {
+			return false, fmt.Errorf("securing config file permissions: %w", err)
+		}
+	}
+	return removedPassword, nil
+}
+
+func readConfig(configPath string) (Config, error) {
+	var config Config
+	data, err := os.ReadFile(configPath)
+	if os.IsNotExist(err) {
+		return config, nil
+	}
+	if err != nil {
+		return config, fmt.Errorf("reading config file: %w", err)
+	}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return config, fmt.Errorf("parsing config file: %w", err)
+	}
+	return config, nil
+}
+
+func writeConfigAtomically(configPath string, data []byte) (retErr error) {
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+	temp, err := os.CreateTemp(configDir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temporary config file: %w", err)
+	}
+	tempPath := temp.Name()
+	defer func() {
+		if retErr != nil {
+			_ = os.Remove(tempPath)
+		}
+	}()
+	if err := temp.Chmod(0600); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("securing temporary config file: %w", err)
+	}
+	if _, err := temp.Write(data); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("writing temporary config file: %w", err)
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("syncing temporary config file: %w", err)
+	}
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("closing temporary config file: %w", err)
+	}
+	if err := os.Rename(tempPath, configPath); err != nil {
+		return fmt.Errorf("replacing config file: %w", err)
+	}
+	if err := os.Chmod(configPath, 0600); err != nil {
+		return fmt.Errorf("securing config file permissions: %w", err)
+	}
 	return nil
 }

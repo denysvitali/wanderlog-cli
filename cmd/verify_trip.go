@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -28,16 +27,15 @@ Examples:
   wanderlog verify-trip abc123xyz
   wanderlog verify-trip abc123xyz --output json`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tripID := args[0]
 
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
-		trip, err := client.GetTrip(tripID)
+		trip, err := client.GetTripContext(cmd.Context(), tripID)
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch trip")
-			os.Exit(1)
+			return fmt.Errorf("fetch trip: %w", err)
 		}
 
 		// Output in text format (human readable)
@@ -51,10 +49,10 @@ Examples:
 		fmt.Println()
 		jsonBytes, err := json.MarshalIndent(trip, "", "  ")
 		if err != nil {
-			logger.WithError(err).Error("Failed to marshal trip to JSON")
-			os.Exit(1)
+			return fmt.Errorf("marshal trip to JSON: %w", err)
 		}
 		fmt.Println(string(jsonBytes))
+		return nil
 	},
 }
 

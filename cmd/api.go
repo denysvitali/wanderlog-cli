@@ -25,61 +25,77 @@ var apiCmd = &cobra.Command{
 	Short: "Call a raw Wanderlog API endpoint",
 	Long: `Call any Wanderlog API endpoint discovered from the Android/web bundle.
 
-The path can be /api/..., tripPlans/..., or a full URL. Auth is optional by
-default and is attached when credentials are available; use --auth to require it.`,
+The path can be /api/..., tripPlans/..., or a full URL. Authentication is never
+attached unless --auth is set. Authenticated requests are restricted to the
+configured Wanderlog API origin.`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		body := mustJSON(apiBody)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		body, err := parseJSONBody(apiBody)
+		if err != nil {
+			return err
+		}
 		if apiBodyFile != "" {
 			fileBody, err := os.ReadFile(apiBodyFile)
 			if err != nil {
-				logger.WithError(err).Error("Failed to read body file")
-				os.Exit(1)
+				return fmt.Errorf("read body file: %w", err)
 			}
-			body = mustJSON(string(fileBody))
+			body, err = parseJSONBody(string(fileBody))
+			if err != nil {
+				return fmt.Errorf("parse body file: %w", err)
+			}
 		}
 
 		headers := map[string]string{}
 		for _, header := range apiHeaderValues {
 			key, value, ok := strings.Cut(header, ":")
 			if !ok {
-				logger.Errorf("Invalid header %q. Use Name: value", header)
-				os.Exit(1)
+				return fmt.Errorf("invalid header %q: use Name: value", header)
 			}
 			headers[strings.TrimSpace(key)] = strings.TrimSpace(value)
 		}
 
-		client := newClient(apiAuthenticated)
-		status, respBody, err := client.DoAPI(apiMethod, args[0], body, headers, apiAuthenticated)
+		client, err := newClientE(apiAuthenticated)
 		if err != nil {
-			logger.WithError(err).Error("API request failed")
+			return err
+		}
+		status, respBody, err := client.DoAPIContext(cmd.Context(), apiMethod, args[0], body, headers, apiAuthenticated)
+		if err != nil {
 			if len(respBody) > 0 {
-				fmt.Fprintln(os.Stderr, string(respBody))
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), string(respBody))
 			}
-			os.Exit(1)
+			return fmt.Errorf("API request failed: %w", err)
 		}
 
 		if outputFormat == "raw" {
-			_, _ = os.Stdout.Write(respBody)
-			if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
-				fmt.Println()
+			if _, err := cmd.OutOrStdout().Write(respBody); err != nil {
+				return err
 			}
-			return
+			if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
+				_, err = fmt.Fprintln(cmd.OutOrStdout())
+			}
+			return err
 		}
 
 		if outputFormat == "json" {
-			_, _ = os.Stdout.Write(respBody)
-			if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
-				fmt.Println()
+			if _, err := cmd.OutOrStdout().Write(respBody); err != nil {
+				return err
 			}
-			return
+			if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
+				_, err = fmt.Fprintln(cmd.OutOrStdout())
+			}
+			return err
 		}
 
-		fmt.Printf("HTTP %s\n", ui.HighlightStyle.Render(fmt.Sprintf("%d", status)))
-		_, _ = io.Copy(os.Stdout, strings.NewReader(string(respBody)))
-		if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
-			fmt.Println()
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "HTTP %s\n", ui.HighlightStyle.Render(fmt.Sprintf("%d", status))); err != nil {
+			return err
 		}
+		if _, err := io.Copy(cmd.OutOrStdout(), strings.NewReader(string(respBody))); err != nil {
+			return err
+		}
+		if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
+			_, err = fmt.Fprintln(cmd.OutOrStdout())
+		}
+		return err
 	},
 }
 

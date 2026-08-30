@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -20,20 +19,16 @@ Examples:
   wanderlog trips like abc123xyz --liked
   wanderlog trips like abc123xyz --liked=false`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		if err := client.SetLike(args[0], tripsLikeValue); err != nil {
-			logger.WithError(err).Error("Failed to update like")
-			os.Exit(1)
+			return fmt.Errorf("update like: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Set like=%t for trip %s", tripsLikeValue, args[0]), map[string]interface{}{"tripKey": args[0], "liked": tripsLikeValue})
+		return printSuccess(outputFormat, fmt.Sprintf("Set like=%t for trip %s", tripsLikeValue, args[0]), map[string]interface{}{"tripKey": args[0], "liked": tripsLikeValue})
 	},
 }
 
@@ -45,16 +40,15 @@ var tripsLikeCountCmd = &cobra.Command{
 Examples:
   wanderlog trips like-count abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		resp, err := client.GetLikeCount(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to get like count")
-			os.Exit(1)
+			return fmt.Errorf("get like count: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -67,13 +61,10 @@ Examples:
   wanderlog trips share-key abc123xyz --can-edit
   wanderlog trips share-key abc123xyz --can-view`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		resp, err := client.GetOrCreateShareKey(args[0], wanderlog.ShareKeyPermissions{
@@ -81,10 +72,9 @@ Examples:
 			CanView: shareCanView,
 		})
 		if err != nil {
-			logger.WithError(err).Error("Failed to create share key")
-			os.Exit(1)
+			return fmt.Errorf("create share key: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -96,15 +86,14 @@ var tripsRegisterViewCmd = &cobra.Command{
 Examples:
   wanderlog trips register-view abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.RegisterTripView(args[0]); err != nil {
-			logger.WithError(err).Error("Failed to register view")
-			os.Exit(1)
+			return fmt.Errorf("register view: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Registered view on %s", args[0]), map[string]interface{}{"tripKey": args[0]})
+		return printSuccess(outputFormat, fmt.Sprintf("Registered view on %s", args[0]), map[string]interface{}{"tripKey": args[0]})
 	},
 }
 
@@ -118,33 +107,24 @@ Examples:
   wanderlog trips distinction abc123xyz
   wanderlog trips distinction abc123xyz --set "Best Trip"`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		authenticated := tripsDistinctionValue != ""
-		if authenticated {
-			if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-				logger.WithError(err).Error("Authentication required")
-				os.Exit(1)
-			}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(tripsDistinctionValue != "")
+		if err != nil {
+			return err
 		}
 
 		if tripsDistinctionValue == "" {
 			resp, err := client.GetTripDistinction(args[0])
 			if err != nil {
-				logger.WithError(err).Error("Failed to fetch distinction")
-				os.Exit(1)
+				return fmt.Errorf("fetch distinction: %w", err)
 			}
-			ui.PrintJSON(resp)
-			return
+			return ui.PrintJSON(resp)
 		}
 
 		if err := client.SetTripDistinction(args[0], tripsDistinctionValue); err != nil {
-			logger.WithError(err).Error("Failed to set distinction")
-			os.Exit(1)
+			return fmt.Errorf("set distinction: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Set distinction to %q", tripsDistinctionValue), map[string]interface{}{"tripKey": args[0], "distinction": tripsDistinctionValue})
+		return printSuccess(outputFormat, fmt.Sprintf("Set distinction to %q", tripsDistinctionValue), map[string]interface{}{"tripKey": args[0], "distinction": tripsDistinctionValue})
 	},
 }
 
@@ -156,21 +136,17 @@ var tripsCreateGuideCmd = &cobra.Command{
 Examples:
   wanderlog trips create-guide abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		resp, err := client.CreateGuideFromTripPlan(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to create guide")
-			os.Exit(1)
+			return fmt.Errorf("create guide: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -181,31 +157,25 @@ var tripsGetIfEditedCmd = &cobra.Command{
 
 Examples:
   wanderlog trips get-if-edited --body '{"tripPlans":[{"key":"abc","lastEditedAt":"..."}]}'`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var req wanderlog.GetIfEditedRequest
 		if tripsGetIfEditedBody == "" {
-			logger.Error("--body is required (JSON: {\"tripPlans\":[{\"key\":\"...\",\"lastEditedAt\":\"...\"}]})")
-			os.Exit(1)
+			return fmt.Errorf("--body is required (JSON: {\"tripPlans\":[{\"key\":\"...\",\"lastEditedAt\":\"...\"}]})")
 		}
 		if err := json.Unmarshal([]byte(tripsGetIfEditedBody), &req); err != nil {
-			logger.WithError(err).Error("Invalid --body JSON")
-			os.Exit(1)
+			return fmt.Errorf("invalid --body JSON: %w", err)
 		}
 
-		client := wanderlog.NewClient()
-		client.SetLogger(logger)
-
-		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
 
 		resp, err := client.GetIfEdited(req)
 		if err != nil {
-			logger.WithError(err).Error("getIfEdited failed")
-			os.Exit(1)
+			return fmt.Errorf("getIfEdited failed: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -217,16 +187,15 @@ var tripsUpdateRequiredCmd = &cobra.Command{
 Examples:
   wanderlog trips update-required abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		resp, err := client.GetTripUpdateRequired(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch updateRequired status")
-			os.Exit(1)
+			return fmt.Errorf("fetch updateRequired status: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -238,16 +207,15 @@ var tripsJournalCmd = &cobra.Command{
 Examples:
   wanderlog trips journal abc123xyz`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		resp, err := client.GetViewOnlyJournal(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch journal")
-			os.Exit(1)
+			return fmt.Errorf("fetch journal: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 

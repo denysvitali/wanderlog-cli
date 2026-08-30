@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/denysvitali/wanderlog-cli/pkg/ui"
@@ -20,22 +22,28 @@ var tripsChecklistAddCmd = &cobra.Command{
 Examples:
   wanderlog trips checklist add abc123xyz 123 --item "Pack passport" --item "Book hotel"`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sectionID, err := parseRequiredIntE(args[1], "section ID")
+		if err != nil {
+			return err
+		}
+		items, err := parseChecklistItemsE(tripsChecklistItems)
+		if err != nil {
+			return err
+		}
+
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		sectionID := parseRequiredInt(args[1], "section ID")
-		resp, err := client.AddChecklistItems(args[0], sectionID, parseChecklistItems(tripsChecklistItems))
+		resp, err := client.AddChecklistItems(args[0], sectionID, items)
 		if err != nil {
-			logger.WithError(err).Error("Failed to add checklist items")
-			return
+			return fmt.Errorf("add checklist items: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -47,23 +55,28 @@ var tripsChecklistToggleCmd = &cobra.Command{
 Examples:
   wanderlog trips checklist toggle abc123xyz 123 456 --checked=true`,
 	Args: cobra.ExactArgs(3),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sectionID, err := parseRequiredIntE(args[1], "section ID")
+		if err != nil {
+			return err
+		}
+		itemID, err := parseRequiredIntE(args[2], "item ID")
+		if err != nil {
+			return err
+		}
+
 		client := wanderlog.NewClient()
 		client.SetLogger(logger)
 
 		if err := client.EnsureAuthenticated(sessionCookie, xsrfToken); err != nil {
-			logger.WithError(err).Error("Authentication required")
-			return
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		sectionID := parseRequiredInt(args[1], "section ID")
-		itemID := parseRequiredInt(args[2], "item ID")
 		resp, err := client.ToggleChecklistItem(args[0], sectionID, itemID, tripsChecklistChecked)
 		if err != nil {
-			logger.WithError(err).Error("Failed to toggle checklist item")
-			return
+			return fmt.Errorf("toggle checklist item: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 

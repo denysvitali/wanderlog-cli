@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -40,79 +39,85 @@ Examples:
   wanderlog user profile 12345
   wanderlog user profile @someuser`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		if len(args) == 0 {
 			profile, err := client.GetMe()
 			if err != nil {
-				logger.WithError(err).Error("Failed to get profile")
-				os.Exit(1)
+				return fmt.Errorf("get profile: %w", err)
 			}
-			ui.PrintJSON(profile)
-			return
+			return ui.PrintJSON(profile)
 		}
 		target := args[0]
 		if strings.HasPrefix(target, "@") {
 			resp, err := client.GetUserProfileByUsername(strings.TrimPrefix(target, "@"))
 			if err != nil {
-				logger.WithError(err).Error("Failed to get profile by username")
-				os.Exit(1)
+				return fmt.Errorf("get profile by username: %w", err)
 			}
-			ui.PrintJSON(resp)
-			return
+			return ui.PrintJSON(resp)
 		}
-		id := parseRequiredInt(target, "user ID")
+		id, err := parseRequiredIntE(target, "user ID")
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetUserProfile(id)
 		if err != nil {
-			logger.WithError(err).Error("Failed to get profile")
-			os.Exit(1)
+			return fmt.Errorf("get profile: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var userNotificationsCmd = &cobra.Command{
 	Use:   "notifications",
 	Short: "List the authenticated user's notifications",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetNotifications(userNotifOffset)
 		if err != nil {
-			logger.WithError(err).Error("Failed to list notifications")
-			os.Exit(1)
+			return fmt.Errorf("list notifications: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var userNotificationsMarkReadCmd = &cobra.Command{
 	Use:   "mark-read",
 	Short: "Mark notifications as read",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(userNotifIDs) == 0 {
-			logger.Error("At least one --id is required")
-			os.Exit(1)
+			return fmt.Errorf("at least one --id is required")
 		}
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		if err := client.MarkNotificationsRead(userNotifIDs); err != nil {
-			logger.WithError(err).Error("Failed to mark notifications read")
-			os.Exit(1)
+			return fmt.Errorf("mark notifications read: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Marked %d notification(s) read", len(userNotifIDs)), map[string]interface{}{"ids": userNotifIDs})
+		return printSuccess(outputFormat, fmt.Sprintf("Marked %d notification(s) read", len(userNotifIDs)), map[string]interface{}{"ids": userNotifIDs})
 	},
 }
 
 var userSettingsGetCmd = &cobra.Command{
 	Use:   "settings",
 	Short: "Get the authenticated user's notification settings",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetNotificationSettings()
 		if err != nil {
-			logger.WithError(err).Error("Failed to get notification settings")
-			os.Exit(1)
+			return fmt.Errorf("get notification settings: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -121,23 +126,23 @@ var userSettingsSetCmd = &cobra.Command{
 	Short: "Replace the authenticated user's notification settings",
 	Long: `Replace notification settings. The --body JSON becomes the value of
 "notificationSettings" in the POST payload.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(userSettingsBody) == "" {
-			logger.Error("--body is required")
-			os.Exit(1)
+			return fmt.Errorf("--body is required")
 		}
 		var raw json.RawMessage
 		if err := json.Unmarshal([]byte(userSettingsBody), &raw); err != nil {
-			logger.WithError(err).Error("Invalid --body JSON")
-			os.Exit(1)
+			return fmt.Errorf("invalid --body JSON: %w", err)
 		}
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.UpdateNotificationSettings(raw)
 		if err != nil {
-			logger.WithError(err).Error("Failed to update notification settings")
-			os.Exit(1)
+			return fmt.Errorf("update notification settings: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -145,14 +150,17 @@ var userKVGetCmd = &cobra.Command{
 	Use:   "kv-get [key]",
 	Short: "Read a value from the authenticated user's key-value store",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		value, err := client.GetKeyValue(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to get key-value")
-			os.Exit(1)
+			return fmt.Errorf("get key-value: %w", err)
 		}
-		fmt.Println(string(value))
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), string(value))
+		return err
 	},
 }
 
@@ -160,52 +168,56 @@ var userKVSetCmd = &cobra.Command{
 	Use:   "kv-set [key]",
 	Short: "Write a value to the authenticated user's key-value store",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(userKVValue) == "" {
-			logger.Error("--value is required")
-			os.Exit(1)
+			return fmt.Errorf("--value is required")
 		}
 		var raw json.RawMessage
 		if err := json.Unmarshal([]byte(userKVValue), &raw); err != nil {
 			raw = json.RawMessage(fmt.Sprintf("%q", userKVValue))
 		}
-		client := newClient(true)
-		if err := client.SetKeyValue(args[0], raw); err != nil {
-			logger.WithError(err).Error("Failed to set key-value")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Wrote %s", args[0]), map[string]interface{}{"key": args[0]})
+		if err := client.SetKeyValue(args[0], raw); err != nil {
+			return fmt.Errorf("set key-value: %w", err)
+		}
+		return printSuccess(outputFormat, fmt.Sprintf("Wrote %s", args[0]), map[string]interface{}{"key": args[0]})
 	},
 }
 
 var userUTCOffsetCmd = &cobra.Command{
 	Use:   "utc-offset",
 	Short: "Persist the authenticated user's UTC offset (minutes)",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
-		if err := client.SetUTCOffset(userUTCOffset); err != nil {
-			logger.WithError(err).Error("Failed to set UTC offset")
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Set UTC offset to %d minutes", userUTCOffset), map[string]interface{}{"utcOffset": userUTCOffset})
+		if err := client.SetUTCOffset(userUTCOffset); err != nil {
+			return fmt.Errorf("set UTC offset: %w", err)
+		}
+		return printSuccess(outputFormat, fmt.Sprintf("Set UTC offset to %d minutes", userUTCOffset), map[string]interface{}{"utcOffset": userUTCOffset})
 	},
 }
 
 var userFollowingCmd = &cobra.Command{
 	Use:   "following",
 	Short: "Report whether the authenticated user follows each listed userId",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(userFollowingIDs) == 0 {
-			logger.Error("At least one --user-id is required")
-			os.Exit(1)
+			return fmt.Errorf("at least one --user-id is required")
 		}
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.ListFollowing(userFollowingIDs)
 		if err != nil {
-			logger.WithError(err).Error("Failed to list following")
-			os.Exit(1)
+			return fmt.Errorf("list following: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -213,92 +225,101 @@ var userSearchCmd = &cobra.Command{
 	Use:   "search [query]",
 	Short: "Autocomplete Wanderlog users by name prefix",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.AutocompleteUsers(args[0])
 		if err != nil {
-			logger.WithError(err).Error("Failed to search users")
-			os.Exit(1)
+			return fmt.Errorf("search users: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var userByEmailCmd = &cobra.Command{
 	Use:   "by-email",
 	Short: "Look up a user by email",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if userEmailLookup == "" {
-			logger.Error("--email is required")
-			os.Exit(1)
+			return fmt.Errorf("--email is required")
 		}
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.FindUserByEmail(userEmailLookup)
 		if err != nil {
-			logger.WithError(err).Error("Failed to find user by email")
-			os.Exit(1)
+			return fmt.Errorf("find user by email: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var userBlockCmd = &cobra.Command{
 	Use:   "block",
 	Short: "Block a Wanderlog user",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if userBlockID == "" {
-			logger.Error("--user-id is required")
-			os.Exit(1)
+			return fmt.Errorf("--user-id is required")
 		}
-		client := newClient(true)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		if err := client.BlockUser(userBlockID); err != nil {
-			logger.WithError(err).Error("Failed to block user")
-			os.Exit(1)
+			return fmt.Errorf("block user: %w", err)
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Blocked user %s", userBlockID), map[string]interface{}{"userId": userBlockID})
+		return printSuccess(outputFormat, fmt.Sprintf("Blocked user %s", userBlockID), map[string]interface{}{"userId": userBlockID})
 	},
 }
 
 var userUsernameTakenCmd = &cobra.Command{
 	Use:   "username-taken",
 	Short: "Check whether a username is already taken",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if userUsername == "" {
-			logger.Error("--username is required")
-			os.Exit(1)
+			return fmt.Errorf("--username is required")
 		}
-		client := newClient(false)
+		client, err := newClientE(false)
+		if err != nil {
+			return err
+		}
 		taken, err := client.IsUsernameTaken(userUsername)
 		if err != nil {
-			logger.WithError(err).Error("Failed to check username")
-			os.Exit(1)
+			return fmt.Errorf("check username: %w", err)
 		}
-		ui.PrintJSON(map[string]interface{}{"username": userUsername, "taken": taken})
+		return ui.PrintJSON(map[string]interface{}{"username": userUsername, "taken": taken})
 	},
 }
 
 var userEmailsCmd = &cobra.Command{
 	Use:   "emails",
 	Short: "List the authenticated user's registered email addresses",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetUserEmails()
 		if err != nil {
-			logger.WithError(err).Error("Failed to get emails")
-			os.Exit(1)
+			return fmt.Errorf("get emails: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
 var userLogoutServerCmd = &cobra.Command{
 	Use:   "server-logout",
 	Short: "Invalidate the current session on the server (keeps local creds unless --clear)",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		if err := client.ServerLogout(); err != nil {
-			logger.WithError(err).Error("Server logout failed")
-			os.Exit(1)
+			return fmt.Errorf("server logout: %w", err)
 		}
 		clearLocal, _ := cmd.Flags().GetBool("clear")
 		if clearLocal {
@@ -309,7 +330,7 @@ var userLogoutServerCmd = &cobra.Command{
 				logger.WithError(err).Warn("Failed to clear config credentials")
 			}
 		}
-		printSuccess(outputFormat, "Server session invalidated", map[string]interface{}{"cleared": clearLocal})
+		return printSuccess(outputFormat, "Server session invalidated", map[string]interface{}{"cleared": clearLocal})
 	},
 }
 

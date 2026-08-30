@@ -108,10 +108,10 @@ var (
 			Foreground(lipgloss.Color("#78716C"))
 )
 
-func PrintJSON(data interface{}) {
+func PrintJSON(data interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(data)
+	return encoder.Encode(data)
 }
 
 func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
@@ -123,7 +123,7 @@ func PrintTrip(trip *wanderlog.TripResponse, showDetails bool) {
 	plan := trip.TripPlan
 
 	// Trip title and basic info
-	fmt.Println(TitleStyle.Render("🌍 " + plan.Title))
+	fmt.Println(TitleStyle.Render("🌍 " + SafeText(plan.Title)))
 	fmt.Println()
 
 	// Trip dates
@@ -193,7 +193,7 @@ func printFlights(sections []wanderlog.ItSections) {
 				if block.Type == "flight" && block.FlightInfo != nil {
 					// Flight header
 					flightInfo := fmt.Sprintf("%s %d",
-						block.FlightInfo.Airline.Name,
+						SafeText(block.FlightInfo.Airline.Name),
 						block.FlightInfo.Number)
 					fmt.Println(PlaceStyle.Render("🛫 " + flightInfo))
 
@@ -235,7 +235,7 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 		}
 
 		// Show destination header
-		fmt.Println(SubHeaderStyle.Render("📍 " + section.Heading))
+		fmt.Println(SubHeaderStyle.Render("📍 " + SafeText(section.Heading)))
 
 		if section.Date != nil && *section.Date != "" {
 			sectionDate, _ := time.Parse("2006-01-02", *section.Date)
@@ -249,14 +249,14 @@ func printDestinations(sections []wanderlog.ItSections, sectionRecommendations m
 				switch block.Type {
 				case "place":
 					if block.Place != nil && block.Place.Name != "" {
-						fmt.Println(InfoStyle.Render("🏢 " + block.Place.Name))
+						fmt.Println(InfoStyle.Render("🏢 " + SafeText(block.Place.Name)))
 						hasContent = true
 					}
 				case "note":
 					if !block.Text.IsString && len(block.Text.Text.Ops) > 0 && block.Text.Text.Ops[0].Insert != "\n" {
 						noteText := strings.TrimSpace(block.Text.Text.Ops[0].Insert)
 						if noteText != "" {
-							fmt.Println(InfoStyle.Render("   📝 " + noteText))
+							fmt.Println(InfoStyle.Render("   📝 " + SafeText(noteText)))
 							hasContent = true
 						}
 					}

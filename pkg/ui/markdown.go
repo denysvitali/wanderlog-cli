@@ -18,7 +18,7 @@ func PrintTripMarkdown(trip *wanderlog.TripResponse, showDetails bool) {
 	plan := trip.TripPlan
 
 	// Trip header
-	fmt.Printf("# %s\n\n", plan.Title)
+	fmt.Printf("# %s\n\n", MarkdownInline(plan.Title))
 
 	// Trip metadata
 	fmt.Println("## Trip Information")
@@ -61,7 +61,7 @@ func printFlightsMarkdown(sections []wanderlog.ItSections) {
 				if block.Type == "flight" && block.FlightInfo != nil {
 					// Flight details
 					fmt.Printf("### %s Flight %d\n\n",
-						block.FlightInfo.Airline.Name,
+						MarkdownInline(block.FlightInfo.Airline.Name),
 						block.FlightInfo.Number)
 
 					// Departure
@@ -104,7 +104,7 @@ func printDestinationsMarkdown(sections []wanderlog.ItSections) {
 		}
 
 		// Destination header
-		fmt.Printf("### %s\n\n", section.Heading)
+		fmt.Printf("### %s\n\n", MarkdownInline(section.Heading))
 
 		if section.Date != nil && *section.Date != "" {
 			sectionDate, _ := time.Parse("2006-01-02", *section.Date)
@@ -123,7 +123,7 @@ func printDestinationsMarkdown(sections []wanderlog.ItSections) {
 								fmt.Println("**Notes:**")
 								hasContent = true
 							}
-							fmt.Printf("- %s\n", noteText)
+							fmt.Printf("- %s\n", MarkdownInline(noteText))
 						}
 					}
 				}
@@ -147,7 +147,7 @@ func PrintPlacesMarkdown(places []wanderlog.Metadata) {
 
 	for _, place := range places {
 		// Place header with rating
-		header := place.Name
+		header := MarkdownInline(place.Name)
 		if place.Rating > 0 {
 			header += fmt.Sprintf(" (%.1f★)", place.Rating)
 		}
@@ -155,11 +155,11 @@ func PrintPlacesMarkdown(places []wanderlog.Metadata) {
 
 		// Basic information
 		if place.Address != "" {
-			fmt.Printf("- **Address:** %s\n", place.Address)
+			fmt.Printf("- **Address:** %s\n", MarkdownInline(place.Address))
 		}
 
 		if len(place.Categories) > 0 {
-			fmt.Printf("- **Categories:** %s\n", strings.Join(place.Categories, ", "))
+			fmt.Printf("- **Categories:** %s\n", MarkdownInline(strings.Join(place.Categories, ", ")))
 		}
 
 		if place.Rating > 0 {
@@ -171,16 +171,16 @@ func PrintPlacesMarkdown(places []wanderlog.Metadata) {
 		}
 
 		if place.Website != "" {
-			fmt.Printf("- **Website:** %s\n", place.Website)
+			fmt.Printf("- **Website:** %s\n", MarkdownInline(place.Website))
 		}
 
 		if place.InternationalPhoneNumber != "" {
-			fmt.Printf("- **Phone:** %s\n", place.InternationalPhoneNumber)
+			fmt.Printf("- **Phone:** %s\n", MarkdownInline(place.InternationalPhoneNumber))
 		}
 
 		// Business status
 		if place.BusinessStatus != "" {
-			fmt.Printf("- **Business Status:** %s\n", place.BusinessStatus)
+			fmt.Printf("- **Business Status:** %s\n", MarkdownInline(place.BusinessStatus))
 		}
 
 		if place.PermanentlyClosed {
@@ -189,12 +189,12 @@ func PrintPlacesMarkdown(places []wanderlog.Metadata) {
 
 		// Description
 		if place.Description != nil && *place.Description != "" {
-			fmt.Printf("\n**Description:**\n%s\n", *place.Description)
+			fmt.Printf("\n**Description:**\n%s\n", MarkdownInline(*place.Description))
 		}
 
 		// Generated description
 		if place.GeneratedDescription != nil && *place.GeneratedDescription != "" {
-			fmt.Printf("\n**Summary:**\n%s\n", *place.GeneratedDescription)
+			fmt.Printf("\n**Summary:**\n%s\n", MarkdownInline(*place.GeneratedDescription))
 		}
 
 		fmt.Println()

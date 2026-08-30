@@ -1,38 +1,66 @@
-#!/bin/bash
-# Integration test runner for Wanderlog CLI
-# This script runs integration tests against the real Wanderlog API
+#!/usr/bin/env bash
 
-set -e
+# Runs the production integration suites against wanderlog.com. The explicit
+# opt-in and credential preflight prevent accidental writes and false-green CI.
+set -euo pipefail
 
-# Check if credentials are set
-if [ -z "$WANDERLOG_SESSION_COOKIE" ] || [ -z "$WANDERLOG_XSRF_TOKEN" ]; then
-    echo "Error: WANDERLOG_SESSION_COOKIE and WANDERLOG_XSRF_TOKEN must be set"
-    echo ""
-    echo "To get these credentials:"
-    echo "1. Log in to wanderlog.com in your browser"
-    echo "2. Open Developer Tools (F12)"
-    echo "3. Go to Application/Storage -> Cookies"
-    echo "4. Copy the value of 'connect.sid' cookie to WANDERLOG_SESSION_COOKIE"
-    echo "5. Look for the X-XSRF-TOKEN in the request headers"
-    echo ""
-    echo "Example:"
-    echo "  export WANDERLOG_SESSION_COOKIE='s%3A...'"
-    echo "  export WANDERLOG_XSRF_TOKEN='...'"
-    echo "  ./test_integration.sh"
+if [[ ${WANDERLOG_RUN_PROD_INTEGRATION:-} != "1" ]]; then
+    echo "Refusing to run production tests without WANDERLOG_RUN_PROD_INTEGRATION=1" >&2
     exit 1
 fi
 
-if [ -z "$WANDERLOG_TEST_TRIP_ID" ]; then
-    echo "Error: WANDERLOG_TEST_TRIP_ID must be set to the trip ID to exercise."
+session_cookie=${WANDERLOG_AUTH_SESSION_COOKIE:-}
+session_xsrf=${WANDERLOG_AUTH_SESSION_XSRF_TOKEN:-}
+auth_email=${WANDERLOG_AUTH_EMAIL:-}
+auth_password=${WANDERLOG_AUTH_PASSWORD:-}
+
+if [[ -n $session_cookie || -n $session_xsrf ]]; then
+    if [[ -z $session_cookie || -z $session_xsrf ]]; then
+        echo "Session auth requires both WANDERLOG_AUTH_SESSION_COOKIE and WANDERLOG_AUTH_SESSION_XSRF_TOKEN" >&2
+        exit 1
+    fi
+    has_session_auth=1
+else
+    has_session_auth=0
+fi
+
+if [[ -n $auth_email || -n $auth_password ]]; then
+    if [[ -z $auth_email || -z $auth_password ]]; then
+        echo "Login auth requires both WANDERLOG_AUTH_EMAIL and WANDERLOG_AUTH_PASSWORD" >&2
+        exit 1
+    fi
+    has_login_auth=1
+else
+    has_login_auth=0
+fi
+
+if [[ $has_session_auth == 0 && $has_login_auth == 0 ]]; then
+    echo "Set a complete session-token pair or email/password pair for production tests" >&2
     exit 1
 fi
 
-# Enable integration tests
-export WANDERLOG_INTEGRATION_TEST=1
+if [[ -z ${WANDERLOG_TEST_TRIP_ID:-} ]]; then
+    echo "WANDERLOG_TEST_TRIP_ID must identify a disposable test trip" >&2
+    exit 1
+fi
 
-# Run the tests
-echo "Running integration tests..."
-go test -v -tags=integration -timeout 30m ./pkg/wanderlog -run TestIntegration
+pkg_pattern='^TestIntegration_'
+cmd_pattern='^(TestCLI_|TestMCPIntegration_|TestIntegration_)'
 
-echo ""
-echo "Integration tests completed!"
+if ! go test -tags=integration -list "$pkg_pattern" ./pkg/wanderlog | grep -q '^Test'; then
+    echo "No pkg/wanderlog production integration tests matched; refusing a false-green run" >&2
+    exit 1
+fi
+
+if ! go test -list "$cmd_pattern" ./cmd | grep -q '^Test'; then
+    echo "No cmd production integration tests matched; refusing a false-green run" >&2
+    exit 1
+fi
+
+echo "Running pkg/wanderlog production integration tests..."
+go test -count=1 -v -tags=integration -timeout 30m ./pkg/wanderlog -run "$pkg_pattern"
+
+echo "Running cmd production integration tests..."
+go test -count=1 -v -timeout 30m ./cmd -run "$cmd_pattern"
+
+echo "Production integration tests completed."

@@ -8,8 +8,9 @@ import (
 
 // PlaceSearchResponse represents the response from the place search API
 type PlaceSearchResponse struct {
-	Success bool           `json:"success"`
-	Places  []SearchResult `json:"places"`
+	Success  bool           `json:"success"`
+	Places   []SearchResult `json:"places"`
+	Warnings []string       `json:"warnings,omitempty"`
 }
 
 // SearchResult represents a single place result from search

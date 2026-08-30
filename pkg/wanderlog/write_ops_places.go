@@ -39,8 +39,8 @@ func (c *Client) RemovePlace(tripKey string, sectionID, placeID int) error {
 		respBody = resp.Body
 	}
 
-	if statusCode != http.StatusOK {
-		return fmt.Errorf("RemovePlace: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
+	if err := decodeOptionalMutationBody("RemovePlace", statusCode, respBody); err != nil {
+		return err
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -79,36 +79,8 @@ func (c *Client) ApplyOperations(tripKey string, ops []Operation) error {
 		"responseBody": string(resp.Body),
 	}).Debug("ApplyOperations API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("ApplyOperations: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
-	// Try to parse the response to check for API-level errors
-	var apiResp map[string]interface{}
-	if err := json.Unmarshal(resp.Body, &apiResp); err != nil {
-		c.logger.WithField("responseBody", string(resp.Body)).Warn("Could not parse API response as JSON")
-	} else {
-		// Check if the response indicates success
-		if success, ok := apiResp["success"]; ok {
-			if successBool, ok := success.(bool); ok && !successBool {
-				// API returned success: false
-				errorMsg := "unknown error"
-				if msg, ok := apiResp["error"]; ok {
-					if msgStr, ok := msg.(string); ok {
-						errorMsg = msgStr
-					}
-				}
-				// Also check for messages array
-				if messages, ok := apiResp["messages"]; ok {
-					if msgArray, ok := messages.([]interface{}); ok && len(msgArray) > 0 {
-						if firstMsg, ok := msgArray[0].(string); ok {
-							errorMsg = firstMsg
-						}
-					}
-				}
-				return fmt.Errorf("API request failed: %s", errorMsg)
-			}
-		}
+	if err := decodeMutationBody("ApplyOperations", resp.StatusCode, resp.Body, nil); err != nil {
+		return err
 	}
 
 	c.logger.WithFields(map[string]interface{}{
@@ -125,22 +97,23 @@ func (c *Client) ClearSectionBlocks(tripKey string, sectionID int) error {
 		return fmt.Errorf("authentication required for clearing section blocks")
 	}
 
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
-	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
-	if sectionIdx < 0 {
-		return fmt.Errorf("section %d not found", sectionID)
+	sectionIdx, section, err := findRawItinerarySection(trip, sectionID)
+	if err != nil {
+		return err
 	}
-	oldBlocks := trip.TripPlan.Itinerary.Sections[sectionIdx].Blocks
+	oldBlocks, err := rawBlocks(section)
+	if err != nil {
+		return fmt.Errorf("section %d: %w", sectionID, err)
+	}
+	if len(oldBlocks) == 0 {
+		return nil
+	}
 
-	// Create an operation to replace the blocks array with an empty array
-	clearOp := ReplaceInObject(
-		[]any{"itinerary", "sections", sectionIdx, "blocks"},
-		oldBlocks,
-		[]any{},
-	)
+	clearOp := ReplaceInObject([]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, []any{})
 
 	err = c.ApplyOperations(tripKey, []Operation{clearOp})
 	if err != nil {
@@ -161,15 +134,14 @@ func (c *Client) DeleteSection(tripKey string, sectionID int) error {
 		return fmt.Errorf("authentication required for deleting sections")
 	}
 
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
-	sectionIdx := FindSectionIndex(trip.TripPlan.Itinerary.Sections, sectionID)
-	if sectionIdx < 0 {
-		return fmt.Errorf("section %d not found", sectionID)
+	sectionIdx, oldSection, err := findRawItinerarySection(trip, sectionID)
+	if err != nil {
+		return err
 	}
-	oldSection := trip.TripPlan.Itinerary.Sections[sectionIdx]
 
 	// Create an operation to remove the section
 	deleteOp := DeleteFromList(
@@ -198,38 +170,61 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 		return fmt.Errorf("authentication required for nuking trip places")
 	}
 
-	// First fetch the trip to see what sections actually exist
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch trip: %w", err)
 	}
 
-	if len(trip.TripPlan.Itinerary.Sections) == 0 {
-		c.logger.WithField("tripKey", tripKey).Info("No sections found in trip, nothing to clear")
+	sections, err := rawItinerarySections(trip)
+	if err != nil {
+		return err
+	}
+	operations := make([]Operation, 0, len(sections)+1)
+	removedPlaces := 0
+	for sectionIdx, sectionAny := range sections {
+		section, ok := sectionAny.(map[string]any)
+		if !ok {
+			return fmt.Errorf("itinerary section %d has unexpected type %T", sectionIdx, sectionAny)
+		}
+		oldBlocks, err := rawBlocks(section)
+		if err != nil {
+			return fmt.Errorf("itinerary section %d: %w", sectionIdx, err)
+		}
+		newBlocks := make([]any, 0, len(oldBlocks))
+		for _, block := range oldBlocks {
+			if rawBlockIsPlace(block) {
+				removedPlaces++
+				continue
+			}
+			newBlocks = append(newBlocks, block)
+		}
+		if len(newBlocks) != len(oldBlocks) {
+			operations = append(operations, ReplaceInObject(
+				[]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, newBlocks,
+			))
+		}
+	}
+
+	if resources, ok := trip["resources"].(map[string]any); ok {
+		if metadata, exists := resources["placeMetadata"]; exists && !rawContainerEmpty(metadata) {
+			emptyMetadata, err := emptyRawContainer(metadata)
+			if err != nil {
+				return fmt.Errorf("resources.placeMetadata: %w", err)
+			}
+			operations = append(operations, ReplaceInObject(
+				[]any{"resources", "placeMetadata"}, metadata, emptyMetadata,
+			))
+		}
+	}
+	if len(operations) == 0 {
+		c.logger.WithField("tripKey", tripKey).Info("No place blocks found in trip, nothing to clear")
 		return nil
 	}
 
-	// Build operations only for sections that exist
-	operations := []Operation{}
-	for i := range trip.TripPlan.Itinerary.Sections {
-		operations = append(operations, ReplaceInObject(
-			[]any{"itinerary", "sections", i, "blocks"},
-			[]any{}, // old value placeholder for ShareDB OD field
-			[]any{},
-		))
-	}
-
-	// Also clear place metadata
-	operations = append(operations, ReplaceInObject(
-		[]any{"resources", "placeMetadata"},
-		[]any{}, // old value placeholder for ShareDB OD field
-		[]any{},
-	))
-
 	c.logger.WithFields(map[string]interface{}{
-		"tripKey":         tripKey,
-		"sectionsCleared": len(trip.TripPlan.Itinerary.Sections),
-	}).Debug("Clearing sections from trip")
+		"tripKey":       tripKey,
+		"placesRemoved": removedPlaces,
+	}).Debug("Removing place blocks from trip")
 
 	err = c.ApplyOperations(tripKey, operations)
 	if err != nil {
@@ -237,8 +232,8 @@ func (c *Client) NukeTripPlaces(tripKey string) error {
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"tripKey":  tripKey,
-		"sections": len(trip.TripPlan.Itinerary.Sections),
+		"tripKey": tripKey,
+		"places":  removedPlaces,
 	}).Info("Successfully nuked all place data from trip")
 
 	return nil
@@ -250,13 +245,12 @@ func (c *Client) MovePlace(tripKey string, placeID, fromSectionID, toSectionID, 
 		return fmt.Errorf("authentication required for moving places")
 	}
 
-	// First, get the current trip to find the place data
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
 
-	ops, err := movePlaceOperations(trip.TripPlan.Itinerary.Sections, placeID, fromSectionID, toSectionID, position)
+	ops, err := movePlaceRawOperations(trip, placeID, fromSectionID, toSectionID, position)
 	if err != nil {
 		return err
 	}
@@ -282,13 +276,12 @@ func (c *Client) ReorderPlaces(tripKey string, sectionID int, placeIDs []int) er
 		return fmt.Errorf("authentication required for reordering places")
 	}
 
-	// First, get the current trip to find the section data
-	trip, err := c.GetTrip(tripKey)
+	trip, err := c.GetTripRaw(tripKey)
 	if err != nil {
 		return fmt.Errorf("getting current trip: %w", err)
 	}
 
-	ops, err := reorderPlacesOperations(trip.TripPlan.Itinerary.Sections, sectionID, placeIDs)
+	ops, err := reorderPlacesRawOperations(trip, sectionID, placeIDs)
 	if err != nil {
 		return err
 	}
@@ -367,16 +360,102 @@ func cloneRawMap(value map[string]any) (map[string]any, error) {
 		return nil, err
 	}
 	var cloned map[string]any
-	if err := json.Unmarshal(data, &cloned); err != nil {
+	if err := decodeJSONPreserveNumbers(data, &cloned); err != nil {
 		return nil, err
 	}
 	return cloned, nil
 }
 
+func rawItinerarySections(trip map[string]any) ([]any, error) {
+	tripPlan, ok := trip["tripPlan"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("trip response is missing tripPlan")
+	}
+	itinerary, ok := tripPlan["itinerary"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("trip response is missing tripPlan.itinerary")
+	}
+	sectionsValue, exists := itinerary["sections"]
+	if !exists || sectionsValue == nil {
+		return []any{}, nil
+	}
+	sections, ok := sectionsValue.([]any)
+	if !ok {
+		return nil, fmt.Errorf("tripPlan.itinerary.sections has unexpected type %T", sectionsValue)
+	}
+	return sections, nil
+}
+
+func findRawItinerarySection(trip map[string]any, sectionID int) (int, map[string]any, error) {
+	sections, err := rawItinerarySections(trip)
+	if err != nil {
+		return 0, nil, err
+	}
+	for sectionIdx, sectionAny := range sections {
+		section, ok := sectionAny.(map[string]any)
+		if !ok {
+			continue
+		}
+		if rawInt(section["id"]) == sectionID {
+			return sectionIdx, section, nil
+		}
+	}
+	return 0, nil, fmt.Errorf("section %d not found", sectionID)
+}
+
+func rawBlocks(section map[string]any) ([]any, error) {
+	blocksValue, exists := section["blocks"]
+	if !exists || blocksValue == nil {
+		return []any{}, nil
+	}
+	blocks, ok := blocksValue.([]any)
+	if !ok {
+		return nil, fmt.Errorf("blocks has unexpected type %T", blocksValue)
+	}
+	return blocks, nil
+}
+
+func rawBlockIsPlace(blockAny any) bool {
+	block, ok := blockAny.(map[string]any)
+	if !ok {
+		return false
+	}
+	if blockType, _ := block["type"].(string); blockType != "" {
+		return blockType == "place"
+	}
+	_, hasPlace := block["place"]
+	return hasPlace
+}
+
+func rawContainerEmpty(value any) bool {
+	switch container := value.(type) {
+	case nil:
+		return true
+	case []any:
+		return len(container) == 0
+	case map[string]any:
+		return len(container) == 0
+	default:
+		return false
+	}
+}
+
+func emptyRawContainer(value any) (any, error) {
+	switch value.(type) {
+	case []any:
+		return []any{}, nil
+	case map[string]any:
+		return map[string]any{}, nil
+	default:
+		return nil, fmt.Errorf("expected array or object, got %T", value)
+	}
+}
+
 func findRawItineraryBlock(trip map[string]any, sectionID, blockID int) (int, int, map[string]any, error) {
-	tripPlan, _ := trip["tripPlan"].(map[string]any)
-	itinerary, _ := tripPlan["itinerary"].(map[string]any)
-	sections, _ := itinerary["sections"].([]any)
+	sections, err := rawItinerarySections(trip)
+	if err != nil {
+		return 0, 0, nil, err
+	}
 	for sectionIdx, sectionAny := range sections {
 		section, _ := sectionAny.(map[string]any)
 		if section == nil {
@@ -398,6 +477,115 @@ func findRawItineraryBlock(trip map[string]any, sectionID, blockID int) (int, in
 		return 0, 0, nil, fmt.Errorf("place %d not found in section %d", blockID, sectionID)
 	}
 	return 0, 0, nil, fmt.Errorf("place %d not found", blockID)
+}
+
+func movePlaceRawOperations(trip map[string]any, placeID, fromSectionID, toSectionID, position int) ([]Operation, error) {
+	if position < 0 {
+		return nil, fmt.Errorf("position must be >= 0")
+	}
+	fromIdx, fromSection, err := findRawItinerarySection(trip, fromSectionID)
+	if err != nil {
+		return nil, fmt.Errorf("source %w", err)
+	}
+	toIdx, toSection, err := findRawItinerarySection(trip, toSectionID)
+	if err != nil {
+		return nil, fmt.Errorf("destination %w", err)
+	}
+	fromBlocks, err := rawBlocks(fromSection)
+	if err != nil {
+		return nil, fmt.Errorf("source section %d: %w", fromSectionID, err)
+	}
+	toBlocks, err := rawBlocks(toSection)
+	if err != nil {
+		return nil, fmt.Errorf("destination section %d: %w", toSectionID, err)
+	}
+
+	blockIdx := -1
+	var blockData any
+	for i, block := range fromBlocks {
+		blockMap, ok := block.(map[string]any)
+		if ok && rawInt(blockMap["id"]) == placeID && rawBlockIsPlace(block) {
+			blockIdx = i
+			blockData = block
+			break
+		}
+	}
+	if blockIdx < 0 {
+		return nil, fmt.Errorf("place %d not found in section %d", placeID, fromSectionID)
+	}
+
+	// position is the desired zero-based index in the final destination list.
+	// A same-section deletion happens first, so its final list has one fewer item.
+	maxPosition := len(toBlocks)
+	if fromIdx == toIdx {
+		maxPosition--
+	}
+	if position > maxPosition {
+		position = maxPosition
+	}
+
+	return []Operation{
+		DeleteFromList([]any{"itinerary", "sections", fromIdx, "blocks"}, blockIdx, blockData),
+		InsertInList([]any{"itinerary", "sections", toIdx, "blocks"}, position, blockData),
+	}, nil
+}
+
+func reorderPlacesRawOperations(trip map[string]any, sectionID int, placeIDs []int) ([]Operation, error) {
+	if len(placeIDs) == 0 {
+		return nil, fmt.Errorf("at least one place ID is required")
+	}
+	sectionIdx, section, err := findRawItinerarySection(trip, sectionID)
+	if err != nil {
+		return nil, err
+	}
+	oldBlocks, err := rawBlocks(section)
+	if err != nil {
+		return nil, fmt.Errorf("section %d: %w", sectionID, err)
+	}
+
+	requested := make(map[int]struct{}, len(placeIDs))
+	for _, id := range placeIDs {
+		if _, exists := requested[id]; exists {
+			return nil, fmt.Errorf("duplicate place %d in requested order", id)
+		}
+		requested[id] = struct{}{}
+	}
+	byID := make(map[int]any, len(placeIDs))
+	for _, block := range oldBlocks {
+		blockMap, ok := block.(map[string]any)
+		if !ok || !rawBlockIsPlace(block) {
+			continue
+		}
+		id := rawInt(blockMap["id"])
+		if _, wanted := requested[id]; wanted {
+			byID[id] = block
+		}
+	}
+	orderedBlocks := make([]any, 0, len(placeIDs))
+	for _, id := range placeIDs {
+		block, ok := byID[id]
+		if !ok {
+			return nil, fmt.Errorf("place %d not found in section %d", id, sectionID)
+		}
+		orderedBlocks = append(orderedBlocks, block)
+	}
+
+	newBlocks := make([]any, 0, len(oldBlocks))
+	orderedIdx := 0
+	for _, block := range oldBlocks {
+		blockMap, ok := block.(map[string]any)
+		if ok {
+			if _, replace := requested[rawInt(blockMap["id"])]; replace && rawBlockIsPlace(block) {
+				newBlocks = append(newBlocks, orderedBlocks[orderedIdx])
+				orderedIdx++
+				continue
+			}
+		}
+		newBlocks = append(newBlocks, block)
+	}
+	return []Operation{ReplaceInObject(
+		[]any{"itinerary", "sections", sectionIdx, "blocks"}, oldBlocks, newBlocks,
+	)}, nil
 }
 
 func updatePlaceVisitTimeRawOperations(trip map[string]any, sectionID, placeID int, startTime, endTime string) ([]Operation, error) {
@@ -433,54 +621,6 @@ func updatePlaceVisitTimeRawOperations(trip map[string]any, sectionID, placeID i
 	}, nil
 }
 
-func movePlaceOperations(sections []ItSections, placeID, fromSectionID, toSectionID, position int) ([]Operation, error) {
-	fromIdx := FindSectionIndex(sections, fromSectionID)
-	if fromIdx < 0 {
-		return nil, fmt.Errorf("source section %d not found", fromSectionID)
-	}
-	toIdx := FindSectionIndex(sections, toSectionID)
-	if toIdx < 0 {
-		return nil, fmt.Errorf("destination section %d not found", toSectionID)
-	}
-	if position < 0 {
-		return nil, fmt.Errorf("position must be >= 0")
-	}
-
-	blockIdx := -1
-	var blockData any
-	for i, block := range sections[fromIdx].Blocks {
-		if block.ID == placeID {
-			blockIdx = i
-			blockData = block
-			break
-		}
-	}
-	if blockIdx < 0 {
-		return nil, fmt.Errorf("place %d not found in section %d", placeID, fromSectionID)
-	}
-
-	insertPosition := position
-	if insertPosition > len(sections[toIdx].Blocks) {
-		insertPosition = len(sections[toIdx].Blocks)
-	}
-	if fromIdx == toIdx && insertPosition > blockIdx {
-		insertPosition--
-	}
-
-	return []Operation{
-		DeleteFromList(
-			[]any{"itinerary", "sections", fromIdx, "blocks"},
-			blockIdx,
-			blockData,
-		),
-		InsertInList(
-			[]any{"itinerary", "sections", toIdx, "blocks"},
-			insertPosition,
-			blockData,
-		),
-	}, nil
-}
-
 func updatePlaceVisitTimeOperations(sections []ItSections, sectionID, placeID int, startTime, endTime string) ([]Operation, error) {
 	sectionIdx := FindSectionIndex(sections, sectionID)
 	if sectionIdx < 0 {
@@ -510,54 +650,6 @@ func updatePlaceVisitTimeOperations(sections []ItSections, sectionID, placeID in
 			blockIdx,
 			oldBlock,
 			newBlock,
-		),
-	}, nil
-}
-
-func reorderPlacesOperations(sections []ItSections, sectionID int, placeIDs []int) ([]Operation, error) {
-	sectionIdx := FindSectionIndex(sections, sectionID)
-	if sectionIdx < 0 {
-		return nil, fmt.Errorf("section %d not found", sectionID)
-	}
-	section := sections[sectionIdx]
-
-	blockMap := make(map[int]any)
-	order := make(map[int]int, len(placeIDs))
-	for i, id := range placeIDs {
-		if _, exists := order[id]; exists {
-			return nil, fmt.Errorf("duplicate place %d in requested order", id)
-		}
-		order[id] = i
-	}
-	for _, block := range section.Blocks {
-		blockMap[block.ID] = block
-	}
-
-	orderedBlocks := make([]any, len(placeIDs))
-	for _, id := range placeIDs {
-		block, ok := blockMap[id]
-		if !ok {
-			return nil, fmt.Errorf("place %d not found in section %d", id, sectionID)
-		}
-		orderedBlocks[order[id]] = block
-	}
-
-	newBlocks := make([]any, 0, len(section.Blocks))
-	orderedIdx := 0
-	for _, block := range section.Blocks {
-		if _, shouldReorder := order[block.ID]; shouldReorder {
-			newBlocks = append(newBlocks, orderedBlocks[orderedIdx])
-			orderedIdx++
-			continue
-		}
-		newBlocks = append(newBlocks, block)
-	}
-
-	return []Operation{
-		ReplaceInObject(
-			[]any{"itinerary", "sections", sectionIdx, "blocks"},
-			section.Blocks,
-			newBlocks,
 		),
 	}, nil
 }

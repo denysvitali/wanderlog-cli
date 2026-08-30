@@ -4,14 +4,16 @@ project_name: wanderlog
 
 before:
   hooks:
-    - go mod tidy
-    - go test ./...
+    - go mod verify
+    - go test -shuffle=on ./...
 
 builds:
   - main: .
     binary: wanderlog
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goos:
       - linux
       - darwin
@@ -20,7 +22,12 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w
+      - >-
+        -s -w
+        -X github.com/denysvitali/wanderlog-cli/cmd.Version={{ .Version }}
+        -X github.com/denysvitali/wanderlog-cli/cmd.Commit={{ .Commit }}
+        -X github.com/denysvitali/wanderlog-cli/cmd.BuildDate={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
   - formats: [tar.gz]
@@ -28,9 +35,14 @@ archives:
       - goos: windows
         formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
 
 checksum:
   name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
 
 changelog:
   sort: asc

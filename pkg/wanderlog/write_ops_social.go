@@ -47,23 +47,21 @@ func (c *Client) CopyTrip(sourceKey string) (*CreateTripResponse, error) {
 		"body":   string(resp.Body),
 	}).Debug("CopyTrip API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("CopyTrip: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var copyResp models.CopyTripResponse
-	if err := json.Unmarshal(resp.Body, &copyResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := decodeMutationBody("CopyTrip", resp.StatusCode, resp.Body, &copyResp); err != nil {
+		return nil, err
 	}
-
-	if !copyResp.Success {
-		c.logger.WithField("response", string(resp.Body)).Error("Copy trip failed")
-		return nil, fmt.Errorf("failed to copy trip - response: %s", string(resp.Body))
+	key := copyResp.Data.Key
+	if key == "" {
+		key = copyResp.Data.ViewKey
+	}
+	if key == "" {
+		return nil, fmt.Errorf("CopyTrip: successful response is missing trip key")
 	}
 
 	c.logger.WithFields(map[string]interface{}{
 		"sourceKey": sourceKey,
-		"newKey":    copyResp.Data.Key,
+		"newKey":    key,
 		"title":     copyResp.Data.Title,
 	}).Info("Successfully copied trip")
 
@@ -72,7 +70,7 @@ func (c *Client) CopyTrip(sourceKey string) (*CreateTripResponse, error) {
 		Success: copyResp.Success,
 		TripPlan: models.TripPlanSummary{
 			ID:    copyResp.Data.ID,
-			Key:   copyResp.Data.Key,
+			Key:   key,
 			Title: copyResp.Data.Title,
 		},
 	}, nil
@@ -91,7 +89,7 @@ func (c *Client) RestoreTrip(tripKey string) error {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeAPIBody("RestoreTrip", resp.StatusCode, resp.Body, nil); err != nil {
+	if err := decodeOptionalMutationBody("RestoreTrip", resp.StatusCode, resp.Body); err != nil {
 		return err
 	}
 
@@ -119,7 +117,7 @@ func (c *Client) SendTripInvites(tripKey string, req SendInvitesRequest) error {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeAPIBody("SendTripInvites", resp.StatusCode, resp.Body, nil); err != nil {
+	if err := decodeOptionalMutationBody("SendTripInvites", resp.StatusCode, resp.Body); err != nil {
 		return err
 	}
 
@@ -182,8 +180,8 @@ func (c *Client) SetLike(tripKey string, liked bool) error {
 		return fmt.Errorf("SetLike: %w", err)
 	}
 
-	if statusCode < 200 || statusCode >= 300 {
-		return fmt.Errorf("SetLike: HTTP %d: %s", statusCode, truncateForLog(string(respBody), 500))
+	if err := decodeOptionalMutationBody("SetLike", statusCode, respBody); err != nil {
+		return err
 	}
 
 	c.logger.WithField("tripKey", tripKey).Info("Successfully set like status")
@@ -223,7 +221,7 @@ func (c *Client) AddCollaborator(tripKey string, userID int) error {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeAPIBody("AddCollaborator", resp.StatusCode, resp.Body, nil); err != nil {
+	if err := decodeOptionalMutationBody("AddCollaborator", resp.StatusCode, resp.Body); err != nil {
 		return err
 	}
 
@@ -251,7 +249,7 @@ func (c *Client) RemoveCollaborator(tripKey string, userID int) error {
 		return fmt.Errorf("making request: %w", err)
 	}
 
-	if err := decodeAPIBody("RemoveCollaborator", resp.StatusCode, resp.Body, nil); err != nil {
+	if err := decodeOptionalMutationBody("RemoveCollaborator", resp.StatusCode, resp.Body); err != nil {
 		return err
 	}
 
@@ -373,7 +371,7 @@ func (c *Client) ExportTrip(tripKey string) (*ExportTripResponse, error) {
 	}).Debug("ExportTrip API response")
 
 	var exportResp ExportTripResponse
-	if err := decodeAPIBody("ExportTrip", resp.StatusCode, resp.Body, &exportResp); err != nil {
+	if err := decodeMutationBody("ExportTrip", resp.StatusCode, resp.Body, &exportResp); err != nil {
 		return nil, err
 	}
 
@@ -440,16 +438,9 @@ func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*Auto
 		"body":      string(resp.Body),
 	}).Debug("AutofillDay API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("AutofillDay: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var autofillResp AutofillDayResponse
-	if err := json.Unmarshal(resp.Body, &autofillResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-	if !autofillResp.Success {
-		return nil, fmt.Errorf("failed to autofill day - response: %s", string(resp.Body))
+	if err := decodeMutationBody("AutofillDay", resp.StatusCode, resp.Body, &autofillResp); err != nil {
+		return nil, err
 	}
 
 	c.logger.WithField("suggestionCount", len(autofillResp.Data.Suggestions)).Info("Successfully autofilled day")
@@ -461,6 +452,12 @@ func (c *Client) AutofillDay(tripKey string, sectionID int, query string) (*Auto
 func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []ChecklistItem) (*ChecklistSectionResponse, error) {
 	if c.auth == nil {
 		return nil, fmt.Errorf("authentication required for adding checklist items")
+	}
+	if sectionID <= 0 {
+		return nil, fmt.Errorf("section ID must be greater than zero")
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("at least one checklist item is required")
 	}
 
 	trip, err := c.GetTrip(tripKey)
@@ -474,9 +471,11 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 	}
 	reqBody, err := json.Marshal(struct {
 		TripPlanID int      `json:"tripPlanId"`
+		SectionID  int      `json:"sectionId"`
 		Items      []string `json:"items"`
 	}{
 		TripPlanID: trip.TripPlan.ID,
+		SectionID:  sectionID,
 		Items:      itemTexts,
 	})
 	if err != nil {
@@ -501,16 +500,9 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 		"body":      string(resp.Body),
 	}).Debug("AddChecklistItems API response")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("AddChecklistItems: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var checklistResp ChecklistSectionResponse
-	if err := json.Unmarshal(resp.Body, &checklistResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-	if !checklistResp.Success {
-		return nil, fmt.Errorf("failed to add checklist items - response: %s", string(resp.Body))
+	if err := decodeMutationBody("AddChecklistItems", resp.StatusCode, resp.Body, &checklistResp); err != nil {
+		return nil, err
 	}
 
 	c.logger.WithField("itemCount", len(checklistResp.Data.Section.Items)).Info("Successfully added checklist items")
@@ -522,6 +514,12 @@ func (c *Client) AddChecklistItems(tripKey string, sectionID int, items []Checkl
 func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, checked bool) (*ChecklistSectionResponse, error) {
 	if c.auth == nil {
 		return nil, fmt.Errorf("authentication required for toggling checklist items")
+	}
+	if sectionID <= 0 {
+		return nil, fmt.Errorf("section ID must be greater than zero")
+	}
+	if itemID <= 0 {
+		return nil, fmt.Errorf("item ID must be greater than zero")
 	}
 
 	reqBody, err := json.Marshal(ChecklistSectionRequest{
@@ -546,13 +544,9 @@ func (c *Client) ToggleChecklistItem(tripKey string, sectionID, itemID int, chec
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ToggleChecklistItem: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
-	}
-
 	var checklistResp ChecklistSectionResponse
-	if err := json.Unmarshal(resp.Body, &checklistResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := decodeMutationBody("ToggleChecklistItem", resp.StatusCode, resp.Body, &checklistResp); err != nil {
+		return nil, err
 	}
 
 	c.logger.Info("Successfully toggled checklist item")

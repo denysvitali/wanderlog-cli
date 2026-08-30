@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,35 +23,41 @@ var configCmd = &cobra.Command{
 var configGlobalCmd = &cobra.Command{
 	Use:   "global",
 	Short: "Fetch the server's global configuration",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(false)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(false)
+		if err != nil {
+			return err
+		}
 		cfg, err := client.GetGlobalConfig()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch global config")
-			os.Exit(1)
+			return fmt.Errorf("fetch global config: %w", err)
 		}
 		if len(cfg.Raw) > 0 {
-			_, _ = os.Stdout.Write(cfg.Raw)
-			if cfg.Raw[len(cfg.Raw)-1] != '\n' {
-				fmt.Println()
+			if _, err := cmd.OutOrStdout().Write(cfg.Raw); err != nil {
+				return err
 			}
-			return
+			if cfg.Raw[len(cfg.Raw)-1] != '\n' {
+				_, err = fmt.Fprintln(cmd.OutOrStdout())
+			}
+			return err
 		}
-		ui.PrintJSON(cfg)
+		return ui.PrintJSON(cfg)
 	},
 }
 
 var configSessionGetCmd = &cobra.Command{
 	Use:   "session",
 	Short: "Fetch the authenticated session store",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := newClient(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := newClientE(true)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetSessionStore()
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch session store")
-			os.Exit(1)
+			return fmt.Errorf("fetch session store: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
@@ -60,38 +65,41 @@ var configSessionSetCmd = &cobra.Command{
 	Use:   "session-set [key]",
 	Short: "Write a value to the authenticated session store",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(sessionSetValue) == "" {
-			logger.Error("--value is required")
-			os.Exit(1)
+			return fmt.Errorf("--value is required")
 		}
 		var value any
 		if err := json.Unmarshal([]byte(sessionSetValue), &value); err != nil {
 			value = sessionSetValue
 		}
-		client := newClient(true)
-		if err := client.SetSessionStoreValue(args[0], value); err != nil {
-			logger.WithError(err).Error("Failed to write session value")
-			os.Exit(1)
+		client, err := newClientE(true)
+		if err != nil {
+			return err
 		}
-		printSuccess(outputFormat, fmt.Sprintf("Wrote session key %s", args[0]), map[string]interface{}{"key": args[0]})
+		if err := client.SetSessionStoreValue(args[0], value); err != nil {
+			return fmt.Errorf("write session value: %w", err)
+		}
+		return printSuccess(outputFormat, fmt.Sprintf("Wrote session key %s", args[0]), map[string]interface{}{"key": args[0]})
 	},
 }
 
 var configSessionPreferencesCmd = &cobra.Command{
 	Use:   "preferences",
 	Short: "Fetch locale-scoped session preferences",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if sessionLocale == "" {
 			sessionLocale = "en"
 		}
-		client := newClient(false)
+		client, err := newClientE(false)
+		if err != nil {
+			return err
+		}
 		resp, err := client.GetSessionPreferences(sessionLocale)
 		if err != nil {
-			logger.WithError(err).Error("Failed to fetch session preferences")
-			os.Exit(1)
+			return fmt.Errorf("fetch session preferences: %w", err)
 		}
-		ui.PrintJSON(resp)
+		return ui.PrintJSON(resp)
 	},
 }
 
