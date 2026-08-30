@@ -130,8 +130,10 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
-          cache: true
+          # GoReleaser v2.18 requires Go 1.27 even though the project itself
+          # intentionally remains on the toolchain declared in go.mod.
+          go-version: 1.27.0
+          cache: false
       - run: go run github.com/goreleaser/goreleaser/v2@v2.18.0 check
 
   build:
