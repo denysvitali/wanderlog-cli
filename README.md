@@ -142,7 +142,7 @@ wanderlog trips create --title "New Trip" --geo-id 1 --session "cookie" --xsrf "
 ```
 
 **Security Features:**
-- 🔐 **Secure Storage**: Credentials are stored in your system keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux)
+- 🔐 **Secure Storage**: Credentials are stored in your system keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux); when no keychain backend exists (e.g. headless Linux without D-Bus), session tokens fall back to a `0600` plaintext file at `~/.config/wanderlog/credentials.json`
 - 🔄 **Automatic Loading**: Once logged in, credentials are automatically used for all write operations
 - 🗑️ **Easy Logout**: Clear stored credentials with `wanderlog logout`
 - ✅ **Status Check**: Verify authentication status with `wanderlog status`
@@ -495,11 +495,15 @@ The CLI implements secure credential storage using your system's native keychain
 - **Linux**: Secret Service (GNOME Keyring, KDE Wallet, etc.)
 
 Your account password is **never stored**. New session tokens are stored only in
-the native keychain. On startup, the CLI removes plaintext passwords left in
+the native keychain. On hosts without a keychain backend (headless Linux without
+D-Bus, or with `WANDERLOG_DISABLE_KEYCHAIN=1`), session tokens are stored in a
+`0600` plaintext file at `~/.config/wanderlog/credentials.json` instead
+(override with `WANDERLOG_CREDENTIALS_FILE`). On startup, the CLI removes
+plaintext passwords left in
 config files by older releases and repairs config permissions to `0600`.
 `wanderlog status` verifies stored credentials with the server without printing
 token fragments, and `wanderlog logout` invalidates the remote session before
-clearing local keychain and legacy config data.
+clearing local keychain, plaintext fallback, and legacy config data.
 
 Raw `wanderlog api` requests never receive stored credentials unless `--auth` is
 explicitly set. Authenticated raw requests must use the configured Wanderlog API

@@ -48,6 +48,11 @@ func (c *Client) GetMe() (*UserProfile, error) {
 		return nil, fmt.Errorf("GetMe: decoding response: %w", err)
 	}
 	profile.Raw = resp.Body
+	// The API answers 200 with an anonymous body for unrecognized sessions;
+	// without an identity the caller is not authenticated.
+	if profile.ID == 0 {
+		return nil, fmt.Errorf("%w: current user identity missing", ErrSessionRejected)
+	}
 	return &profile, nil
 }
 

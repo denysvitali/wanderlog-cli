@@ -17,8 +17,10 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate with Wanderlog",
 	Long: `Login to Wanderlog to enable trip editing and creation features.
 
-Your credentials are used to obtain a session token which is securely stored
-in the system keychain for future use.
+Your credentials are used to obtain a session token which is stored in the
+system keychain for future use. When no keychain backend is available (e.g.
+headless Linux without D-Bus), the session token falls back to a chmod-0600
+plaintext file. The account password is never stored anywhere.
 
 Examples:
   wanderlog login
@@ -50,8 +52,9 @@ Examples:
 			return fmt.Errorf("login failed: %w", err)
 		}
 
-		// New logins are persisted only in the system keychain. Never fall back to
-		// writing bearer credentials or the account password to a plaintext file.
+		// Only session tokens are persisted, in the keychain when one exists and
+		// in the plaintext fallback otherwise. The account password is never
+		// written anywhere.
 		if err := wanderlog.SaveCredentials(creds); err != nil {
 			return fmt.Errorf("login succeeded, but securely storing credentials failed: %w", err)
 		}
@@ -59,7 +62,11 @@ Examples:
 			logger.WithError(err).Warn("Logged in, but failed to remove legacy config credentials")
 		}
 
-		fmt.Println(ui.SuccessStyle.Render("🔐 Credentials saved to keychain"))
+		if _, statErr := os.Stat(wanderlog.CredentialsFilePath()); statErr == nil {
+			fmt.Println(ui.WarningStyle.Render(fmt.Sprintf("🔐 Credentials saved to plaintext file: %s", wanderlog.CredentialsFilePath())))
+		} else {
+			fmt.Println(ui.SuccessStyle.Render("🔐 Credentials saved to keychain"))
+		}
 		fmt.Println(ui.SuccessStyle.Render("✅ Successfully logged in!"))
 		fmt.Println(ui.InfoStyle.Render("Session: [redacted]"))
 		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("User ID: %s", creds.UserID)))
@@ -71,7 +78,8 @@ var logoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Clear stored authentication credentials",
 	Long: `Invalidate the current server session and remove stored authentication
-credentials from the system keychain and any legacy config-file fallback.
+credentials from the system keychain, the plaintext fallback file, and any
+legacy config-file session.
 
 This will require you to login again before performing write operations.
 
@@ -132,7 +140,7 @@ Examples:
 		client.SetAuth(creds)
 		profile, err := client.GetMe()
 		if err != nil {
-			return fmt.Errorf("stored credentials from %s could not be verified: %w", source, err)
+			return fmt.Errorf("verifying %s: %w", source, err)
 		}
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("✅ Authenticated (verified via %s)", source)))
@@ -149,7 +157,7 @@ Examples:
 func loadAuthCredentials() (*wanderlog.AuthCredentials, string, error) {
 	creds, keychainErr := wanderlog.LoadCredentials()
 	if creds != nil {
-		return creds, "keychain", nil
+		return creds, "stored credentials", nil
 	}
 	if wanderlog.HasConfigCredentials() {
 		creds, err := wanderlog.LoadCredentialsFromConfig()

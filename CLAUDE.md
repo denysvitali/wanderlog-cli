@@ -99,9 +99,12 @@ Generated Go structs in `pkg/wanderlog/models.go` represent the Wanderlog API re
 ### Security Features
 
 - Never stores login credentials (email/password)
-- Only session tokens stored in system keychain
+- Session tokens stored in the system keychain; when no keychain backend
+  exists (headless Linux without D-Bus) or `WANDERLOG_DISABLE_KEYCHAIN=1`,
+  stored in a `0600` plaintext file at `~/.config/wanderlog/credentials.json`
+  (`WANDERLOG_CREDENTIALS_FILE` overrides the path)
 - Automatic token loading for write operations
-- Easy logout to clear stored credentials
+- Easy logout to clear stored credentials (keychain + plaintext file)
 
 ### MCP Server Implementation
 
@@ -144,7 +147,9 @@ Or use the MCP tool `get_trip` to fetch trip data.
 2. Client calls `Login()` in `auth.go` which POSTs to `/api/user/login`
 3. Response contains the session cookie (`connect.sid`); the XSRF-TOKEN cookie
    is optional (Wanderlog stopped issuing and enforcing it in August 2026)
-4. Tokens stored in system keychain via `SaveCredentials()` in `keychain.go`
+4. Tokens stored in system keychain via `SaveCredentials()` in `keychain.go`;
+   when no keychain backend is available the tokens fall back to the plaintext
+   file described under Security Features
 5. All subsequent write operations use `addAuthHeaders()` to attach cookies
    and, when present, the XSRF token
 

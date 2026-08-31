@@ -10,7 +10,8 @@ import (
 )
 
 // EnsureAuthenticated configures a complete credential pair from explicit
-// flags, environment variables, the system keychain, or the legacy config
+// flags, environment variables, the stored credential session (keychain, or
+// the plaintext fallback file when no keychain exists), or the legacy config
 // session. Passwords are only accepted from the environment and are never
 // loaded from the plaintext config file.
 func (c *Client) EnsureAuthenticated(sessionCookie, xsrfToken string) error {
@@ -40,7 +41,7 @@ func (c *Client) EnsureAuthenticatedContext(ctx context.Context, sessionCookie, 
 			return fmt.Errorf("validating %s credentials: %w", source, validationErr)
 		}
 		if envEmail == "" && envPassword == "" {
-			return fmt.Errorf("validating %s credentials: %w", source, validationErr)
+			return fmt.Errorf("validating %s credentials: %w (run 'wanderlog login' to re-authenticate)", source, validationErr)
 		}
 		if envEmail == "" || envPassword == "" {
 			return fmt.Errorf("%s credentials were rejected and both WANDERLOG_AUTH_EMAIL and WANDERLOG_AUTH_PASSWORD are required for refresh", source)
@@ -53,11 +54,11 @@ func (c *Client) EnsureAuthenticatedContext(ctx context.Context, sessionCookie, 
 		c.SetAuth(creds)
 		if persistRefresh {
 			if err := SaveCredentials(creds); err != nil {
-				// Authentication succeeded, so a temporarily unavailable keychain
-				// must not break the current headless/environment-backed process.
-				c.logger.WithError(err).Warn("Session refreshed, but the keychain could not be updated")
+				// Authentication succeeded, so a temporarily unavailable credential
+				// store must not break the current headless/environment-backed process.
+				c.logger.WithError(err).Warn("Session refreshed, but stored credentials could not be updated")
 			} else {
-				c.logger.Debug("Updated refreshed session credentials in the keychain")
+				c.logger.Debug("Updated refreshed session credentials in the credential store")
 			}
 		}
 		return nil
@@ -92,14 +93,15 @@ func (c *Client) EnsureAuthenticatedContext(ctx context.Context, sessionCookie, 
 		}, false)
 	}
 
-	// Prefer the keychain over the legacy config-file session. Headless and
-	// hermetic environments may explicitly disable keychain access.
+	// Prefer the keychain (or its plaintext fallback) over the legacy
+	// config-file session. Headless and hermetic environments may explicitly
+	// disable keychain access.
 	var keychainErr error
 	if os.Getenv("WANDERLOG_DISABLE_KEYCHAIN") != "1" {
 		var creds *AuthCredentials
 		creds, keychainErr = LoadCredentials()
 		if creds != nil {
-			return useSession("keychain session", creds, true)
+			return useSession("stored session", creds, true)
 		}
 	}
 

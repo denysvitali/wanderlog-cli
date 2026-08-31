@@ -106,7 +106,7 @@ func SaveCredentialsToConfig(creds *AuthCredentials, email, _ string) error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	return writeConfigAtomically(configPath, data)
+	return writeFileAtomically(configPath, data)
 }
 
 // HasConfigCredentials checks if credentials are stored in the config file
@@ -158,7 +158,7 @@ func ClearCredentialsFromConfig() error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	return writeConfigAtomically(configPath, data)
+	return writeFileAtomically(configPath, data)
 }
 
 // MigrateLegacyConfig removes plaintext passwords written by older releases
@@ -187,7 +187,7 @@ func MigrateLegacyConfig() (bool, error) {
 		if marshalErr != nil {
 			return false, fmt.Errorf("marshaling config: %w", marshalErr)
 		}
-		if err := writeConfigAtomically(configPath, data); err != nil {
+		if err := writeFileAtomically(configPath, data); err != nil {
 			return false, err
 		}
 	} else if info.Mode().Perm() != 0600 {
@@ -213,7 +213,7 @@ func readConfig(configPath string) (Config, error) {
 	return config, nil
 }
 
-func writeConfigAtomically(configPath string, data []byte) (retErr error) {
+func writeFileAtomically(configPath string, data []byte) (retErr error) {
 	configDir := filepath.Dir(configPath)
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
