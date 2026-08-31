@@ -133,13 +133,20 @@ func (c *Client) ValidateSessionContext(ctx context.Context) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("validating session: HTTP %d: %s", resp.StatusCode, truncateForLog(string(resp.Body), 500))
 	}
-	var profile struct {
-		ID int `json:"id"`
+	var payload struct {
+		ID   int `json:"id"`
+		User *struct {
+			ID int `json:"id"`
+		} `json:"user"`
 	}
-	if err := json.Unmarshal(resp.Body, &profile); err != nil {
+	if err := json.Unmarshal(resp.Body, &payload); err != nil {
 		return fmt.Errorf("validating session response: %w", err)
 	}
-	if profile.ID == 0 {
+	identity := payload.ID
+	if identity == 0 && payload.User != nil {
+		identity = payload.User.ID
+	}
+	if identity == 0 {
 		return fmt.Errorf("%w: current user identity missing", ErrSessionRejected)
 	}
 	return nil

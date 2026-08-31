@@ -34,6 +34,23 @@ func (c *Client) requireAuth(opName string) error {
 	return nil
 }
 
+// decodeUserProfile decodes a /user response. The live API wraps the profile
+// in a {"success": true, "user": {...}} envelope; a bare profile shape is
+// accepted as well.
+func decodeUserProfile(opName string, statusCode int, body []byte) (*UserProfile, error) {
+	var envelope struct {
+		User *UserProfile `json:"user"`
+	}
+	if err := json.Unmarshal(body, &envelope); err == nil && envelope.User != nil {
+		return envelope.User, nil
+	}
+	var profile UserProfile
+	if err := decodeAPIBody(opName, statusCode, body, &profile); err != nil {
+		return nil, fmt.Errorf("%s: decoding response: %w", opName, err)
+	}
+	return &profile, nil
+}
+
 // GetMe fetches the currently authenticated user's profile.
 func (c *Client) GetMe() (*UserProfile, error) {
 	if err := c.requireAuth("GetMe"); err != nil {
@@ -43,9 +60,9 @@ func (c *Client) GetMe() (*UserProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	var profile UserProfile
-	if err := decodeAPIBody("GetMe", resp.StatusCode, resp.Body, &profile); err != nil {
-		return nil, fmt.Errorf("GetMe: decoding response: %w", err)
+	profile, err := decodeUserProfile("GetMe", resp.StatusCode, resp.Body)
+	if err != nil {
+		return nil, err
 	}
 	profile.Raw = resp.Body
 	// The API answers 200 with an anonymous body for unrecognized sessions;
@@ -53,7 +70,7 @@ func (c *Client) GetMe() (*UserProfile, error) {
 	if profile.ID == 0 {
 		return nil, fmt.Errorf("%w: current user identity missing", ErrSessionRejected)
 	}
-	return &profile, nil
+	return profile, nil
 }
 
 // UpdateMe updates the authenticated user's profile.
@@ -78,12 +95,12 @@ func (c *Client) UpdateMe(req UpdateUserRequest) (*UserProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	var profile UserProfile
-	if err := decodeAPIBody("UpdateMe", resp.StatusCode, resp.Body, &profile); err != nil {
-		return nil, fmt.Errorf("UpdateMe: decoding response: %w", err)
+	profile, err := decodeUserProfile("UpdateMe", resp.StatusCode, resp.Body)
+	if err != nil {
+		return nil, err
 	}
 	profile.Raw = json.RawMessage(resp.Body)
-	return &profile, nil
+	return profile, nil
 }
 
 // ServerLogout invokes POST /api/user/logout to invalidate the server session.

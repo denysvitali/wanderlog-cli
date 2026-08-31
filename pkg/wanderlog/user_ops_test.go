@@ -40,7 +40,7 @@ func TestGetMe(t *testing.T) {
 			t.Errorf("expected session cookie to be sent: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":42,"email":"a@b.com","username":"me","name":"Me"}`))
+		_, _ = w.Write([]byte(`{"success":true,"user":{"id":42,"email":"a@b.com","username":"me","name":"Me"}}`))
 	}))
 	defer server.Close()
 

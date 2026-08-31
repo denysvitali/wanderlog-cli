@@ -595,7 +595,9 @@ func responseForContract(name string) string {
 	switch name {
 	case "Login":
 		return `{"success":true,"user":{"id":1,"email":"user@example.com","name":"User","username":"user"}}`
-	case "GetMe", "FindUserByEmail":
+	case "GetMe":
+		return `{"success":true,"user":{"id":1,"email":"user@example.com","name":"User","username":"user"}}`
+	case "FindUserByEmail":
 		return `{"id":1,"email":"user@example.com","name":"User","username":"user"}`
 	case "GetPlaceDetails":
 		return `{"success":true,"data":{"details":{"name":"Tokyo Station","place_id":"place-123","geometry":{"location":{"lat":35.6812,"lng":139.7671}}},"cardData":{"placeId":"place-123"}}}`
