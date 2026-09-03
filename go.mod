@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/charmbracelet/lipgloss/v2 v2.0.6
 	github.com/mark3labs/mcp-go v0.41.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/sirupsen/logrus v1.9.3
