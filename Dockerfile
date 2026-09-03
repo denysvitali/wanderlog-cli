@@ -1,4 +1,4 @@
-FROM golang:1.26.6-alpine AS builder
+FROM golang:1.27.1-alpine AS builder
 
 ARG VERSION=dev
 ARG COMMIT=none
@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 go build -trimpath \
     -ldflags "-s -w -X github.com/denysvitali/wanderlog-cli/cmd.Version=${VERSION} -X github.com/denysvitali/wanderlog-cli/cmd.Commit=${COMMIT} -X github.com/denysvitali/wanderlog-cli/cmd.BuildDate=${BUILD_DATE}" \
     -o wanderlog .
 
-FROM alpine:3.23
+FROM alpine:3.24
 ARG VERSION=dev
 ARG COMMIT=none
 ARG BUILD_DATE=unknown
